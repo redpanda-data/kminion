@@ -14,6 +14,15 @@ type Options struct {
 
 	// Kafka
 	// KafkaBrokers - Addresses of all Kafka Brokers delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")
+	// SASLEnabled - Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)
+	// UseSASLHandshake -  Whether or not to send the Kafka SASL handshake first
+	// SASLUsername - SASL Username
+	// SASLPassword - SASL Password
+	// TLSEnabled - Whether or not to use TLS when connecting to the broker
+	// TLSCAFilePath - Path to the TLS CA file
+	// TLSKeyFilePath - Path to the TLS Key file
+	// TLSCertFilePath - Path to the TLS cert file
+	// TLSInsecureSkipTLSVerify - If InsecureSkipVerify is true, TLS accepts any certificate presented by the server and any host name in that certificate.
 	KafkaBrokers             []string `envconfig:"KAFKA_BROKERS" required:"true"`
 	SASLEnabled              bool     `envconfig:"SASL_ENABLED" default:"false"`
 	UseSASLHandshake         bool     `envconfig:"SASL_USE_HANDSHAKE" default:"true"`

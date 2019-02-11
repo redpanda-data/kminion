@@ -21,13 +21,22 @@ It has been created because of two features which aren't provided by any of the 
 
 ### Environment variables
 
-| Variable name  | Description                                                                        | Default           |
-| -------------- | ---------------------------------------------------------------------------------- | ----------------- |
-| PORT           | HTTP Port to listen on for the prometheus exporter                                 | 8080              |
-| LOG_LEVEL      | Log granularity (debug, info, warn, error, fatal, panic)                           | info              |
-| VERSION        | Application version (env variable is set in Dockerfile)                            | (from Dockerfile) |
-| KAFKA_BROKERS  | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default)      |
-| METRICS_PREFIX | A prefix for all exported prometheus metrics                                       | kafka_minion      |
+| Variable name                | Description                                                                                         | Default           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- | ----------------- |
+| PORT                         | HTTP Port to listen on for the prometheus exporter                                                  | 8080              |
+| LOG_LEVEL                    | Log granularity (debug, info, warn, error, fatal, panic)                                            | info              |
+| VERSION                      | Application version (env variable is set in Dockerfile)                                             | (from Dockerfile) |
+| KAFKA_BROKERS                | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")                  | (No default)      |
+| SASL_ENABLED                 | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)                       | false             |
+| SASL_USE_HANDSHAKE           | Whether or not to send the Kafka SASL handshake first                                               | true              |
+| SASL_USERNAME                | SASL Username                                                                                       | (No default)      |
+| SASL_PASSWORD                | SASL Password                                                                                       | (No default)      |
+| TLS_ENABLED                  | Whether or not to use TLS when connecting to the broker                                             | false             |
+| TLS_CA_FILE_PATH             | Path to the TLS CA file                                                                             | (No default)      |
+| TLS_KEY_FILE_PATH            | Path to the TLS key file                                                                            | (No default)      |
+| TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                           | (No default)      |
+| TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true              |
+| METRICS_PREFIX               | A prefix for all exported prometheus metrics                                                        | kafka_minion      |
 
 ## Exposed metrics
 
