@@ -177,3 +177,8 @@ func getVersionedConsumerGroup(consumerGroupName string) *versionedConsumerGroup
 	}
 	return &versionedConsumerGroup{BaseName: baseName, Name: consumerGroupName, Version: uint8(parsedVersion)}
 }
+
+// IsHealthy returns a bool which indicates if the collector is in a healthy state or not
+func (e *Collector) IsHealthy() bool {
+	return e.kafkaClient.IsHealthy()
+}

@@ -99,12 +99,27 @@ func NewKafkaClient(opts *options.Options) (*Client, error) {
 
 // GetTopicNames returns an array of topic names
 func (c *Client) GetTopicNames() ([]string, error) {
+	err := c.client.RefreshMetadata()
+	if err != nil {
+		return nil, fmt.Errorf("Cannot refresh metadata. %s", err)
+	}
+
 	topicNames, err := c.consumer.Topics()
 	if err != nil {
 		return nil, fmt.Errorf("Cannot fetch topic names. %s", err)
 	}
 
 	return topicNames, nil
+}
+
+// IsHealthy returns true if communication with kafka brokers is fine
+func (c *Client) IsHealthy() bool {
+	err := c.client.RefreshMetadata()
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 // GetPartitionIDs returns an int32 array with all partitionIDs for a specific topic
