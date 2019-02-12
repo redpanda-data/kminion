@@ -33,6 +33,7 @@ type Options struct {
 	TLSKeyFilePath           string   `envconfig:"TLS_KEY_FILE_PATH"`
 	TLSCertFilePath          string   `envconfig:"TLS_CERT_FILE_PATH"`
 	TLSInsecureSkipTLSVerify bool     `envconfig:"TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
+	TLSPassphrase            string   `envconfig:"TLS_PASSPHRASE"`
 
 	// Prometheus exporter
 	// MetricsPrefix - A prefix for all exported prometheus metrics

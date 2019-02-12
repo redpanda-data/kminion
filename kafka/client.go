@@ -3,6 +3,7 @@ package kafka
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/google-cloud-tools/kafka-minion/options"
@@ -44,13 +45,19 @@ func NewKafkaClient(opts *options.Options) (*Client, error) {
 
 	// TLS
 	if opts.TLSEnabled {
-		clientConfig.Net.TLS.Enable = true
+		// Ensure that Cert and Key can be read
+		canReadCertAndKey, err := CanReadCertAndKey(opts.TLSCertFilePath, opts.TLSKeyFilePath)
+		if err != nil {
+			log.Fatalln(err)
+		}
 
+		clientConfig.Net.TLS.Enable = true
 		clientConfig.Net.TLS.Config = &tls.Config{
 			RootCAs:            x509.NewCertPool(),
 			InsecureSkipVerify: opts.TLSInsecureSkipTLSVerify,
 		}
 
+		// Load CA file
 		if opts.TLSCAFilePath != "" {
 			if ca, err := ioutil.ReadFile(opts.TLSCAFilePath); err == nil {
 				clientConfig.Net.TLS.Config.RootCAs.AppendCertsFromPEM(ca)
@@ -59,14 +66,10 @@ func NewKafkaClient(opts *options.Options) (*Client, error) {
 			}
 		}
 
-		canReadCertAndKey, err := CanReadCertAndKey(opts.TLSCertFilePath, opts.TLSKeyFilePath)
-		if err != nil {
-			log.Fatalln(err)
-		}
 		if canReadCertAndKey {
-			cert, err := tls.LoadX509KeyPair(opts.TLSCertFilePath, opts.TLSKeyFilePath)
+			cert, err := getCert(opts)
 			if err == nil {
-				clientConfig.Net.TLS.Config.Certificates = []tls.Certificate{cert}
+				clientConfig.Net.TLS.Config.Certificates = cert
 			} else {
 				log.Fatalln(err)
 			}
@@ -95,6 +98,60 @@ func NewKafkaClient(opts *options.Options) (*Client, error) {
 	}
 
 	return &Client{saramaConfig: clientConfig, client: sclient, consumer: consumer, brokersByID: make(map[int32]*sarama.Broker)}, nil
+}
+
+// getCert returns a Certificate from the CertFile and KeyFile in 'options',
+// if the key is encrypted, the Passphrase in 'options' will be used to decrypt it.
+func getCert(options *options.Options) ([]tls.Certificate, error) {
+	if options.TLSCertFilePath == "" && options.TLSKeyFilePath == "" {
+		return nil, fmt.Errorf("No file path specified for TLS key and certificate in environment variables")
+	}
+
+	errMessage := "Could not load X509 key pair. "
+
+	cert, err := ioutil.ReadFile(options.TLSCertFilePath)
+	if err != nil {
+		return nil, fmt.Errorf(errMessage, err)
+	}
+
+	prKeyBytes, err := ioutil.ReadFile(options.TLSKeyFilePath)
+	if err != nil {
+		return nil, fmt.Errorf(errMessage, err)
+	}
+
+	prKeyBytes, err = getPrivateKey(prKeyBytes, options.TLSPassphrase)
+	if err != nil {
+		return nil, fmt.Errorf(errMessage, err)
+	}
+
+	tlsCert, err := tls.X509KeyPair(cert, prKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf(errMessage, err)
+	}
+
+	return []tls.Certificate{tlsCert}, nil
+}
+
+// getPrivateKey returns the private key in 'keyBytes', in PEM-encoded format.
+// If the private key is encrypted, 'passphrase' is used to decrypted the
+// private key.
+func getPrivateKey(keyBytes []byte, passphrase string) ([]byte, error) {
+	// this section makes some small changes to code from notary/tuf/utils/x509.go
+	pemBlock, _ := pem.Decode(keyBytes)
+	if pemBlock == nil {
+		return nil, fmt.Errorf("no valid private key found")
+	}
+
+	var err error
+	if x509.IsEncryptedPEMBlock(pemBlock) {
+		keyBytes, err = x509.DecryptPEMBlock(pemBlock, []byte(passphrase))
+		if err != nil {
+			return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: '%s'", err)
+		}
+		keyBytes = pem.EncodeToMemory(&pem.Block{Type: pemBlock.Type, Bytes: keyBytes})
+	}
+
+	return keyBytes, nil
 }
 
 // GetTopicNames returns an array of topic names
