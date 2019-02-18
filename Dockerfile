@@ -5,11 +5,11 @@ RUN apk update && apk add git ca-certificates
 WORKDIR /app
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuffix cgo -o /go/bin/kafka-lag-exporter
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuffix cgo -o /go/bin/kafka-minion
 
 # executable image
 FROM scratch
-COPY --from=builder /go/bin/kafka-lag-exporter /go/bin/kafka-lag-exporter
+COPY --from=builder /go/bin/kafka-minion /go/bin/kafka-minion
 
-ENV VERSION 0.0.1
-ENTRYPOINT ["/go/bin/kafka-lag-exporter"]
+ENV VERSION 0.0.2
+ENTRYPOINT ["/go/bin/kafka-minion"]

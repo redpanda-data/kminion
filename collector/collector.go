@@ -106,6 +106,11 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 				isLatest = "true"
 				baseName = consumerGroup.BaseName
 				version = consumerGroup.Version
+			} else {
+				// Since it's not part of the latestConsumerGroupsByName map we still need to figure out the version
+				versioned := getVersionedConsumerGroup(value.Name)
+				baseName = versioned.BaseName
+				version = versioned.Version
 			}
 
 			ch <- prometheus.MustNewConstMetric(
