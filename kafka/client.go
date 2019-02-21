@@ -331,7 +331,7 @@ func (c *Client) ConsumerGroupTopicLags(topicsByName map[string]*Topic) map[stri
 
 				// if consumer hasn't consumed this partition at all, sarama returns -1. In this case the lag is highWaterMark - oldestOffset
 				if consumerPartitionOffset < oldestOffset {
-					partitionLag = 0
+					partitionLag = highWaterMark - oldestOffset
 				}
 
 				// partitionLag might be negative due to the delay between fetching the partitions' high watermarks and the consumer group's offsets
