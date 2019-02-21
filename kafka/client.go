@@ -27,7 +27,7 @@ func NewKafkaClient(opts *options.Options) (*Client, error) {
 	// try to start a kafka client
 	log.Debug("Trying to create a sarama client config")
 	clientConfig := sarama.NewConfig()
-	clientConfig.ClientID = "kafka-lag-Collector-1"
+	clientConfig.ClientID = "kafka-lag-collector-1"
 	clientConfig.Version = sarama.V0_11_0_2
 
 	// SASL
