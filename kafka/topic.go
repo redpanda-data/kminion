@@ -31,6 +31,11 @@ func (t *Topic) HighWaterMarkByPartitionID(partitionID int32) int64 {
 	return t.Partitions[partitionID].HighWaterMark
 }
 
+// OldestOffsetByPartitionID returns the oldest known commited offset for a given partitionID in this topic
+func (t *Topic) OldestOffsetByPartitionID(partitionID int32) int64 {
+	return t.Partitions[partitionID].OldestOffset
+}
+
 // Partition contains the PartitionID and it's highest commited offset (high water mark)
 type Partition struct {
 	PartitionID   int32
