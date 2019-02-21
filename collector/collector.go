@@ -10,10 +10,12 @@ import (
 )
 
 var (
-	topicPartitionCountDesc         *prometheus.Desc
-	topicMessageCountDesc           *prometheus.Desc
-	consumerGroupTopicLagDesc       *prometheus.Desc
-	latestConsumerGroupTopicLagDesc *prometheus.Desc
+	topicPartitionCountDesc          *prometheus.Desc
+	partitionHighWaterMarkDesc       *prometheus.Desc
+	partitionOldestOffsetDesc        *prometheus.Desc
+	topicMessageCountDesc            *prometheus.Desc
+	consumerGroupTopicLagDesc        *prometheus.Desc
+	consumerGroupPartitionOffsetDesc *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics
@@ -34,6 +36,16 @@ func NewKafkaCollector(opts *options.Options) (*Collector, error) {
 		"Number of partitions for this topic",
 		[]string{"topic"}, prometheus.Labels{},
 	)
+	partitionHighWaterMarkDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "partition_high_water_mark"),
+		"High water mark for each partition",
+		[]string{"topic", "partition"}, prometheus.Labels{},
+	)
+	partitionOldestOffsetDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "partition_oldest_offset"),
+		"Oldest known offset for each partition",
+		[]string{"topic", "partition"}, prometheus.Labels{},
+	)
 	topicMessageCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "message_count"),
 		"Number of expected messages on a given topic (not reliable on compacted topics)",
@@ -43,6 +55,11 @@ func NewKafkaCollector(opts *options.Options) (*Collector, error) {
 		prometheus.BuildFQName(opts.MetricsPrefix, "consumer_group", "topic_lag"),
 		"Current approximate lag of a consumergroup for a topic",
 		[]string{"consumer_group", "consumer_group_base_name", "topic", "consumer_group_version", "is_latest_consumer_group"}, prometheus.Labels{},
+	)
+	consumerGroupPartitionOffsetDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "consumer_group", "partition_offset"),
+		"Newest commited offset of a consumer group for a partition",
+		[]string{"consumer_group", "topic", "partition"}, prometheus.Labels{},
 	)
 
 	kafkaCollector := &Collector{
@@ -89,6 +106,22 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 			float64(topic.MessageCount),
 			topicName,
 		)
+		for _, partition := range topic.Partitions {
+			ch <- prometheus.MustNewConstMetric(
+				partitionHighWaterMarkDesc,
+				prometheus.GaugeValue,
+				float64(partition.HighWaterMark),
+				topicName,
+				strconv.Itoa(int(partition.PartitionID)),
+			)
+			ch <- prometheus.MustNewConstMetric(
+				partitionOldestOffsetDesc,
+				prometheus.GaugeValue,
+				float64(partition.OldestOffset),
+				topicName,
+				strconv.Itoa(int(partition.PartitionID)),
+			)
+		}
 	}
 
 	log.Debugf("Collecting consumer group metrics")
@@ -96,19 +129,19 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	latestConsumerGroupsByName := getLatestConsumerGroupsByName(consumerGroupTopicLagsByGroupName)
 
 	for _, topicLags := range consumerGroupTopicLagsByGroupName {
-		for _, value := range topicLags {
+		for _, topicLag := range topicLags {
 			isLatest := "false"
-			baseName := value.Name
+			baseName := topicLag.Name
 			version := uint8(0)
 
 			// If this group is the latest consumer group also add it with a different metrics description
-			if consumerGroup, ok := latestConsumerGroupsByName[value.Name]; ok {
+			if consumerGroup, ok := latestConsumerGroupsByName[topicLag.Name]; ok {
 				isLatest = "true"
 				baseName = consumerGroup.BaseName
 				version = consumerGroup.Version
 			} else {
 				// Since it's not part of the latestConsumerGroupsByName map we still need to figure out the version
-				versioned := getVersionedConsumerGroup(value.Name)
+				versioned := getVersionedConsumerGroup(topicLag.Name)
 				baseName = versioned.BaseName
 				version = versioned.Version
 			}
@@ -116,13 +149,24 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(
 				consumerGroupTopicLagDesc,
 				prometheus.GaugeValue,
-				float64(value.TopicLag),
-				value.Name,
+				float64(topicLag.TopicLag),
+				topicLag.Name,
 				baseName,
-				value.TopicName,
+				topicLag.TopicName,
 				strconv.Itoa(int(version)),
 				isLatest,
 			)
+
+			for _, partitionLag := range topicLag.Partitions {
+				ch <- prometheus.MustNewConstMetric(
+					consumerGroupPartitionOffsetDesc,
+					prometheus.GaugeValue,
+					float64(partitionLag.ConsumerOffset),
+					topicLag.Name,
+					topicLag.TopicName,
+					strconv.Itoa(int(partitionLag.PartitionID)),
+				)
+			}
 		}
 	}
 }

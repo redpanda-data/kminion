@@ -318,6 +318,7 @@ func (c *Client) ConsumerGroupTopicLags(topicsByName map[string]*Topic) map[stri
 			}
 
 			var topicLag int64
+			partitions := make([]*ConsumerGroupPartition, 0)
 			for partition, partitionOffset := range offsetResponse {
 				if partitionOffset.Err != sarama.ErrNoError {
 					log.Warnf("Cannot get partition offset for partition '%d', %v", partition, partitionOffset.Err)
@@ -330,6 +331,16 @@ func (c *Client) ConsumerGroupTopicLags(topicsByName map[string]*Topic) map[stri
 				if partitionLag < 0 {
 					partitionLag = 0
 				}
+
+				// Create partition entry for consumer Group response and push it into an array
+				partition := &ConsumerGroupPartition{
+					PartitionID:    partition,
+					ConsumerOffset: consumerPartitionOffset,
+					HighWaterMark:  highWaterMark,
+					Lag:            partitionLag,
+				}
+				partitions = append(partitions, partition)
+
 				topicLag = topicLag + partitionLag
 				log.Debugf("Partition lag for group '%s': '%d'", groupOffset.GroupName, partitionLag)
 			}
@@ -337,7 +348,7 @@ func (c *Client) ConsumerGroupTopicLags(topicsByName map[string]*Topic) map[stri
 			if _, arrayExists := consumerGroupLags[groupOffset.GroupName]; !arrayExists {
 				consumerGroupLags[groupOffset.GroupName] = make([]*ConsumerGroupTopicLag, 0)
 			}
-			groupLag := &ConsumerGroupTopicLag{Name: groupOffset.GroupName, TopicName: topicName, TopicLag: topicLag}
+			groupLag := &ConsumerGroupTopicLag{Name: groupOffset.GroupName, TopicName: topicName, TopicLag: topicLag, Partitions: partitions}
 			consumerGroupLags[groupOffset.GroupName] = append(consumerGroupLags[groupOffset.GroupName], groupLag)
 		}
 	}
