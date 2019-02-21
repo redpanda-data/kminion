@@ -11,5 +11,5 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuf
 FROM scratch
 COPY --from=builder /go/bin/kafka-minion /go/bin/kafka-minion
 
-ENV VERSION 0.0.2
+ENV VERSION 0.0.3
 ENTRYPOINT ["/go/bin/kafka-minion"]
