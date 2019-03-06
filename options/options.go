@@ -24,16 +24,17 @@ type Options struct {
 	// TLSCertFilePath - Path to the TLS cert file
 	// TLSInsecureSkipTLSVerify - If InsecureSkipVerify is true, TLS accepts any certificate presented by the server and any host name in that certificate.
 	KafkaBrokers             []string `envconfig:"KAFKA_BROKERS" required:"true"`
-	SASLEnabled              bool     `envconfig:"SASL_ENABLED" default:"false"`
-	UseSASLHandshake         bool     `envconfig:"SASL_USE_HANDSHAKE" default:"true"`
-	SASLUsername             string   `envconfig:"SASL_USERNAME"`
-	SASLPassword             string   `envconfig:"SASL_PASSWORD"`
-	TLSEnabled               bool     `envconfig:"TLS_ENABLED" default:"false"`
-	TLSCAFilePath            string   `envconfig:"TLS_CA_FILE_PATH"`
-	TLSKeyFilePath           string   `envconfig:"TLS_KEY_FILE_PATH"`
-	TLSCertFilePath          string   `envconfig:"TLS_CERT_FILE_PATH"`
-	TLSInsecureSkipTLSVerify bool     `envconfig:"TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
-	TLSPassphrase            string   `envconfig:"TLS_PASSPHRASE"`
+	ConsumerOffsetsTopicName string   `envconfig:"KAFKA_CONSUMER_OFFSETS_TOPIC_NAME" default:"__consumer_offsets"`
+	SASLEnabled              bool     `envconfig:"KAFKA_SASL_ENABLED" default:"false"`
+	UseSASLHandshake         bool     `envconfig:"KAFKA_SASL_USE_HANDSHAKE" default:"true"`
+	SASLUsername             string   `envconfig:"KAFKA_SASL_USERNAME"`
+	SASLPassword             string   `envconfig:"KAFKA_SASL_PASSWORD"`
+	TLSEnabled               bool     `envconfig:"KAFKA_TLS_ENABLED" default:"false"`
+	TLSCAFilePath            string   `envconfig:"KAFKA_TLS_CA_FILE_PATH"`
+	TLSKeyFilePath           string   `envconfig:"KAFKA_TLS_KEY_FILE_PATH"`
+	TLSCertFilePath          string   `envconfig:"KAFKA_TLS_CERT_FILE_PATH"`
+	TLSInsecureSkipTLSVerify bool     `envconfig:"KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
+	TLSPassphrase            string   `envconfig:"KAFKA_TLS_PASSPHRASE"`
 
 	// Prometheus exporter
 	// MetricsPrefix - A prefix for all exported prometheus metrics

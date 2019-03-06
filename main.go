@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/google-cloud-tools/kafka-minion/collector"
+	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -33,29 +31,21 @@ func main() {
 	log.SetLevel(level)
 
 	log.Info("Starting kafka minion version%v", opts.Version)
-	kafkaCollector, err := collector.NewKafkaCollector(opts)
+	consumer, err := kafka.NewOffsetConsumer(opts)
 	if err != nil {
-		log.Fatal("Could not create kafka exporter. ", err)
+		log.Panicf("Could not create offset consumer: %v", err)
 	}
-	prometheus.MustRegister(kafkaCollector)
 	log.Infof("Successfully started kafka exporter")
+	consumer.StartKafkaConsumer()
 
 	// Start listening on /metrics endpoint
-	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/healthcheck", healthcheck(kafkaCollector))
 	listenAddress := fmt.Sprintf(":%d", opts.Port)
 	log.Fatal(http.ListenAndServe(listenAddress, nil))
 	log.Infof("Listening on: '%s", listenAddress)
 }
 
-func healthcheck(kafkaCollector *collector.Collector) http.HandlerFunc {
+func healthcheck() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Debug("Healthcheck has been called")
-		isHealthy := kafkaCollector.IsHealthy()
-		if isHealthy {
-			w.Write([]byte("Status: Healthy"))
-		} else {
-			http.Error(w, "Healthcheck failed", http.StatusServiceUnavailable)
-		}
+		w.Write([]byte("Status: Healthy"))
 	})
 }

@@ -1,6 +1,26 @@
 version: "2.1"
 
 services:
+  kafkahq:
+    image: tchiotludo/kafkahq
+    environment:
+      MICRONAUT_APPLICATION_JSON: |
+        {
+          "kafkahq": {
+            "connections": {
+              "docker-kafka-server": {
+                  "properties": {
+                    "bootstrap.servers": "kafka1:19092"
+                  }
+              }
+            }
+          }
+        }
+    ports:
+      - 8080:8080
+    links:
+      - kafka1
+
   zoo1:
     image: zookeeper:3.4.9
     hostname: zoo1
@@ -15,7 +35,7 @@ services:
       - ./zk-single-kafka-single/zoo1/datalog:/datalog
 
   kafka1:
-    image: confluentinc/cp-kafka:5.1.0
+    image: confluentinc/cp-kafka:5.1.2
     hostname: kafka1
     ports:
       - "9092:9092"
