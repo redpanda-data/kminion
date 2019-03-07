@@ -196,7 +196,7 @@ func (c *Client) GetPartitionIDsBulk(topicNames []string) map[string][]int32 {
 		PartitionIDs []int32
 		TopicName    string
 	}
-	ch := make(chan partitionIDResponse, 50)
+	ch := make(chan partitionIDResponse, 500)
 	var wg sync.WaitGroup
 	for _, topicName := range topicNames {
 		if !isValidTopicName(topicName) {
@@ -240,7 +240,7 @@ func (c *Client) ConsumerGroupTopicLags(topicsByName map[string]*Topic) map[stri
 		GroupName      string
 		offsetResponse *sarama.OffsetFetchResponse
 	}
-	offsetFetchResponseCh := make(chan *consumerGroupOffset, 100)
+	offsetFetchResponseCh := make(chan *consumerGroupOffset, 1000)
 
 	// for each broker get all consumer groups
 	var wg sync.WaitGroup
