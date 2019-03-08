@@ -36,7 +36,7 @@ func main() {
 		log.Panicf("Could not create offset consumer: %v", err)
 	}
 	log.Infof("Successfully started kafka exporter")
-	consumer.StartKafkaConsumer()
+	consumer.Start()
 
 	// Start listening on /metrics endpoint
 	listenAddress := fmt.Sprintf(":%d", opts.Port)
