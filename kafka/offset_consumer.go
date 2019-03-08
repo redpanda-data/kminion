@@ -133,51 +133,15 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 }
 
 func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) {
-	// Decode offset key
-	// Version 0 and 1 keys are decoded the same way
-	offsetKey, err := newOffsetKey(buffer)
+	offset, err := newOffsetEntry(buffer, value, logger)
 	if err != nil {
-		logger.WithFields(log.Fields{"message_type": "offset",
-			"group":     offsetKey.Group,
-			"topic":     offsetKey.Topic,
-			"partition": offsetKey.Partition,
-			"reason":    err,
-		}).Warn("failed to decode key and offset")
 		return
 	}
 
-	offsetLogger := logger.WithFields(log.Fields{
-		"message_type": "offset",
-		"group":        offsetKey.Group,
-		"topic":        offsetKey.Topic,
-		"partition":    offsetKey.Partition,
-	})
-
-	// Decode consumer offset value
-	var valueVersion int16
-	valueBuffer := bytes.NewBuffer(value)
-	err = binary.Read(valueBuffer, binary.BigEndian, &valueVersion)
-	if err != nil {
-		offsetLogger.WithFields(log.Fields{
-			"reason": "no value version",
-		}).Warn("failed to decode")
-
-		return
-	}
-
-	offsetValue, err := newOffsetValue(offsetKey, valueBuffer, valueVersion)
-	if err != nil {
-		offsetLogger.WithFields(log.Fields{
-			"reason":  "failed to decode",
-			"version": valueVersion,
-		}).Warn(err)
-
-		return
-	}
-
-	logger.Infof("Offsetkey: %+v\n , Offsetvalue: %+v", offsetKey, offsetValue)
+	logger.Infof("Group %v - Topic: %v - Partition: %v - Offset: %v", offset.Group, offset.Topic, offset.Partition, offset.Offset)
 }
 
 func processGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) {
+	// Group metadata contains client information (such as owner's IP address), how many partitions are assigned to a group member etc
 	newOffsetGroupMetadata(keyBuffer, value, logger)
 }

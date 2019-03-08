@@ -17,6 +17,7 @@ type offsetGroupMetadataHeader struct {
 	Generation   int32
 	Protocol     string
 	Leader       string
+	Timestamp    int64
 }
 
 type offsetGroupMetadataMember struct {
@@ -54,14 +55,13 @@ func newOffsetGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.E
 	}
 
 	// Decode value content
+	var metadata *offsetGroupMetadata
 	switch valueVersion {
-	case 0, 1:
-		metadata, err := decodeGroupMetadata(valueVersion, group, valueBuffer, logger.WithFields(log.Fields{
+	case 0, 1, 2:
+		metadata, err = decodeGroupMetadata(valueVersion, group, valueBuffer, logger.WithFields(log.Fields{
 			"message_type": "metadata",
 			"group":        group,
 		}))
-
-		return metadata, err
 	default:
 		logger.WithFields(log.Fields{
 			"message_type": "metadata",
@@ -72,6 +72,12 @@ func newOffsetGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.E
 
 		return nil, fmt.Errorf("Failed to decode group metadata because value version is not supported")
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return metadata, err
 }
 
 func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Buffer, logger *log.Entry) (*offsetGroupMetadata, error) {
@@ -113,12 +119,27 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 		return nil, err
 	}
 
+	if valueVersion >= 2 {
+		err = binary.Read(valueBuffer, binary.BigEndian, &metadataHeader.Timestamp)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"reason":        "metadata header leader",
+				"protocol_type": metadataHeader.ProtocolType,
+				"generation":    metadataHeader.Generation,
+				"protocol":      metadataHeader.Protocol,
+				"timestamp":     metadataHeader.Timestamp,
+			}).Warn("failed to decode")
+			return nil, err
+		}
+	}
+
 	// Now decode metadata members
 	metadataLogger := logger.WithFields(log.Fields{
 		"protocol_type": metadataHeader.ProtocolType,
 		"generation":    metadataHeader.Generation,
 		"protocol":      metadataHeader.Protocol,
 		"leader":        metadataHeader.Leader,
+		"timestamp":     metadataHeader.Timestamp,
 	})
 
 	var memberCount int32
@@ -148,7 +169,7 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 					"group":     group,
 					"owner":     member.ClientHost,
 					"client_id": member.ClientID,
-				}).Info("Got group metadata")
+				}).Debug("Got group metadata")
 			}
 		}
 	}
@@ -172,7 +193,7 @@ func decodeMetadataMember(buf *bytes.Buffer, memberVersion int16) (offsetGroupMe
 	if err != nil {
 		return memberMetadata, "client_host"
 	}
-	if memberVersion == 1 {
+	if memberVersion >= 1 {
 		err = binary.Read(buf, binary.BigEndian, &memberMetadata.RebalanceTimeout)
 		if err != nil {
 			return memberMetadata, "rebalance_timeout"
