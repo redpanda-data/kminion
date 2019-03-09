@@ -10,7 +10,9 @@ import (
 	"sync"
 )
 
-// OffsetConsumer consumes the offset topic
+// OffsetConsumer is a consumer module which reads consumer group information from the offsets topic in a Kafka cluster.
+// The offsets topic is typically named __consumer_offsets. All messages in this topic are binary and therefore they
+// must first be decoded to access the information. This module consumes and processes all messages in the offsets topic.
 type OffsetConsumer struct {
 	// Waitgroup for all partitionConsumers. For each partition consumer waitgroup is incremented
 	wg sync.WaitGroup
@@ -40,7 +42,7 @@ func NewOffsetConsumer(opts *options.Options) (*OffsetConsumer, error) {
 	}, nil
 }
 
-// Start creates partition consumer for each partition in that topic
+// Start creates partition consumer for each partition in that topic and starts consuming them
 func (module *OffsetConsumer) Start() error {
 	// Create the consumer from the client
 	consumer, err := sarama.NewConsumerFromClient(module.client)
@@ -113,7 +115,7 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 		return
 	}
 
-	// Get key version which tells us what kind of message we have received
+	// Get the key version which tells us what kind of message (group metadata or offset info) we have received
 	var keyver int16
 	keyBuffer := bytes.NewBuffer(msg.Key)
 	err := binary.Read(keyBuffer, binary.BigEndian, &keyver)
@@ -121,7 +123,6 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 		logger.Warn("Failed to decode offset message", log.Fields{"reason": "no key version"})
 		return
 	}
-
 	switch keyver {
 	case 0, 1:
 		processKeyAndOffset(keyBuffer, msg.Value, logger)

@@ -2,17 +2,20 @@
 
 Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to expose consumer group lags on a per topic (rather than per partition) basis.
 
+## FAQ
+
 ### Why did you create yet another kafka lag exporter?
 
-It has been created because of two features which aren't provided by any of the other public kafka lag exporters:
+1. As of writing the exporter there is no publicly available prometheus exporter which is lightweight, robust and supports Kafka v0.11 - v2.1+
 
-- We are only interested in per consumergroup:topic lags. Some exporters export either only consumer group lags (of all topics alltogether) or they export per partition metrics
+2. We are primarily interested in per consumergroup:topic lags. Some exporters export either only consumer group lags (of all topics alltogether) or they export only per partition metrics. While you can obviously aggregate those partition metrics in Grafana as well, it adds unnecessary complexity in Grafana dashboards.
 
-- In our environment developers occasionally replay data by creating a new consumer group. They do so by incrementing a trailing number (e. g. "sample-group-1" becomes "sample-group-2"). In order to setup a proper alerting based on increasing lags for all consumer groups in a cluster, we need to ignore those "outdated" consumer groups (in this case "sample-group-1" as it's not being used anymore). This exporter adds 3 labels on each exporter consumergroup:topic lag metric to make that possible: `consumer_group_base_name`, `consumer_group_version`, `is_latest_consumer_group`. The meaning of each label is explained in the section [Exposed Metrics](#exposed-metrics)
+3. In our environment developers occasionally replay data by creating a new consumer group. They do so by incrementing a trailing number (e. g. "sample-group-1" becomes "sample-group-2"). In order to setup a proper alerting based on increasing lags for all consumer groups in a cluster, we need to ignore those "outdated" consumer groups. In this illustration "sample-group-1" as it's not being used anymore. This exporter adds 3 labels on each exporter consumergroup:topic lag metric to make that possible: `consumer_group_base_name`, `consumer_group_version`, `is_latest_consumer_group`. The meaning of each label is explained in the section [Exposed Metrics](#exposed-metrics)
 
 ## Features
 
-- [x] Supports Kafka 0.10.1.0 - 2.1.x (last updated 10th Feb 2019)
+- [x] Supports Kafka 0.10.1.0 - 2.1.x (last updated 09th Mar 2019)
+- [x] Fetches consumer group information from `__consumer_offsets` topic instead of querying single brokers for consumer group lags to ensure robustness in case of broker failures and leader elections
 - [x] Kafka SASL/SSL support
 - [x] Provides per consumergroup:topic lag metrics (removes a topic's metrics if a single partition metric in that topic couldn't be fetched)
 - [x] Created to use in Kubernetes clusters (has liveness/readiness check and helm chart)
@@ -52,3 +55,13 @@ It has been created because of two features which aren't provided by any of the 
 - consumer_group_base_name: The recognized name without "version"
 - consumer_group_version: The parsed consumer group version
 - is_latest_consumer_group: Indicates if this consumer group id has the highest version for the consumer group base name
+
+## How does it work
+
+At a high level Kafka Minion fetches source data in two different ways.
+
+1. **Consumer Group Data:** Since Kafka version 0.10 Zookeeper is no longer in charge of maintaining the consumer group offsets. Instead Kafka itself utilizes an internal Kafka topic called `__consumer_offsets`. Messages in that topic are binary and the protocol may change with broker upgrades. On each succesful client commit a message is created in that topic which contains the current offset for the according `groupId`, `topic` and `partition`.
+
+    Additionally one can find group metadata messages in this topic. 
+
+2. **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, lowest & highest commited offset.
