@@ -24,24 +24,28 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to ex
 
 ### Environment variables
 
-| Variable name                | Description                                                                                         | Default           |
-| ---------------------------- | --------------------------------------------------------------------------------------------------- | ----------------- |
-| PORT                         | HTTP Port to listen on for the prometheus exporter                                                  | 8080              |
-| LOG_LEVEL                    | Log granularity (debug, info, warn, error, fatal, panic)                                            | info              |
-| VERSION                      | Application version (env variable is set in Dockerfile)                                             | (from Dockerfile) |
-| KAFKA_BROKERS                | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")                  | (No default)      |
-| SASL_ENABLED                 | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)                       | false             |
-| SASL_USE_HANDSHAKE           | Whether or not to send the Kafka SASL handshake first                                               | true              |
-| SASL_USERNAME                | SASL Username                                                                                       | (No default)      |
-| SASL_PASSWORD                | SASL Password                                                                                       | (No default)      |
-| TLS_ENABLED                  | Whether or not to use TLS when connecting to the broker                                             | false             |
-| TLS_CA_FILE_PATH             | Path to the TLS CA file                                                                             | (No default)      |
-| TLS_KEY_FILE_PATH            | Path to the TLS key file                                                                            | (No default)      |
-| TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                           | (No default)      |
-| TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true              |
-| METRICS_PREFIX               | A prefix for all exported prometheus metrics                                                        | kafka_minion      |
+| Variable name                      | Description                                                                                         | Default               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------- |
+| PORT                               | HTTP Port to listen on for the prometheus exporter                                                  | 8080                  |
+| LOG_LEVEL                          | Log granularity (debug, info, warn, error, fatal, panic)                                            | info                  |
+| VERSION                            | Application version (env variable is set in Dockerfile)                                             | (from Dockerfile)     |
+| KAFKA_BROKERS                      | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")                  | (No default)          |
+| KAFKA_CONSUMER_OFFSETS_TOPIC_NAME  | Topic name of topic where kafka commits the consumer offsets                                        | \_\_consunmer_offsets |
+| KAFKA_SASL_ENABLED                 | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)                       | false                 |
+| KAFKA_SASL_USE_HANDSHAKE           | Whether or not to send the Kafka SASL handshake first                                               | true                  |
+| KAFKA_SASL_USERNAME                | SASL Username                                                                                       | (No default)          |
+| KAFKA_SASL_PASSWORD                | SASL Password                                                                                       | (No default)          |
+| KAFKA_TLS_ENABLED                  | Whether or not to use TLS when connecting to the broker                                             | false                 |
+| KAFKA_TLS_CA_FILE_PATH             | Path to the TLS CA file                                                                             | (No default)          |
+| KAFKA_TLS_KEY_FILE_PATH            | Path to the TLS key file                                                                            | (No default)          |
+| KAFKA_TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                           | (No default)          |
+| KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true                  |
+| KAFKA_TLS_PASSPHRASE               | Passphrase to decrypt the TLS Key                                                                   | (No default)          |
+| METRICS_PREFIX                     | A prefix for all exported prometheus metrics                                                        | kafka_minion          |
 
 ## Exposed metrics
+
+**`kafka_minion_partition_offset{group, topic}`**
 
 | Metric name                           | Description                                                                                    |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -62,6 +66,6 @@ At a high level Kafka Minion fetches source data in two different ways.
 
 1. **Consumer Group Data:** Since Kafka version 0.10 Zookeeper is no longer in charge of maintaining the consumer group offsets. Instead Kafka itself utilizes an internal Kafka topic called `__consumer_offsets`. Messages in that topic are binary and the protocol may change with broker upgrades. On each succesful client commit a message is created in that topic which contains the current offset for the according `groupId`, `topic` and `partition`.
 
-    Additionally one can find group metadata messages in this topic. 
+   Additionally one can find group metadata messages in this topic.
 
 2. **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, lowest & highest commited offset.

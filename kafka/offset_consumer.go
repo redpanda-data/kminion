@@ -3,10 +3,10 @@ package kafka
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 )
 
@@ -16,40 +16,57 @@ import (
 type OffsetConsumer struct {
 	// Waitgroup for all partitionConsumers. For each partition consumer waitgroup is incremented
 	wg sync.WaitGroup
+
 	// QuitChannel is being sent to when a partitionConsumer can not consume messages anymore
-	quitChannel      chan struct{}
+	quitChannel chan struct{}
+
+	// StorageChannel is used to persist processed messages in memory so that they can be exposed with prometheus
+	storageChannel chan *OffsetEntry
+
+	logger           *log.Entry
 	client           sarama.Client
 	offsetsTopicName string
 }
 
 // NewOffsetConsumer creates a consumer which process all messages in the __consumer_offsets topic
-func NewOffsetConsumer(opts *options.Options) (*OffsetConsumer, error) {
-	log.Debug("Trying to create a sarama client config")
-	clientConfig := saramaClientConfig(opts)
-	log.Debug("Trying to create a new sarama client")
+// If it cannot connect to the cluster it will panic
+func NewOffsetConsumer(opts *options.Options, storageChannel chan *OffsetEntry) *OffsetConsumer {
+	logger := log.WithFields(log.Fields{
+		"module": "offset_consumer",
+	})
 
 	// Connect client to at least one of the brokers and verify the connection by requesting metadata
+	connectionLogger := log.WithFields(log.Fields{
+		"address": strings.Join(opts.KafkaBrokers, ","),
+	})
+	clientConfig := saramaClientConfig(opts)
+	connectionLogger.Info("Connecting to kafka cluster")
 	client, err := sarama.NewClient(opts.KafkaBrokers, clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start client: %v", err)
+		connectionLogger.WithFields(log.Fields{
+			"reason": err,
+		}).Panicf("failed to start client")
 	}
+	connectionLogger.Info("Successfully connected to kafka cluster")
 
 	return &OffsetConsumer{
 		wg:               sync.WaitGroup{},
 		quitChannel:      make(chan struct{}),
+		storageChannel:   storageChannel,
+		logger:           logger,
 		client:           client,
 		offsetsTopicName: opts.ConsumerOffsetsTopicName,
-	}, nil
+	}
 }
 
 // Start creates partition consumer for each partition in that topic and starts consuming them
-func (module *OffsetConsumer) Start() error {
+func (module *OffsetConsumer) Start() {
+	defer module.client.Close()
+
 	// Create the consumer from the client
 	consumer, err := sarama.NewConsumerFromClient(module.client)
 	if err != nil {
-		log.Error("failed to get new consumer", err)
-		module.client.Close()
-		return err
+		log.Panic("failed to get new consumer", err)
 	}
 
 	// Get the partition count for the offsets topic
@@ -58,9 +75,7 @@ func (module *OffsetConsumer) Start() error {
 		log.WithFields(log.Fields{
 			"topic": module.offsetsTopicName,
 			"error": err.Error(),
-		}).Error("failed to get partition count")
-		module.client.Close()
-		return err
+		}).Panic("failed to get partition count")
 	}
 
 	// Default to bootstrapping the offsets topic, unless configured otherwise
@@ -78,14 +93,15 @@ func (module *OffsetConsumer) Start() error {
 				"topic":     module.offsetsTopicName,
 				"partition": i,
 				"error":     err.Error(),
-			})
-			return err
+			}).Panic("could not start consumer")
 		}
 		module.wg.Add(1)
 		go module.partitionConsumer(pconsumer)
 	}
-
-	return nil
+	log.WithFields(log.Fields{
+		"topic": module.offsetsTopicName,
+		"count": len(partitions),
+	}).Info("Started all consumers")
 }
 
 // partitionConsumer is a worker routine which consumes a single partition in the __consumer_offsets topic
@@ -125,7 +141,11 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 	}
 	switch keyver {
 	case 0, 1:
-		processKeyAndOffset(keyBuffer, msg.Value, logger)
+		offset, err := processKeyAndOffset(keyBuffer, msg.Value, logger)
+		if err != nil {
+			break
+		}
+		module.storageChannel <- offset
 	case 2:
 		processGroupMetadata(keyBuffer, msg.Value, logger)
 	default:
@@ -133,13 +153,14 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 	}
 }
 
-func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) {
+func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*OffsetEntry, error) {
 	offset, err := newOffsetEntry(buffer, value, logger)
 	if err != nil {
-		return
+		return nil, err
 	}
+	logger.Debugf("Group %v - Topic: %v - Partition: %v - Offset: %v", offset.Group, offset.Topic, offset.Partition, offset.Offset)
 
-	logger.Infof("Group %v - Topic: %v - Partition: %v - Offset: %v", offset.Group, offset.Topic, offset.Partition, offset.Offset)
+	return offset, nil
 }
 
 func processGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) {

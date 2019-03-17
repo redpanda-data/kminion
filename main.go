@@ -2,9 +2,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/google-cloud-tools/kafka-minion/collector"
 	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
+	"github.com/google-cloud-tools/kafka-minion/storage"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
@@ -30,18 +34,32 @@ func main() {
 	}
 	log.SetLevel(level)
 
-	log.Info("Starting kafka minion version%v", opts.Version)
-	consumer, err := kafka.NewOffsetConsumer(opts)
-	if err != nil {
-		log.Panicf("Could not create offset consumer: %v", err)
-	}
-	log.Infof("Successfully started kafka exporter")
+	log.Infof("Starting kafka minion version%v", opts.Version)
+	// Create cross package shared dependencies
+	storageChannel := make(chan *kafka.OffsetEntry, 1000)
+
+	// Create storage module
+	offsetStorage := storage.NewOffsetStorage(storageChannel)
+	offsetStorage.Start()
+
+	// Create kafka consumer
+	consumer := kafka.NewOffsetConsumer(opts, storageChannel)
 	consumer.Start()
 
+	// Create cluster module
+	cluster := kafka.NewCluster(opts, storageChannel)
+	cluster.Start()
+
+	// Create prometheus collector
+	collector := collector.NewCollector(opts, offsetStorage)
+	prometheus.MustRegister(collector)
+
 	// Start listening on /metrics endpoint
+	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/healthcheck", healthcheck())
 	listenAddress := fmt.Sprintf(":%d", opts.Port)
-	log.Fatal(http.ListenAndServe(listenAddress, nil))
 	log.Infof("Listening on: '%s", listenAddress)
+	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
 
 func healthcheck() http.HandlerFunc {
