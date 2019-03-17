@@ -51,3 +51,7 @@ func (o *OffsetStorage) storeOffsetEntry(offset *kafka.OffsetEntry) {
 		LastCommitTimestamp: offset.Timestamp,
 	}
 }
+
+func (o *OffsetStorage) Offsets() {
+	
+}
