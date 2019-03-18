@@ -72,9 +72,6 @@ func (module *OffsetConsumer) Start() {
 		}).Panic("failed to get partition count")
 	}
 
-	// Default to bootstrapping the offsets topic, unless configured otherwise
-	// startFrom := sarama.OffsetOldest
-
 	// Start consumers for each partition with fan in
 	log.WithFields(log.Fields{
 		"topic": module.offsetsTopicName,
@@ -82,7 +79,7 @@ func (module *OffsetConsumer) Start() {
 	}).Info("Starting consumers")
 	for _, partition := range partitions {
 		module.wg.Add(1)
-		go module.partitionConsumer(consumer, partition, module.offsetsTopicName)
+		go module.partitionConsumer(consumer, partition)
 	}
 	log.WithFields(log.Fields{
 		"topic": module.offsetsTopicName,
@@ -91,14 +88,14 @@ func (module *OffsetConsumer) Start() {
 }
 
 // partitionConsumer is a worker routine which consumes a single partition in the __consumer_offsets topic
-func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partitionID int32, offsetsTopicName string) {
+func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partitionID int32) {
 	defer module.wg.Done()
 
 	log.Infof("Starting consumer %d", partitionID)
-	pconsumer, err := consumer.ConsumePartition(offsetsTopicName, partitionID, sarama.OffsetOldest)
+	pconsumer, err := consumer.ConsumePartition(module.offsetsTopicName, partitionID, sarama.OffsetOldest)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"topic":     offsetsTopicName,
+			"topic":     module.offsetsTopicName,
 			"partition": partitionID,
 			"error":     err.Error(),
 		}).Panic("could not start consumer")
@@ -113,7 +110,7 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 			counter++
 			if counter%10000 == 0 {
 				log.WithFields(log.Fields{
-					"consumer_id": partitionID,
+					"partition_id": partitionID,
 				}).Infof("Consumed '%d'", counter)
 			}
 			module.processConsumerOffsetsMessage(msg)
