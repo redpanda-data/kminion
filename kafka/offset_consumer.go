@@ -124,6 +124,10 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.ConsumerMessage) {
 	logger := log.WithFields(log.Fields{"offset_topic": msg.Topic, "offset_partition": msg.Partition, "offset_offset": msg.Offset})
 
+	if !isTopicAllowed(msg.Topic) {
+		logger.Debug("topic is not allowed")
+		return
+	}
 	if len(msg.Value) == 0 {
 		// Tombstone message - we don't handle them for now
 		logger.Debug("dropped tombstone")
@@ -150,6 +154,14 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 	default:
 		logger.Warn("Failed to decode offset message", log.Fields{"reason": "unknown key version", "version": keyver})
 	}
+}
+
+func isTopicAllowed(topicName string) bool {
+	if strings.HasPrefix(topicName, "__") || strings.HasPrefix(topicName, "_confluent") {
+		return false
+	}
+
+	return true
 }
 
 func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*OffsetEntry, error) {

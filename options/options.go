@@ -12,6 +12,9 @@ type Options struct {
 	LogLevel string `envconfig:"LOG_LEVEL" default:"INFO"`
 	Version  string `envconfig:"VERSION" required:"true"`
 
+	// Exporter config
+	IgnoreSystemTopics bool `envconfig:"EXPORTER_IGNORE_SYSTEM_TOPICS" default:"true"`
+
 	// Kafka configurations
 	// KafkaBrokers - Addresses of all Kafka Brokers delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")
 	// ConsumerOffsetsTopicName - Topic name of topic where kafka commits the consumer offsets
