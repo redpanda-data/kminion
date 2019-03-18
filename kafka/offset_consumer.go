@@ -17,9 +17,6 @@ type OffsetConsumer struct {
 	// Waitgroup for all partitionConsumers. For each partition consumer waitgroup is incremented
 	wg sync.WaitGroup
 
-	// QuitChannel is being sent to when a partitionConsumer can not consume messages anymore
-	quitChannel chan struct{}
-
 	// StorageChannel is used to persist processed messages in memory so that they can be exposed with prometheus
 	storageChannel chan *OffsetEntry
 
@@ -51,7 +48,6 @@ func NewOffsetConsumer(opts *options.Options, storageChannel chan *OffsetEntry) 
 
 	return &OffsetConsumer{
 		wg:               sync.WaitGroup{},
-		quitChannel:      make(chan struct{}),
 		storageChannel:   storageChannel,
 		logger:           logger,
 		client:           client,
@@ -123,9 +119,6 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 			module.processConsumerOffsetsMessage(msg)
 		case err := <-pconsumer.Errors():
 			log.Errorf("consume error. %+v %+v %+v", err.Topic, err.Partition, err.Err.Error())
-		case <-module.quitChannel:
-			log.Error("partition consumer quit")
-			return
 		}
 	}
 }
