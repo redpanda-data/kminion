@@ -48,7 +48,7 @@ func (e *Collector) Describe(ch chan<- *prometheus.Desc) {
 // provided channel and returns once the last metric has been sent.
 func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
-	offsets := e.storage.Offsets
+	offsets := e.storage.Offsets()
 	consumerGroups := getVersionedConsumerGroups(offsets)
 
 	for _, offset := range offsets {

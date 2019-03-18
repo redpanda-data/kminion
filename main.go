@@ -47,8 +47,8 @@ func main() {
 	consumer.Start()
 
 	// Create cluster module
-	cluster := kafka.NewCluster(opts, storageChannel)
-	cluster.Start()
+	// cluster := kafka.NewCluster(opts, storageChannel)
+	// cluster.Start()
 
 	// Create prometheus collector
 	collector := collector.NewCollector(opts, offsetStorage)

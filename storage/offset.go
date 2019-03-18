@@ -36,6 +36,7 @@ func (o *OffsetStorage) Start() {
 		for offset := range o.inputOffsetChannel {
 			o.storeOffsetEntry(offset)
 		}
+		log.Error("Storage channel closed")
 	}()
 }
 
@@ -52,6 +53,6 @@ func (o *OffsetStorage) storeOffsetEntry(offset *kafka.OffsetEntry) {
 	}
 }
 
-func (o *OffsetStorage) Offsets() {
-	
+func (o *OffsetStorage) Offsets() map[string]*PartitionOffset {
+	return o.offsets
 }

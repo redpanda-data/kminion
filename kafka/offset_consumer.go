@@ -61,8 +61,6 @@ func NewOffsetConsumer(opts *options.Options, storageChannel chan *OffsetEntry) 
 
 // Start creates partition consumer for each partition in that topic and starts consuming them
 func (module *OffsetConsumer) Start() {
-	defer module.client.Close()
-
 	// Create the consumer from the client
 	consumer, err := sarama.NewConsumerFromClient(module.client)
 	if err != nil {
@@ -79,24 +77,16 @@ func (module *OffsetConsumer) Start() {
 	}
 
 	// Default to bootstrapping the offsets topic, unless configured otherwise
-	startFrom := sarama.OffsetOldest
+	// startFrom := sarama.OffsetOldest
 
 	// Start consumers for each partition with fan in
 	log.WithFields(log.Fields{
 		"topic": module.offsetsTopicName,
 		"count": len(partitions),
 	}).Info("Starting consumers")
-	for i, partition := range partitions {
-		pconsumer, err := consumer.ConsumePartition(module.offsetsTopicName, partition, startFrom)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"topic":     module.offsetsTopicName,
-				"partition": i,
-				"error":     err.Error(),
-			}).Panic("could not start consumer")
-		}
+	for _, partition := range partitions {
 		module.wg.Add(1)
-		go module.partitionConsumer(pconsumer)
+		go module.partitionConsumer(consumer, partition, module.offsetsTopicName)
 	}
 	log.WithFields(log.Fields{
 		"topic": module.offsetsTopicName,
@@ -105,17 +95,36 @@ func (module *OffsetConsumer) Start() {
 }
 
 // partitionConsumer is a worker routine which consumes a single partition in the __consumer_offsets topic
-func (module *OffsetConsumer) partitionConsumer(consumer sarama.PartitionConsumer) {
+func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partitionID int32, offsetsTopicName string) {
 	defer module.wg.Done()
-	defer consumer.AsyncClose()
 
+	log.Infof("Starting consumer %d", partitionID)
+	pconsumer, err := consumer.ConsumePartition(offsetsTopicName, partitionID, sarama.OffsetOldest)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"topic":     offsetsTopicName,
+			"partition": partitionID,
+			"error":     err.Error(),
+		}).Panic("could not start consumer")
+	}
+	log.Infof("Started consumer %d", partitionID)
+	defer pconsumer.AsyncClose()
+
+	counter := 0
 	for {
 		select {
-		case msg := <-consumer.Messages():
+		case msg := <-pconsumer.Messages():
+			counter++
+			if counter%10000 == 0 {
+				log.WithFields(log.Fields{
+					"consumer_id": partitionID,
+				}).Infof("Consumed '%d'", counter)
+			}
 			module.processConsumerOffsetsMessage(msg)
-		case err := <-consumer.Errors():
+		case err := <-pconsumer.Errors():
 			log.Errorf("consume error. %+v %+v %+v", err.Topic, err.Partition, err.Err.Error())
 		case <-module.quitChannel:
+			log.Error("partition consumer quit")
 			return
 		}
 	}
