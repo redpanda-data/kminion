@@ -107,6 +107,7 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 	for {
 		select {
 		case msg := <-pconsumer.Messages():
+
 			counter++
 			if counter%10000 == 0 {
 				log.WithFields(log.Fields{
@@ -124,10 +125,6 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.ConsumerMessage) {
 	logger := log.WithFields(log.Fields{"offset_topic": msg.Topic, "offset_partition": msg.Partition, "offset_offset": msg.Offset})
 
-	if !isTopicAllowed(msg.Topic) {
-		logger.Debug("topic is not allowed")
-		return
-	}
 	if len(msg.Value) == 0 {
 		// Tombstone message - we don't handle them for now
 		logger.Debug("dropped tombstone")
@@ -148,9 +145,13 @@ func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.Consumer
 		if err != nil {
 			break
 		}
+		if !isTopicAllowed(offset.Topic) {
+			logger.Debug("topic is not allowed")
+			return
+		}
 		module.storageChannel <- offset
 	case 2:
-		processGroupMetadata(keyBuffer, msg.Value, logger)
+		// processGroupMetadata(keyBuffer, msg.Value, logger)
 	default:
 		logger.Warn("Failed to decode offset message", log.Fields{"reason": "unknown key version", "version": keyver})
 	}
