@@ -6,37 +6,44 @@ import (
 )
 
 func TestGetVersionedConsumerGroups(t *testing.T) {
-	offsets := make(map[string]*kafka.ConsumerPartitionOffset)
-	offsets["sample-group-1"] = &kafka.ConsumerPartitionOffset{
+	offsets := make(map[string]kafka.ConsumerPartitionOffset)
+	offsets["sample-group-1"] = kafka.ConsumerPartitionOffset{
 		Group:     "sample-group-1",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1156,
 		Timestamp: 1552723003465,
 	}
-	offsets["sample-group-2"] = &kafka.ConsumerPartitionOffset{
+	offsets["sample-group-2"] = kafka.ConsumerPartitionOffset{
 		Group:     "sample-group-2",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1000,
 		Timestamp: 1552723003465,
 	}
-	offsets["sample-group-3"] = &kafka.ConsumerPartitionOffset{
+	offsets["sample-group-3"] = kafka.ConsumerPartitionOffset{
 		Group:     "sample-group-3",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
 		Timestamp: 1552723003475,
 	}
-	offsets["another-group"] = &kafka.ConsumerPartitionOffset{
-		Group:     "another-group",
+	offsets["another-group-v1"] = kafka.ConsumerPartitionOffset{
+		Group:     "another-group-v1",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
 		Timestamp: 1552723003485,
 	}
-	offsets["another-group"] = &kafka.ConsumerPartitionOffset{
-		Group:     "another-group",
+	offsets["another-group-v3"] = kafka.ConsumerPartitionOffset{
+		Group:     "another-group-v3",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    1200,
+		Timestamp: 1552723003489,
+	}
+	offsets["console-consumer-40098"] = kafka.ConsumerPartitionOffset{
+		Group:     "console-consumer-40098",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    936,
@@ -49,11 +56,12 @@ func TestGetVersionedConsumerGroups(t *testing.T) {
 		baseName     string
 		isLatest     bool
 	}{
-		{"sample-group-1", 1, "sample-group", false},
-		{"sample-group-2", 2, "sample-group", false},
-		{"sample-group-3", 3, "sample-group", true},
-		{"another-group", 0, "another-group", true},
-		{"console-consumer-40098", 40098, "console-consumer", true},
+		{"sample-group-1", 1, "sample-group-", false},
+		{"sample-group-2", 2, "sample-group-", false},
+		{"sample-group-3", 3, "sample-group-", true},
+		{"another-group-v1", 1, "another-group-v", false},
+		{"another-group-v3", 3, "another-group-v", true},
+		{"console-consumer-40098", 40098, "console-consumer-", true},
 	}
 
 	versionedGroups := getVersionedConsumerGroups(offsets)
@@ -77,7 +85,7 @@ func TestGetVersionedConsumerGroups(t *testing.T) {
 func TestParseConsumerGroupName(t *testing.T) {
 	tables := []struct {
 		groupName string
-		version   uint8
+		version   uint32
 		baseName  string
 		isLatest  bool
 	}{

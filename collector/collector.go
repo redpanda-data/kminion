@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strconv"
-	"strings"
 )
 
 var (
@@ -84,7 +83,7 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func getVersionedConsumerGroups(offsets map[string]*kafka.ConsumerPartitionOffset) map[string]*versionedConsumerGroup {
+func getVersionedConsumerGroups(offsets map[string]kafka.ConsumerPartitionOffset) map[string]*versionedConsumerGroup {
 	// This map contains all known consumer groups. Key is the actual group name
 	groupsByName := make(map[string]*versionedConsumerGroup)
 
@@ -122,49 +121,42 @@ func getVersionedConsumerGroups(offsets map[string]*kafka.ConsumerPartitionOffse
 // Given the name "sample-group-01" the base name would be "sample-group" and the version is "1"
 // If there's no appending number it's being considered as version 0
 func parseConsumerGroupName(consumerGroupName string) *versionedConsumerGroup {
-	baseName := consumerGroupName
-	parsedVersion := 0
-
-	lastDashIndex := strings.LastIndex(consumerGroupName, "-")
-	if lastDashIndex > 0 {
-		// Potentially this is our base name (if the group has no trailing number at all, this is wrong though)
-		baseName = consumerGroupName[:lastDashIndex]
-		potentialVersion := consumerGroupName[lastDashIndex+1 : len(consumerGroupName)]
-		var err error
-		parsedVersion, err = strconv.Atoi(potentialVersion)
-		if err != nil {
-			parsedVersion = 0
-			baseName = consumerGroupName
-		}
-	}
+	parsedVersion, baseName := parseVersion(consumerGroupName, "", len(consumerGroupName)-1)
 	return &versionedConsumerGroup{BaseName: baseName, Name: consumerGroupName, Version: uint32(parsedVersion), IsLatest: false}
 }
 
 // parseVersion tries to parse a "version" from a consumer group name. An appending number of a consumer group name is considered as it's version
-func parseVersion(subString string, versionString string) uint32 {
-	if len(subString) == 0 {
-		return 0
+// it returns the parsed version and the index of the last character of the group basename
+// recursive function where
+// - groupName is the name of the group
+// - versionString is the version as string
+// - digitIndexCursor indicates the index of the last recognized digit in the substring
+func parseVersion(groupName string, versionString string, digitIndexCursor int) (uint32, string) {
+	if len(groupName) == 0 {
+		return 0, ""
 	}
 
 	// Try to parse a digit from right to left, so that we correctly identify names like "consumer-group-v003" as well
-	lastCharacter := subString[len(subString)-1:]
-	digit, err := strconv.Atoi(lastCharacter)
+	lastCharacter := groupName[digitIndexCursor : digitIndexCursor+1]
+	_, err := strconv.Atoi(lastCharacter)
 	if err != nil {
 		if len(versionString) == 0 {
-			return 0
+			return 0, groupName[0 : digitIndexCursor+1]
 		}
 
+		// We've got a versionString, but this character is no digit anymore
 		version, err := strconv.ParseUint(versionString, 10, 0)
 		if err != nil {
 			// should never happen, because version string must only consist of valid ints
-			return 0
+			return 0, groupName[0:digitIndexCursor]
 		}
-		return uint32(version)
+		return uint32(version), groupName[0 : digitIndexCursor+1]
 	}
 
-	// It's a valid digit, so we can prepend it to the "versionString" which we can try to parse as int when we are done
+	// Last character is a valid digit, so we can prepend it to the "versionString" which we can try to
+	// parse as int when we are done
 	newVersionedString := lastCharacter + versionString
-	remainingSubString := subString[0 : len(subString)-1]
+	indexCursor := digitIndexCursor - 1
 
-	return parseVersion(remainingSubString, newVersionedString)
+	return parseVersion(groupName, newVersionedString, indexCursor)
 }
