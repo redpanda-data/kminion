@@ -14,15 +14,24 @@ import (
 // partition information (e. g. HighWaterMark). This information is passed to the storage module so that it can be used
 // for consumer lag calculations.
 type Cluster struct {
-	// StorageChannel is used to persist broker offsets in memory so that they can be exposed with prometheus
-	storageChannel chan *OffsetEntry
-	client         sarama.Client
-	logger         *log.Entry
+	// partitionWaterMarksCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
+	partitionWaterMarksCh chan *PartitionWaterMarks
+	client                sarama.Client
+	logger                *log.Entry
+}
+
+// PartitionWaterMarks contains the earliest and last known commited offset (highWaterMark) for a partition
+type PartitionWaterMarks struct {
+	TopicName     string
+	PartitionID   int32
+	HighWaterMark int64
+	LowWaterMark  int64
+	Timestamp     int64
 }
 
 // NewCluster creates a new cluster module and tries to connect to the kafka cluster
 // If it cannot connect to the cluster it will panic
-func NewCluster(opts *options.Options, storageChannel chan *OffsetEntry) *Cluster {
+func NewCluster(opts *options.Options, partitionWaterMarksCh chan *PartitionWaterMarks) *Cluster {
 	logger := log.WithFields(log.Fields{
 		"module": "cluster",
 	})
@@ -43,27 +52,26 @@ func NewCluster(opts *options.Options, storageChannel chan *OffsetEntry) *Cluste
 	connectionLogger.Info("successfully connected to kafka cluster")
 
 	return &Cluster{
-		storageChannel: storageChannel,
-		client:         client,
-		logger:         logger,
+		partitionWaterMarksCh: partitionWaterMarksCh,
+		client:                client,
+		logger:                logger,
 	}
 }
 
 // Start starts cluster module
 func (module *Cluster) Start() {
-	module.logger.Info("starting")
+	// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
+	module.refreshAndSendTopicMetadata()
 
 	offsetRefresh := time.NewTicker(time.Second * 5)
-	topicRefresh := time.NewTicker(time.Second * 60)
-	go module.mainLoop(offsetRefresh, topicRefresh)
+	go module.mainLoop(offsetRefresh)
 }
 
-func (module *Cluster) mainLoop(offsetRefresh *time.Ticker, topicRefresh *time.Ticker) {
+func (module *Cluster) mainLoop(offsetRefresh *time.Ticker) {
 	for {
 		select {
 		case <-offsetRefresh.C:
 			module.refreshAndSendTopicMetadata()
-		case <-topicRefresh.C:
 		}
 	}
 }
@@ -78,17 +86,17 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 
 	// Send requests in bulk to each broker for those partitions it is responsible/leader for
 	var wg = sync.WaitGroup{}
-	module.logger.Info("starting to collect topic offsets")
+	module.logger.Debug("starting to collect topic offsets")
 	requests, brokers := module.generateOffsetRequests(partitionIDsByTopicName)
 	for brokerID, request := range requests {
 		wg.Add(1)
 		logger := module.logger.WithFields(log.Fields{
 			"broker_id": brokerID,
 		})
-		go brokerOffsets(&wg, brokers[brokerID], request, logger)
+		go brokerOffsets(&wg, brokers[brokerID], request, logger, module.partitionWaterMarksCh)
 	}
-	module.logger.Info("collected topic offsets")
 	wg.Wait()
+	module.logger.Debug("collected topic offsets")
 }
 
 // topicPartitions returns a map of all partition IDs (value) grouped by topic name (key)
@@ -156,7 +164,7 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 	return requests, brokers
 }
 
-func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
+func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry, ch chan<- *PartitionWaterMarks) {
 	defer wg.Done()
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
@@ -183,7 +191,14 @@ func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.Of
 				"partition": partitionID,
 				"offset":    offsetResponse.Offsets[0],
 				"timestamp": ts,
-			}).Info("Got topic offset")
+			}).Debug("Got topic offset")
+			entry := &PartitionWaterMarks{
+				TopicName:     topicName,
+				PartitionID:   partitionID,
+				HighWaterMark: offsetResponse.Offsets[0],
+				Timestamp:     ts,
+			}
+			ch <- entry
 		}
 	}
 }

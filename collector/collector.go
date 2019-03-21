@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/google-cloud-tools/kafka-minion/storage"
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,6 +12,7 @@ import (
 
 var (
 	groupPartitionOffsetDesc *prometheus.Desc
+	partitionWaterMarksDesc  *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics on each /metrics invocation
@@ -23,7 +25,7 @@ type Collector struct {
 type versionedConsumerGroup struct {
 	BaseName string
 	Name     string
-	Version  uint8
+	Version  uint32
 	IsLatest bool
 }
 
@@ -33,6 +35,11 @@ func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collec
 		prometheus.BuildFQName(opts.MetricsPrefix, "group", "partition_offset"),
 		"Newest commited offset of a consumer group for a partition",
 		[]string{"group", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+	)
+	partitionWaterMarksDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "high_water_mark"),
+		"Highest known commited offset for this partition",
+		[]string{"topic", "partition", "timestamp"}, prometheus.Labels{},
 	)
 
 	return &Collector{opts, storage}
@@ -48,9 +55,8 @@ func (e *Collector) Describe(ch chan<- *prometheus.Desc) {
 // provided channel and returns once the last metric has been sent.
 func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
-	offsets := e.storage.Offsets()
+	offsets := e.storage.ConsumerOffsets()
 	consumerGroups := getVersionedConsumerGroups(offsets)
-
 	for _, offset := range offsets {
 		group := consumerGroups[offset.Group]
 		ch <- prometheus.MustNewConstMetric(
@@ -64,9 +70,21 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 			strconv.Itoa(int(offset.Partition)),
 		)
 	}
+
+	partitionWaterMarks := e.storage.PartitionWaterMarks()
+	for _, partition := range partitionWaterMarks {
+		ch <- prometheus.MustNewConstMetric(
+			partitionWaterMarksDesc,
+			prometheus.GaugeValue,
+			float64(partition.HighWaterMark),
+			partition.TopicName,
+			strconv.Itoa(int(partition.PartitionID)),
+			strconv.Itoa(int(partition.Timestamp)),
+		)
+	}
 }
 
-func getVersionedConsumerGroups(offsets map[string]*storage.PartitionOffset) map[string]*versionedConsumerGroup {
+func getVersionedConsumerGroups(offsets map[string]*kafka.ConsumerPartitionOffset) map[string]*versionedConsumerGroup {
 	// This map contains all known consumer groups. Key is the actual group name
 	groupsByName := make(map[string]*versionedConsumerGroup)
 
@@ -119,5 +137,34 @@ func parseConsumerGroupName(consumerGroupName string) *versionedConsumerGroup {
 			baseName = consumerGroupName
 		}
 	}
-	return &versionedConsumerGroup{BaseName: baseName, Name: consumerGroupName, Version: uint8(parsedVersion), IsLatest: false}
+	return &versionedConsumerGroup{BaseName: baseName, Name: consumerGroupName, Version: uint32(parsedVersion), IsLatest: false}
+}
+
+// parseVersion tries to parse a "version" from a consumer group name. An appending number of a consumer group name is considered as it's version
+func parseVersion(subString string, versionString string) uint32 {
+	if len(subString) == 0 {
+		return 0
+	}
+
+	// Try to parse a digit from right to left, so that we correctly identify names like "consumer-group-v003" as well
+	lastCharacter := subString[len(subString)-1:]
+	digit, err := strconv.Atoi(lastCharacter)
+	if err != nil {
+		if len(versionString) == 0 {
+			return 0
+		}
+
+		version, err := strconv.ParseUint(versionString, 10, 0)
+		if err != nil {
+			// should never happen, because version string must only consist of valid ints
+			return 0
+		}
+		return uint32(version)
+	}
+
+	// It's a valid digit, so we can prepend it to the "versionString" which we can try to parse as int when we are done
+	newVersionedString := lastCharacter + versionString
+	remainingSubString := subString[0 : len(subString)-1]
+
+	return parseVersion(remainingSubString, newVersionedString)
 }

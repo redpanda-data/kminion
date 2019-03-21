@@ -36,22 +36,23 @@ func main() {
 
 	log.Infof("Starting kafka minion version%v", opts.Version)
 	// Create cross package shared dependencies
-	storageChannel := make(chan *kafka.OffsetEntry, 1000)
+	consumerOffsetsCh := make(chan *kafka.ConsumerPartitionOffset, 1000)
+	partitionWaterMarksCh := make(chan *kafka.PartitionWaterMarks, 200)
 
 	// Create storage module
-	offsetStorage := storage.NewOffsetStorage(storageChannel)
-	offsetStorage.Start()
-
-	// Create kafka consumer
-	consumer := kafka.NewOffsetConsumer(opts, storageChannel)
-	consumer.Start()
+	cache := storage.NewOffsetStorage(consumerOffsetsCh, partitionWaterMarksCh)
+	cache.Start()
 
 	// Create cluster module
-	// cluster := kafka.NewCluster(opts, storageChannel)
-	// cluster.Start()
+	cluster := kafka.NewCluster(opts, partitionWaterMarksCh)
+	cluster.Start()
+
+	// Create kafka consumer
+	consumer := kafka.NewOffsetConsumer(opts, consumerOffsetsCh)
+	consumer.Start()
 
 	// Create prometheus collector
-	collector := collector.NewCollector(opts, offsetStorage)
+	collector := collector.NewCollector(opts, cache)
 	prometheus.MustRegister(collector)
 
 	// Start listening on /metrics endpoint

@@ -7,12 +7,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type offsetGroupMetadata struct {
-	Header  offsetGroupMetadataHeader
-	Members []offsetGroupMetadataMember
+type consumerGroupMetadata struct {
+	Header  metadataHeader
+	Members []metadataMember
 }
 
-type offsetGroupMetadataHeader struct {
+type metadataHeader struct {
 	ProtocolType string
 	Generation   int32
 	Protocol     string
@@ -20,7 +20,7 @@ type offsetGroupMetadataHeader struct {
 	Timestamp    int64
 }
 
-type offsetGroupMetadataMember struct {
+type metadataMember struct {
 	MemberID         string
 	ClientID         string
 	ClientHost       string
@@ -29,7 +29,7 @@ type offsetGroupMetadataMember struct {
 	Assignment       map[string][]int32
 }
 
-func newOffsetGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) (*offsetGroupMetadata, error) {
+func newConsumerGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) (*consumerGroupMetadata, error) {
 	// Decode key (resolves to group id)
 	group, err := readString(keyBuffer)
 	if err != nil {
@@ -55,7 +55,7 @@ func newOffsetGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.E
 	}
 
 	// Decode value content
-	var metadata *offsetGroupMetadata
+	var metadata *consumerGroupMetadata
 	switch valueVersion {
 	case 0, 1, 2:
 		metadata, err = decodeGroupMetadata(valueVersion, group, valueBuffer, logger.WithFields(log.Fields{
@@ -80,10 +80,10 @@ func newOffsetGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.E
 	return metadata, err
 }
 
-func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Buffer, logger *log.Entry) (*offsetGroupMetadata, error) {
+func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Buffer, logger *log.Entry) (*consumerGroupMetadata, error) {
 	// First decode header fields
 	var err error
-	metadataHeader := offsetGroupMetadataHeader{}
+	metadataHeader := metadataHeader{}
 	metadataHeader.ProtocolType, err = readString(valueBuffer)
 	if err != nil {
 		logger.WithFields(log.Fields{
@@ -174,12 +174,12 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 		}
 	}
 
-	return &offsetGroupMetadata{}, nil
+	return &consumerGroupMetadata{}, nil
 }
 
-func decodeMetadataMember(buf *bytes.Buffer, memberVersion int16) (offsetGroupMetadataMember, string) {
+func decodeMetadataMember(buf *bytes.Buffer, memberVersion int16) (metadataMember, string) {
 	var err error
-	memberMetadata := offsetGroupMetadataMember{}
+	memberMetadata := metadataMember{}
 
 	memberMetadata.MemberID, err = readString(buf)
 	if err != nil {

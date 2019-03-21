@@ -1,44 +1,51 @@
 package collector
 
 import (
-	"github.com/google-cloud-tools/kafka-minion/storage"
+	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"testing"
 )
 
 func TestGetVersionedConsumerGroups(t *testing.T) {
-	offsets := make(map[string]*storage.PartitionOffset)
-	offsets["sample-group-1"] = &storage.PartitionOffset{
-		Group:               "sample-group-1",
-		Topic:               "important-topic",
-		Partition:           0,
-		Offset:              1156,
-		LastCommitTimestamp: 1552723003465,
+	offsets := make(map[string]*kafka.ConsumerPartitionOffset)
+	offsets["sample-group-1"] = &kafka.ConsumerPartitionOffset{
+		Group:     "sample-group-1",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    1156,
+		Timestamp: 1552723003465,
 	}
-	offsets["sample-group-2"] = &storage.PartitionOffset{
-		Group:               "sample-group-2",
-		Topic:               "important-topic",
-		Partition:           0,
-		Offset:              1000,
-		LastCommitTimestamp: 1552723003465,
+	offsets["sample-group-2"] = &kafka.ConsumerPartitionOffset{
+		Group:     "sample-group-2",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    1000,
+		Timestamp: 1552723003465,
 	}
-	offsets["sample-group-3"] = &storage.PartitionOffset{
-		Group:               "sample-group-3",
-		Topic:               "important-topic",
-		Partition:           0,
-		Offset:              1200,
-		LastCommitTimestamp: 1552723003475,
+	offsets["sample-group-3"] = &kafka.ConsumerPartitionOffset{
+		Group:     "sample-group-3",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    1200,
+		Timestamp: 1552723003475,
 	}
-	offsets["another-group"] = &storage.PartitionOffset{
-		Group:               "another-group",
-		Topic:               "important-topic",
-		Partition:           0,
-		Offset:              1200,
-		LastCommitTimestamp: 1552723003485,
+	offsets["another-group"] = &kafka.ConsumerPartitionOffset{
+		Group:     "another-group",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    1200,
+		Timestamp: 1552723003485,
+	}
+	offsets["another-group"] = &kafka.ConsumerPartitionOffset{
+		Group:     "another-group",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    936,
+		Timestamp: 1552723003485,
 	}
 
 	tables := []struct {
 		groupName    string
-		groupVersion uint8
+		groupVersion uint32
 		baseName     string
 		isLatest     bool
 	}{
@@ -46,6 +53,7 @@ func TestGetVersionedConsumerGroups(t *testing.T) {
 		{"sample-group-2", 2, "sample-group", false},
 		{"sample-group-3", 3, "sample-group", true},
 		{"another-group", 0, "another-group", true},
+		{"console-consumer-40098", 40098, "console-consumer", true},
 	}
 
 	versionedGroups := getVersionedConsumerGroups(offsets)

@@ -18,7 +18,7 @@ type OffsetConsumer struct {
 	wg sync.WaitGroup
 
 	// StorageChannel is used to persist processed messages in memory so that they can be exposed with prometheus
-	storageChannel chan *OffsetEntry
+	storageChannel chan *ConsumerPartitionOffset
 
 	logger           *log.Entry
 	client           sarama.Client
@@ -27,7 +27,7 @@ type OffsetConsumer struct {
 
 // NewOffsetConsumer creates a consumer which process all messages in the __consumer_offsets topic
 // If it cannot connect to the cluster it will panic
-func NewOffsetConsumer(opts *options.Options, storageChannel chan *OffsetEntry) *OffsetConsumer {
+func NewOffsetConsumer(opts *options.Options, storageChannel chan *ConsumerPartitionOffset) *OffsetConsumer {
 	logger := log.WithFields(log.Fields{
 		"module": "offset_consumer",
 	})
@@ -165,8 +165,8 @@ func isTopicAllowed(topicName string) bool {
 	return true
 }
 
-func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*OffsetEntry, error) {
-	offset, err := newOffsetEntry(buffer, value, logger)
+func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*ConsumerPartitionOffset, error) {
+	offset, err := newConsumerPartitionOffset(buffer, value, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -177,5 +177,5 @@ func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) 
 
 func processGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) {
 	// Group metadata contains client information (such as owner's IP address), how many partitions are assigned to a group member etc
-	newOffsetGroupMetadata(keyBuffer, value, logger)
+	newConsumerGroupMetadata(keyBuffer, value, logger)
 }

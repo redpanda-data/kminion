@@ -7,8 +7,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// OffsetEntry represents a consumer group commit which can be decoded from the consumer_offsets topic
-type OffsetEntry struct {
+// ConsumerPartitionOffset represents a consumer group commit which can be decoded from the consumer_offsets topic
+type ConsumerPartitionOffset struct {
 	Group     string
 	Topic     string
 	Partition int32
@@ -21,10 +21,10 @@ type offsetValue struct {
 	Timestamp int64
 }
 
-func newOffsetEntry(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*OffsetEntry, error) {
+func newConsumerPartitionOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*ConsumerPartitionOffset, error) {
 	// Decode key which contains group, topic and partition information first
 	var err error
-	entry := OffsetEntry{}
+	entry := ConsumerPartitionOffset{}
 
 	entry.Group, err = readString(buffer)
 	if err != nil {
