@@ -14,13 +14,16 @@ var (
 	partitionWaterMarksDesc  *prometheus.Desc
 )
 
-// Collector collects and provides all Kafka metrics on each /metrics invocation
+// Collector collects and provides all Kafka metrics on each /metrics invocation, see:
+// https://godoc.org/github.com/prometheus/client_golang/prometheus#hdr-Custom_Collectors_and_constant_Metrics
 type Collector struct {
 	opts    *options.Options
 	storage *storage.OffsetStorage
 }
 
-// versionedConsumerGroup contains information about the consumer group's base name and version
+// versionedConsumerGroup represents the information which one could interpret by looking at all consumer group names
+// For instance consumer group name "sample-group-1" has base name "sample-group-", version: 1 and is the latest as long
+// as there is no group with the same base name and a higher appending number than 1
 type versionedConsumerGroup struct {
 	BaseName string
 	Name     string
@@ -28,7 +31,8 @@ type versionedConsumerGroup struct {
 	IsLatest bool
 }
 
-// NewCollector returns a new prometheus collector, preinitialized with all the to be exposed metrics
+// NewCollector returns a new prometheus collector, preinitialized with all the to be exposed metrics under respect
+// of the metrics prefix which can be passed via environment variables
 func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collector {
 	groupPartitionOffsetDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group", "partition_offset"),
@@ -49,9 +53,7 @@ func (e *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- groupPartitionOffsetDesc
 }
 
-// Collect is called by the Prometheus registry when collecting
-// metricses. The implementation sends each collected metric via the
-// provided channel and returns once the last metric has been sent.
+// Collect is triggered by the Prometheus registry when the metrics endpoint has been invoked
 func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
 	offsets := e.storage.ConsumerOffsets()
@@ -84,15 +86,11 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func getVersionedConsumerGroups(offsets map[string]kafka.ConsumerPartitionOffset) map[string]*versionedConsumerGroup {
-	// This map contains all known consumer groups. Key is the actual group name
+	// This map contains all known consumer groups. Key is the full group name
 	groupsByName := make(map[string]*versionedConsumerGroup)
 
-	// We need the below paragrahp to determine the highest versioned consumer groups for each group base name
-	// Therefore we must completely iterate over all known consumer group names at least once
-
-	// This map is supposed to contain only the highest versioned consumer group for each group base name
+	// This map is supposed to contain only the highest versioned consumer within a consumer group base name
 	latestGroupByBaseName := make(map[string]*versionedConsumerGroup)
-
 	for _, offset := range offsets {
 		consumerGroup := parseConsumerGroupName(offset.Group)
 		groupsByName[offset.Group] = consumerGroup
@@ -107,9 +105,7 @@ func getVersionedConsumerGroups(offsets map[string]kafka.ConsumerPartitionOffset
 		}
 	}
 
-	// We got two maps of versioned consumer groups now. One map contains all consumer groups,
-	// the other just those who have the highest version. We want to mark the consumer group as
-	// IsLatest if this consumer group is the highest known version
+	// Set IsLatest if this consumer group is the highest known version within this group base name
 	for _, group := range latestGroupByBaseName {
 		groupsByName[group.Name].IsLatest = true
 	}
@@ -125,12 +121,8 @@ func parseConsumerGroupName(consumerGroupName string) *versionedConsumerGroup {
 	return &versionedConsumerGroup{BaseName: baseName, Name: consumerGroupName, Version: uint32(parsedVersion), IsLatest: false}
 }
 
-// parseVersion tries to parse a "version" from a consumer group name. An appending number of a consumer group name is considered as it's version
-// it returns the parsed version and the index of the last character of the group basename
-// recursive function where
-// - groupName is the name of the group
-// - versionString is the version as string
-// - digitIndexCursor indicates the index of the last recognized digit in the substring
+// parseVersion tries to parse a "version" from a consumer group name. An appending number of a
+// consumer group name is considered as it's version. It returns the parsed version and the consumer group base name.
 func parseVersion(groupName string, versionString string, digitIndexCursor int) (uint32, string) {
 	if len(groupName) == 0 {
 		return 0, ""

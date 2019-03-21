@@ -20,7 +20,7 @@ type Cluster struct {
 	logger                *log.Entry
 }
 
-// PartitionWaterMarks contains the earliest and last known commited offset (highWaterMark) for a partition
+// PartitionWaterMarks contains the earliest and last known commited offset (water marks) for a partition
 type PartitionWaterMarks struct {
 	TopicName     string
 	PartitionID   int32
@@ -158,6 +158,7 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 			}
 			brokers[broker.ID()] = broker
 			requests[broker.ID()].AddBlock(topic, partitionID, sarama.OffsetNewest, 1)
+			// TODO add oldest offsets too
 		}
 	}
 
