@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/google-cloud-tools/kafka-minion/storage"
@@ -11,6 +12,7 @@ import (
 
 var (
 	groupPartitionOffsetDesc *prometheus.Desc
+	groupPartitionLagDesc    *prometheus.Desc
 	partitionWaterMarksDesc  *prometheus.Desc
 )
 
@@ -35,9 +37,14 @@ type versionedConsumerGroup struct {
 // of the metrics prefix which can be passed via environment variables
 func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collector {
 	groupPartitionOffsetDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(opts.MetricsPrefix, "group", "partition_offset"),
+		prometheus.BuildFQName(opts.MetricsPrefix, "group_partition", "offset"),
 		"Newest commited offset of a consumer group for a partition",
-		[]string{"group", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+		[]string{"group", "group_is_latest", "group_version", "topic", "partition", "last_commit"}, prometheus.Labels{},
+	)
+	groupPartitionLagDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "group_partition", "lag"),
+		"Number of messages the consumer group is behind",
+		[]string{"group", "group_is_latest", "group_version", "topic", "partition", "last_commit"}, prometheus.Labels{},
 	)
 	partitionWaterMarksDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "high_water_mark"),
@@ -58,6 +65,8 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
 	offsets := e.storage.ConsumerOffsets()
 	consumerGroups := getVersionedConsumerGroups(offsets)
+	partitionHighWaterMarks := e.storage.PartitionHighWaterMarks()
+
 	for _, offset := range offsets {
 		group := consumerGroups[offset.Group]
 		ch <- prometheus.MustNewConstMetric(
@@ -69,11 +78,32 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 			strconv.Itoa(int(group.Version)),
 			offset.Topic,
 			strconv.Itoa(int(offset.Partition)),
+			strconv.FormatInt(offset.Timestamp, 10),
+		)
+
+		// Key in partition water mark map is "topic:partition"
+		key := fmt.Sprintf("%v:%v", offset.Topic, offset.Partition)
+		partitionHighWaterMark := partitionHighWaterMarks[key].HighWaterMark
+		lag := offset.Offset - partitionHighWaterMark
+		// Lag might be below zero because partitionHighWaterMark might by older than last commited offset
+		if lag < 0 {
+			lag = 0
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			groupPartitionLagDesc,
+			prometheus.GaugeValue,
+			float64(lag),
+			offset.Group,
+			strconv.FormatBool(group.IsLatest),
+			strconv.Itoa(int(group.Version)),
+			offset.Topic,
+			strconv.Itoa(int(offset.Partition)),
+			strconv.FormatInt(offset.Timestamp, 10),
 		)
 	}
 
-	partitionWaterMarks := e.storage.PartitionWaterMarks()
-	for _, partition := range partitionWaterMarks {
+	for _, partition := range partitionHighWaterMarks {
 		ch <- prometheus.MustNewConstMetric(
 			partitionWaterMarksDesc,
 			prometheus.GaugeValue,
