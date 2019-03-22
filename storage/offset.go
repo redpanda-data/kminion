@@ -13,7 +13,7 @@ type OffsetStorage struct {
 	consumerOffsetCh chan *kafka.StorageRequest
 	clusterCh        chan *kafka.StorageRequest
 
-	// partitionWaterMarks key is "topicname:partitionId" (e.g. "order:20")
+	// partitionHighWaterMarks key is "topicname:partitionId" (e.g. "order:20")
 	// consumerOffsets key is "group:topic:partition" (e.g. "sample-consumer:order:20")
 	consumerOffsetsLock         sync.RWMutex
 	consumerOffsets             map[string]kafka.ConsumerPartitionOffset
@@ -82,13 +82,23 @@ func (module *OffsetStorage) ConsumerOffsets() map[string]kafka.ConsumerPartitio
 	module.consumerOffsetsLock.RLock()
 	defer module.consumerOffsetsLock.RUnlock()
 
-	return module.consumerOffsets
+	mapCopy := make(map[string]kafka.ConsumerPartitionOffset)
+	for key, value := range module.consumerOffsets {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
 }
 
-// TODO emove outdated data
-func (module *OffsetStorage) PartitionWaterMarks() map[string]kafka.PartitionHighWaterMark {
+// TODO remove outdated data
+func (module *OffsetStorage) PartitionHighWaterMarks() map[string]kafka.PartitionHighWaterMark {
 	module.partitionHighWaterMarksLock.RLock()
 	defer module.partitionHighWaterMarksLock.RUnlock()
 
-	return module.partitionHighWaterMarks
+	mapCopy := make(map[string]kafka.PartitionHighWaterMark)
+	for key, value := range module.partitionHighWaterMarks {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
 }
