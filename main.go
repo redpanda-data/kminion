@@ -58,7 +58,7 @@ func main() {
 	// Start listening on /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", healthcheck())
-	listenAddress := fmt.Sprintf(":%d", opts.Port)
+	listenAddress := fmt.Sprintf("%v:%d", opts.TelemetryHost, opts.TelemetryPort)
 	log.Infof("Listening on: '%s", listenAddress)
 	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
