@@ -15,23 +15,22 @@ import (
 // for consumer lag calculations.
 type Cluster struct {
 	// partitionWaterMarksCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
-	partitionWaterMarksCh chan *PartitionWaterMarks
+	partitionWaterMarksCh chan *StorageRequest
 	client                sarama.Client
 	logger                *log.Entry
 }
 
-// PartitionWaterMarks contains the earliest and last known commited offset (water marks) for a partition
-type PartitionWaterMarks struct {
+// PartitionHighWaterMark contains last known commited offset (water mark) for a partition
+type PartitionHighWaterMark struct {
 	TopicName     string
 	PartitionID   int32
 	HighWaterMark int64
-	LowWaterMark  int64
 	Timestamp     int64
 }
 
 // NewCluster creates a new cluster module and tries to connect to the kafka cluster
 // If it cannot connect to the cluster it will panic
-func NewCluster(opts *options.Options, partitionWaterMarksCh chan *PartitionWaterMarks) *Cluster {
+func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageRequest) *Cluster {
 	logger := log.WithFields(log.Fields{
 		"module": "cluster",
 	})
@@ -165,7 +164,7 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 	return requests, brokers
 }
 
-func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry, ch chan<- *PartitionWaterMarks) {
+func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry, ch chan<- *StorageRequest) {
 	defer wg.Done()
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
@@ -193,13 +192,13 @@ func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.Of
 				"offset":    offsetResponse.Offsets[0],
 				"timestamp": ts,
 			}).Debug("Got topic offset")
-			entry := &PartitionWaterMarks{
+			entry := &PartitionHighWaterMark{
 				TopicName:     topicName,
 				PartitionID:   partitionID,
 				HighWaterMark: offsetResponse.Offsets[0],
 				Timestamp:     ts,
 			}
-			ch <- entry
+			ch <- newAddPartitionHighWaterMarkRequest(entry)
 		}
 	}
 }

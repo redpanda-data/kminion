@@ -36,15 +36,15 @@ func main() {
 
 	log.Infof("Starting kafka minion version%v", opts.Version)
 	// Create cross package shared dependencies
-	consumerOffsetsCh := make(chan *kafka.ConsumerPartitionOffset, 1000)
-	partitionWaterMarksCh := make(chan *kafka.PartitionWaterMarks, 200)
+	consumerOffsetsCh := make(chan *kafka.StorageRequest, 1000)
+	clusterCh := make(chan *kafka.StorageRequest, 200)
 
 	// Create storage module
-	cache := storage.NewOffsetStorage(consumerOffsetsCh, partitionWaterMarksCh)
+	cache := storage.NewOffsetStorage(consumerOffsetsCh, clusterCh)
 	cache.Start()
 
 	// Create cluster module
-	cluster := kafka.NewCluster(opts, partitionWaterMarksCh)
+	cluster := kafka.NewCluster(opts, clusterCh)
 	cluster.Start()
 
 	// Create kafka consumer
