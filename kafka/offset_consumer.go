@@ -23,6 +23,7 @@ type OffsetConsumer struct {
 	logger           *log.Entry
 	client           sarama.Client
 	offsetsTopicName string
+	options          *options.Options
 }
 
 // NewOffsetConsumer creates a consumer which process all messages in the __consumer_offsets topic
@@ -52,6 +53,7 @@ func NewOffsetConsumer(opts *options.Options, storageChannel chan *StorageReques
 		logger:           logger,
 		client:           client,
 		offsetsTopicName: opts.ConsumerOffsetsTopicName,
+		options:          opts,
 	}
 }
 
@@ -76,7 +78,7 @@ func (module *OffsetConsumer) Start() {
 	log.WithFields(log.Fields{
 		"topic": module.offsetsTopicName,
 		"count": len(partitions),
-	}).Info("Starting consumers")
+	}).Infof("Starting '%d' partition consumers", len(partitions))
 	for _, partition := range partitions {
 		module.wg.Add(1)
 		go module.partitionConsumer(consumer, partition)
@@ -84,14 +86,14 @@ func (module *OffsetConsumer) Start() {
 	log.WithFields(log.Fields{
 		"topic": module.offsetsTopicName,
 		"count": len(partitions),
-	}).Info("Started all consumers")
+	}).Info("Spawned all consumers")
 }
 
 // partitionConsumer is a worker routine which consumes a single partition in the __consumer_offsets topic
 func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partitionID int32) {
 	defer module.wg.Done()
 
-	log.Infof("Starting consumer %d", partitionID)
+	log.Debugf("Starting consumer %d", partitionID)
 	pconsumer, err := consumer.ConsumePartition(module.offsetsTopicName, partitionID, sarama.OffsetOldest)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -100,79 +102,106 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 			"error":     err.Error(),
 		}).Panic("could not start consumer")
 	}
-	log.Infof("Started consumer %d", partitionID)
+	log.Debugf("Started consumer %d", partitionID)
 	defer pconsumer.AsyncClose()
 
-	counter := 0
 	for {
 		select {
 		case msg := <-pconsumer.Messages():
-
-			counter++
-			if counter%10000 == 0 {
-				log.WithFields(log.Fields{
-					"partition_id": partitionID,
-				}).Infof("Consumed '%d'", counter)
-			}
-			module.processConsumerOffsetsMessage(msg)
+			module.processMessage(msg)
 		case err := <-pconsumer.Errors():
-			log.Errorf("consume error. %+v %+v %+v", err.Topic, err.Partition, err.Err.Error())
+			log.WithFields(log.Fields{
+				"error":     err.Error(),
+				"topic":     err.Topic,
+				"partition": err.Partition,
+			}).Errorf("partition consume error")
 		}
 	}
 }
 
-// processConsumerOffsetsMessage is responsible for decoding the consumer offsets message
-func (module *OffsetConsumer) processConsumerOffsetsMessage(msg *sarama.ConsumerMessage) {
-	logger := log.WithFields(log.Fields{"offset_topic": msg.Topic, "offset_partition": msg.Partition, "offset_offset": msg.Offset})
+// processMessage decodes the message and sends it to the storage module
+func (module *OffsetConsumer) processMessage(msg *sarama.ConsumerMessage) {
+	logger := module.logger.WithFields(log.Fields{
+		"offset_topic":     msg.Topic,
+		"offset_partition": msg.Partition,
+		"offset_offset":    msg.Offset,
+	})
 
-	if len(msg.Value) == 0 {
-		// Tombstone message - we don't handle them for now
-		logger.Debug("dropped tombstone")
-		return
-	}
+	key := bytes.NewBuffer(msg.Key)
+	value := bytes.NewBuffer(msg.Value)
 
 	// Get the key version which tells us what kind of message (group metadata or offset info) we have received
-	var keyver int16
-	keyBuffer := bytes.NewBuffer(msg.Key)
-	err := binary.Read(keyBuffer, binary.BigEndian, &keyver)
+	var keyVersion int16
+	err := binary.Read(key, binary.BigEndian, &keyVersion)
 	if err != nil {
-		logger.Warn("Failed to decode offset message", log.Fields{"reason": "no key version"})
+		logger.WithFields(log.Fields{
+			"reason": "no key version",
+		}).Warn("failed to decode offset message")
 		return
 	}
-	switch keyver {
+
+	switch keyVersion {
 	case 0, 1:
-		offset, err := processKeyAndOffset(keyBuffer, msg.Value, logger)
-		if err != nil {
-			break
-		}
-		if !isTopicAllowed(offset.Topic) {
-			logger.Debug("topic is not allowed")
-			return
-		}
-		module.storageChannel <- newAddConsumerOffsetRequest(offset)
+		module.processOffsetCommit(key, value, logger)
 	case 2:
 		// processGroupMetadata(keyBuffer, msg.Value, logger)
 	default:
-		logger.Warn("Failed to decode offset message", log.Fields{"reason": "unknown key version", "version": keyver})
+		logger.WithFields(log.Fields{
+			"reason":  "unknown key version",
+			"version": keyVersion,
+		}).Warn("Failed to decode offset message")
 	}
 }
 
-func isTopicAllowed(topicName string) bool {
-	if strings.HasPrefix(topicName, "__") || strings.HasPrefix(topicName, "_confluent") {
-		return false
+func (module *OffsetConsumer) processOffsetCommit(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
+	isTombstone := false
+	if value.Len() == 0 {
+		logger.Info(key.String())
+		isTombstone = true
 	}
 
-	return true
-}
+	if isTombstone {
+		group, err := readString(key)
+		if err != nil {
+			logger.Errorf("fail")
+		}
+		topic, err := readString(key)
+		if err != nil {
+			logger.Errorf("fail")
+		}
+		var partitionID int32
+		err = binary.Read(key, binary.BigEndian, &partitionID)
+		if err != nil {
+			logger.Errorf("fail")
+		}
 
-func processKeyAndOffset(buffer *bytes.Buffer, value []byte, logger *log.Entry) (*ConsumerPartitionOffset, error) {
-	offset, err := newConsumerPartitionOffset(buffer, value, logger)
+		logger.Infof("%+v %+v %+v", group, topic, partitionID)
+	}
+
+	offset, err := newConsumerPartitionOffset(key, value, logger)
 	if err != nil {
-		return nil, err
+		// Error is already logged inside of the function
+		return
 	}
 	logger.Debugf("Group %v - Topic: %v - Partition: %v - Offset: %v", offset.Group, offset.Topic, offset.Partition, offset.Offset)
 
-	return offset, nil
+	if !module.isTopicAllowed(offset.Topic) {
+		logger.WithFields(log.Fields{
+			"topic": offset.Topic,
+		}).Debug("topic is not allowed")
+		return
+	}
+	module.storageChannel <- newAddConsumerOffsetRequest(offset)
+}
+
+func (module *OffsetConsumer) isTopicAllowed(topicName string) bool {
+	if module.options.IgnoreSystemTopics {
+		if strings.HasPrefix(topicName, "__") || strings.HasPrefix(topicName, "_confluent") {
+			return false
+		}
+	}
+
+	return true
 }
 
 func processGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) {
