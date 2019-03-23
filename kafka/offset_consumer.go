@@ -156,26 +156,47 @@ func (module *OffsetConsumer) processMessage(msg *sarama.ConsumerMessage) {
 func (module *OffsetConsumer) processOffsetCommit(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
 	isTombstone := false
 	if value.Len() == 0 {
-		logger.Info(key.String())
 		isTombstone = true
 	}
 
+	// A tombstone on the __consumer_offsets topic indicates that the consumer group either expired
+	// due too configured group retention or that the consumed topic has been deleted
 	if isTombstone {
 		group, err := readString(key)
 		if err != nil {
-			logger.Errorf("fail")
+			logger.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Errorf("failed to read tombstone's consumer group")
+			return
 		}
 		topic, err := readString(key)
 		if err != nil {
-			logger.Errorf("fail")
+			logger.WithFields(log.Fields{
+				"error": err.Error(),
+				"group": group,
+				"topic": topic,
+			}).Errorf("failed to read tombstone's topic")
+			return
 		}
 		var partitionID int32
 		err = binary.Read(key, binary.BigEndian, &partitionID)
 		if err != nil {
-			logger.Errorf("fail")
+			logger.WithFields(log.Fields{
+				"error":     err.Error(),
+				"group":     group,
+				"partition": partitionID,
+			}).Errorf("failed to read tombstone's partition")
+			return
 		}
 
-		logger.Infof("%+v %+v %+v", group, topic, partitionID)
+		logger.WithFields(log.Fields{
+			"group":     group,
+			"topic":     topic,
+			"partition": partitionID,
+		}).Debug("received a tombstone")
+		module.storageChannel <- newDeleteConsumerGroupRequest(group, topic, partitionID)
+
+		return
 	}
 
 	offset, err := newConsumerPartitionOffset(key, value, logger)
@@ -183,7 +204,11 @@ func (module *OffsetConsumer) processOffsetCommit(key *bytes.Buffer, value *byte
 		// Error is already logged inside of the function
 		return
 	}
-	logger.Debugf("Group %v - Topic: %v - Partition: %v - Offset: %v", offset.Group, offset.Topic, offset.Partition, offset.Offset)
+	logger.WithFields(log.Fields{
+		"group":     offset.Group,
+		"topic":     offset.Topic,
+		"partition": offset.Partition,
+	}).Debug("received consumer offset")
 
 	if !module.isTopicAllowed(offset.Topic) {
 		logger.WithFields(log.Fields{
