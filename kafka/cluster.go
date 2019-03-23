@@ -18,6 +18,7 @@ type Cluster struct {
 	partitionWaterMarksCh chan *StorageRequest
 	client                sarama.Client
 	logger                *log.Entry
+	options               *options.Options
 }
 
 // PartitionHighWaterMark contains last known commited offset (water mark) for a partition
@@ -54,6 +55,7 @@ func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageReques
 		partitionWaterMarksCh: partitionWaterMarksCh,
 		client:                client,
 		logger:                logger,
+		options:               opts,
 	}
 }
 
@@ -92,7 +94,7 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 		logger := module.logger.WithFields(log.Fields{
 			"broker_id": brokerID,
 		})
-		go brokerOffsets(&wg, brokers[brokerID], request, logger, module.partitionWaterMarksCh)
+		go module.brokerOffsets(&wg, brokers[brokerID], request, logger)
 	}
 	wg.Wait()
 	module.logger.Debug("collected topic offsets")
@@ -164,7 +166,7 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 	return requests, brokers
 }
 
-func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry, ch chan<- *StorageRequest) {
+func (module *Cluster) brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
 	defer wg.Done()
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
@@ -176,6 +178,10 @@ func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.Of
 	}
 	ts := time.Now().Unix() * 1000
 	for topicName, responseBlock := range response.Blocks {
+		if !module.isTopicAllowed(topicName) {
+			continue
+		}
+
 		for partitionID, offsetResponse := range responseBlock {
 			if offsetResponse.Err != sarama.ErrNoError {
 				logger.WithFields(log.Fields{
@@ -198,7 +204,17 @@ func brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.Of
 				HighWaterMark: offsetResponse.Offsets[0],
 				Timestamp:     ts,
 			}
-			ch <- newAddPartitionHighWaterMarkRequest(entry)
+			module.partitionWaterMarksCh <- newAddPartitionHighWaterMarkRequest(entry)
 		}
 	}
+}
+
+func (module *Cluster) isTopicAllowed(topicName string) bool {
+	if module.options.IgnoreSystemTopics {
+		if strings.HasPrefix(topicName, "__") || strings.HasPrefix(topicName, "_confluent") {
+			return false
+		}
+	}
+
+	return true
 }
