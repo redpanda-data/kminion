@@ -9,11 +9,14 @@ type Options struct {
 	// TelemetryPort - Port to listen on for the prometheus exporter
 	// LogLevel - Logger's log granularity (debug, info, warn, error, fatal, panic)
 	// Version - Set by the dockerfile, will be logged once in the beginning
-	TelemetryHost      string `envconfig:"TELEMETRY_HOST" default:"0.0.0.0"`
-	TelemetryPort      int    `envconfig:"TELEMETRY_PORT" default:"8080"`
-	LogLevel           string `envconfig:"LOG_LEVEL" default:"INFO"`
-	Version            string `envconfig:"VERSION" required:"true"`
-	IgnoreSystemTopics bool   `envconfig:"EXPORTER_IGNORE_SYSTEM_TOPICS" default:"true"`
+	TelemetryHost string `envconfig:"TELEMETRY_HOST" default:"0.0.0.0"`
+	TelemetryPort int    `envconfig:"TELEMETRY_PORT" default:"8080"`
+	LogLevel      string `envconfig:"LOG_LEVEL" default:"INFO"`
+	Version       string `envconfig:"VERSION" required:"true"`
+
+	// Exporter settings
+	// IgnoreSystemTopics - Don't expose metrics about system topics (any topic names which are "__" or "_confluent" prefixed)
+	IgnoreSystemTopics bool `envconfig:"EXPORTER_IGNORE_SYSTEM_TOPICS" default:"true"`
 
 	// Kafka configurations
 	// KafkaBrokers - Addresses of all Kafka Brokers delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")
