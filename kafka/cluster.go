@@ -21,12 +21,12 @@ type Cluster struct {
 	options               *options.Options
 }
 
-// PartitionHighWaterMark contains last known commited offset (water mark) for a partition
-type PartitionHighWaterMark struct {
-	TopicName     string
-	PartitionID   int32
-	HighWaterMark int64
-	Timestamp     int64
+// PartitionWaterMark contains either the first or last known commited offset (water mark) for a partition
+type PartitionWaterMark struct {
+	TopicName   string
+	PartitionID int32
+	WaterMark   int64
+	Timestamp   int64
 }
 
 // NewCluster creates a new cluster module and tries to connect to the kafka cluster
@@ -88,13 +88,20 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 	// Send requests in bulk to each broker for those partitions it is responsible/leader for
 	var wg = sync.WaitGroup{}
 	module.logger.Debug("starting to collect topic offsets")
-	requests, brokers := module.generateOffsetRequests(partitionIDsByTopicName)
-	for brokerID, request := range requests {
+	highRequests, lowRequests, brokers := module.generateOffsetRequests(partitionIDsByTopicName)
+	for brokerID, request := range highRequests {
 		wg.Add(1)
 		logger := module.logger.WithFields(log.Fields{
 			"broker_id": brokerID,
 		})
-		go module.brokerOffsets(&wg, brokers[brokerID], request, logger)
+		go module.getHighWaterMarks(&wg, brokers[brokerID], request, logger)
+	}
+	for brokerID, request := range lowRequests {
+		wg.Add(1)
+		logger := module.logger.WithFields(log.Fields{
+			"broker_id": brokerID,
+		})
+		go module.getLowWaterMarks(&wg, brokers[brokerID], request, logger)
 	}
 	wg.Wait()
 	module.logger.Debug("collected topic offsets")
@@ -138,8 +145,12 @@ func (module *Cluster) topicPartitions() (map[string][]int32, error) {
 	return partitionIDsByTopicName, nil
 }
 
-func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string][]int32) (map[int32]*sarama.OffsetRequest, map[int32]*sarama.Broker) {
-	requests := make(map[int32]*sarama.OffsetRequest)
+func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string][]int32) (map[int32]*sarama.OffsetRequest, map[int32]*sarama.OffsetRequest, map[int32]*sarama.Broker) {
+	// we must create two seperate buckets for high & low watermarks, because adding a request block
+	// with same topic:partition but different time will still result in just one request, see:
+	// https://github.com/Shopify/sarama/blob/master/offset_request.go AddBlock() method
+	highWaterMarkRequests := make(map[int32]*sarama.OffsetRequest)
+	lowWaterMarkRequests := make(map[int32]*sarama.OffsetRequest)
 	brokers := make(map[int32]*sarama.Broker)
 
 	// Generate an OffsetRequest for each topic:partition and bucket it to the leader broker
@@ -154,25 +165,26 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 				}).Warn("failed to fetch leader for partition")
 				continue
 			}
-			if _, exists := requests[broker.ID()]; !exists {
-				requests[broker.ID()] = &sarama.OffsetRequest{}
+			if _, exists := highWaterMarkRequests[broker.ID()]; !exists {
+				highWaterMarkRequests[broker.ID()] = &sarama.OffsetRequest{}
+				lowWaterMarkRequests[broker.ID()] = &sarama.OffsetRequest{}
 			}
 			brokers[broker.ID()] = broker
-			requests[broker.ID()].AddBlock(topic, partitionID, sarama.OffsetNewest, 1)
-			// TODO add oldest offsets too
+			highWaterMarkRequests[broker.ID()].AddBlock(topic, partitionID, sarama.OffsetNewest, 1)
+			lowWaterMarkRequests[broker.ID()].AddBlock(topic, partitionID, sarama.OffsetOldest, 1)
 		}
 	}
 
-	return requests, brokers
+	return highWaterMarkRequests, lowWaterMarkRequests, brokers
 }
 
-func (module *Cluster) brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
+func (module *Cluster) getHighWaterMarks(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
 	defer wg.Done()
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
 		logger.WithFields(log.Fields{
 			"error": err.Error(),
-		}).Error("failed to fetch offsets from broker")
+		}).Error("failed to fetch high watermarks from broker")
 		broker.Close()
 		return
 	}
@@ -188,7 +200,7 @@ func (module *Cluster) brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, 
 					"error":     offsetResponse.Err.Error(),
 					"topic":     topicName,
 					"partition": partitionID,
-				}).Warn("error in OffsetResponse")
+				}).Warn("error in high OffsetResponse")
 				continue
 			}
 
@@ -197,14 +209,57 @@ func (module *Cluster) brokerOffsets(wg *sync.WaitGroup, broker *sarama.Broker, 
 				"partition": partitionID,
 				"offset":    offsetResponse.Offsets[0],
 				"timestamp": ts,
-			}).Debug("Got topic offset")
-			entry := &PartitionHighWaterMark{
-				TopicName:     topicName,
-				PartitionID:   partitionID,
-				HighWaterMark: offsetResponse.Offsets[0],
-				Timestamp:     ts,
+			}).Debug("received partition high water mark")
+			entry := &PartitionWaterMark{
+				TopicName:   topicName,
+				PartitionID: partitionID,
+				WaterMark:   offsetResponse.Offsets[0],
+				Timestamp:   ts,
 			}
 			module.partitionWaterMarksCh <- newAddPartitionHighWaterMarkRequest(entry)
+		}
+	}
+}
+
+func (module *Cluster) getLowWaterMarks(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
+	defer wg.Done()
+	response, err := broker.GetAvailableOffsets(request)
+	if err != nil {
+		logger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("failed to fetch low watermarks from broker")
+		broker.Close()
+		return
+	}
+	ts := time.Now().Unix() * 1000
+	for topicName, responseBlock := range response.Blocks {
+		if !module.isTopicAllowed(topicName) {
+			continue
+		}
+
+		for partitionID, offsetResponse := range responseBlock {
+			if offsetResponse.Err != sarama.ErrNoError {
+				logger.WithFields(log.Fields{
+					"error":     offsetResponse.Err.Error(),
+					"topic":     topicName,
+					"partition": partitionID,
+				}).Warn("error in low OffsetResponse")
+				continue
+			}
+
+			logger.WithFields(log.Fields{
+				"topic":     topicName,
+				"partition": partitionID,
+				"offset":    offsetResponse.Offsets[0],
+				"timestamp": ts,
+			}).Debug("received partition low water mark")
+			entry := &PartitionWaterMark{
+				TopicName:   topicName,
+				PartitionID: partitionID,
+				WaterMark:   offsetResponse.Offsets[0],
+				Timestamp:   ts,
+			}
+			module.partitionWaterMarksCh <- newAddPartitionLowWaterMarkRequest(entry)
 		}
 	}
 }

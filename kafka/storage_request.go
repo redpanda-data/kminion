@@ -19,18 +19,25 @@ const (
 
 // StorageRequest is an entity to send requests to the storage module
 type StorageRequest struct {
-	RequestType            StorageRequestType
-	ConsumerOffset         *ConsumerPartitionOffset
-	PartitionHighWaterMark *PartitionHighWaterMark
-	ConsumerGroupName      string
-	TopicName              string
-	PartitionID            int32
+	RequestType        StorageRequestType
+	ConsumerOffset     *ConsumerPartitionOffset
+	PartitionWaterMark *PartitionWaterMark
+	ConsumerGroupName  string
+	TopicName          string
+	PartitionID        int32
 }
 
-func newAddPartitionHighWaterMarkRequest(highWaterMark *PartitionHighWaterMark) *StorageRequest {
+func newAddPartitionLowWaterMarkRequest(lowWaterMark *PartitionWaterMark) *StorageRequest {
 	return &StorageRequest{
-		RequestType:            StorageAddPartitionHighWaterMark,
-		PartitionHighWaterMark: highWaterMark,
+		RequestType:        StorageAddPartitionLowWaterMark,
+		PartitionWaterMark: lowWaterMark,
+	}
+}
+
+func newAddPartitionHighWaterMarkRequest(highWaterMark *PartitionWaterMark) *StorageRequest {
+	return &StorageRequest{
+		RequestType:        StorageAddPartitionHighWaterMark,
+		PartitionWaterMark: highWaterMark,
 	}
 }
 
