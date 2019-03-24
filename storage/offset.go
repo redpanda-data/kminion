@@ -49,6 +49,8 @@ func (module *OffsetStorage) consumerOffsetWorker() {
 		switch request.RequestType {
 		case kafka.StorageAddConsumerOffset:
 			module.storeOffsetEntry(request.ConsumerOffset)
+		case kafka.StorageDeleteConsumerGroup:
+			module.deleteOffsetEntry(request.ConsumerGroupName, request.TopicName, request.PartitionID)
 		default:
 			log.WithFields(log.Fields{
 				"request_type": request.RequestType,
@@ -97,7 +99,15 @@ func (module *OffsetStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOff
 	module.consumerOffsetsLock.Unlock()
 }
 
-// TODO remove outdated data
+func (module *OffsetStorage) deleteOffsetEntry(consumerGroupName string, topicName string, partitionID int32) {
+	key := fmt.Sprintf("%v:%v:%v", consumerGroupName, topicName, partitionID)
+	module.consumerOffsetsLock.Lock()
+	delete(module.consumerOffsets, key)
+	module.consumerOffsetsLock.Unlock()
+}
+
+// ConsumerOffsets returns a copy of the current known consumer group offsets, so that they can safely be processed
+// in another go routine
 func (module *OffsetStorage) ConsumerOffsets() map[string]kafka.ConsumerPartitionOffset {
 	module.consumerOffsetsLock.RLock()
 	defer module.consumerOffsetsLock.RUnlock()

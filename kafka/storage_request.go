@@ -50,7 +50,7 @@ func newAddConsumerOffsetRequest(offset *ConsumerPartitionOffset) *StorageReques
 
 func newDeleteConsumerGroupRequest(group string, topic string, partitionID int32) *StorageRequest {
 	return &StorageRequest{
-		RequestType:       StorageAddConsumerOffset,
+		RequestType:       StorageDeleteConsumerGroup,
 		ConsumerGroupName: group,
 		TopicName:         topic,
 		PartitionID:       partitionID,
