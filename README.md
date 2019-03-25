@@ -19,26 +19,26 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 
 ### Environment variables
 
-| Variable name                      | Description                                                                                           | Default               |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------- |
-| TELEMETRY_HOST                     | Host to listen on for the prometheus exporter                                                         | 0.0.0.0               |
-| TELEMETRY_PORT                     | HTTP Port to listen on for the prometheus exporter                                                    | 8080                  |
-| LOG_LEVEL                          | Log granularity (debug, info, warn, error, fatal, panic)                                              | info                  |
-| VERSION                            | Application version (env variable is set in Dockerfile)                                               | (from Dockerfile)     |
-| EXPORTER_IGNORE_SYSTEM_TOPICS      | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true                  |
-| KAFKA_BROKERS                      | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")                    | (No default)          |
-| KAFKA_CONSUMER_OFFSETS_TOPIC_NAME  | Topic name of topic where kafka commits the consumer offsets                                          | \_\_consunmer_offsets |
-| KAFKA_SASL_ENABLED                 | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)                         | false                 |
-| KAFKA_SASL_USE_HANDSHAKE           | Whether or not to send the Kafka SASL handshake first                                                 | true                  |
-| KAFKA_SASL_USERNAME                | SASL Username                                                                                         | (No default)          |
-| KAFKA_SASL_PASSWORD                | SASL Password                                                                                         | (No default)          |
-| KAFKA_TLS_ENABLED                  | Whether or not to use TLS when connecting to the broker                                               | false                 |
-| KAFKA_TLS_CA_FILE_PATH             | Path to the TLS CA file                                                                               | (No default)          |
-| KAFKA_TLS_KEY_FILE_PATH            | Path to the TLS key file                                                                              | (No default)          |
-| KAFKA_TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                             | (No default)          |
-| KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate.   | true                  |
-| KAFKA_TLS_PASSPHRASE               | Passphrase to decrypt the TLS Key                                                                     | (No default)          |
-| METRICS_PREFIX                     | A prefix for all exported prometheus metrics                                                          | kafka_minion          |
+| Variable name                      | Description                                                                                           | Default              |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------- |
+| TELEMETRY_HOST                     | Host to listen on for the prometheus exporter                                                         | 0.0.0.0              |
+| TELEMETRY_PORT                     | HTTP Port to listen on for the prometheus exporter                                                    | 8080                 |
+| LOG_LEVEL                          | Log granularity (debug, info, warn, error, fatal, panic)                                              | info                 |
+| VERSION                            | Application version (env variable is set in Dockerfile)                                               | (from Dockerfile)    |
+| EXPORTER_IGNORE_SYSTEM_TOPICS      | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true                 |
+| EXPORTER_METRICS_PREFIX            | A prefix for all exported prometheus metrics                                                          | kafka_minion         |
+| KAFKA_BROKERS                      | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")                    | (No default)         |
+| KAFKA_CONSUMER_OFFSETS_TOPIC_NAME  | Topic name of topic where kafka commits the consumer offsets                                          | \_\_consumer_offsets |
+| KAFKA_SASL_ENABLED                 | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)                         | false                |
+| KAFKA_SASL_USE_HANDSHAKE           | Whether or not to send the Kafka SASL handshake first                                                 | true                 |
+| KAFKA_SASL_USERNAME                | SASL Username                                                                                         | (No default)         |
+| KAFKA_SASL_PASSWORD                | SASL Password                                                                                         | (No default)         |
+| KAFKA_TLS_ENABLED                  | Whether or not to use TLS when connecting to the broker                                               | false                |
+| KAFKA_TLS_CA_FILE_PATH             | Path to the TLS CA file                                                                               | (No default)         |
+| KAFKA_TLS_KEY_FILE_PATH            | Path to the TLS key file                                                                              | (No default)         |
+| KAFKA_TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                             | (No default)         |
+| KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate.   | true                 |
+| KAFKA_TLS_PASSPHRASE               | Passphrase to decrypt the TLS Key                                                                     | (No default)         |
 
 ## Exposed metrics
 
@@ -63,6 +63,10 @@ Below metrics have a variety of different labels, explained in this section:
 #### `kafka_minion_group_topic_lag{group, group_base_name, group_is_latest, group_version, topic}`
 
 Number of messages the consumer group is behind for a given topic.
+
+#### `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}`
+
+Current offset of a given group on a given partition.
 
 #### `kafka_minion_group_topic_partition_lag{group, group_base_name, group_is_latest, group_version, topic, partition}`
 
