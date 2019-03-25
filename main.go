@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/google-cloud-tools/kafka-minion/collector"
+	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
+	"github.com/google-cloud-tools/kafka-minion/storage"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,30 +34,37 @@ func main() {
 	}
 	log.SetLevel(level)
 
-	log.Info("Starting kafka minion version%v", opts.Version)
-	kafkaCollector, err := collector.NewKafkaCollector(opts)
-	if err != nil {
-		log.Fatal("Could not create kafka exporter. ", err)
-	}
-	prometheus.MustRegister(kafkaCollector)
-	log.Infof("Successfully started kafka exporter")
+	log.Infof("Starting kafka minion version%v", opts.Version)
+	// Create cross package shared dependencies
+	consumerOffsetsCh := make(chan *kafka.StorageRequest, 1000)
+	clusterCh := make(chan *kafka.StorageRequest, 200)
+
+	// Create storage module
+	cache := storage.NewOffsetStorage(consumerOffsetsCh, clusterCh)
+	cache.Start()
+
+	// Create cluster module
+	cluster := kafka.NewCluster(opts, clusterCh)
+	cluster.Start()
+
+	// Create kafka consumer
+	consumer := kafka.NewOffsetConsumer(opts, consumerOffsetsCh)
+	consumer.Start()
+
+	// Create prometheus collector
+	collector := collector.NewCollector(opts, cache)
+	prometheus.MustRegister(collector)
 
 	// Start listening on /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/healthcheck", healthcheck(kafkaCollector))
-	listenAddress := fmt.Sprintf(":%d", opts.Port)
-	log.Fatal(http.ListenAndServe(listenAddress, nil))
+	http.Handle("/healthcheck", healthcheck())
+	listenAddress := fmt.Sprintf("%v:%d", opts.TelemetryHost, opts.TelemetryPort)
 	log.Infof("Listening on: '%s", listenAddress)
+	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
 
-func healthcheck(kafkaCollector *collector.Collector) http.HandlerFunc {
+func healthcheck() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Debug("Healthcheck has been called")
-		isHealthy := kafkaCollector.IsHealthy()
-		if isHealthy {
-			w.Write([]byte("Status: Healthy"))
-		} else {
-			http.Error(w, "Healthcheck failed", http.StatusServiceUnavailable)
-		}
+		w.Write([]byte("Status: Healthy"))
 	})
 }
