@@ -1,11 +1,11 @@
+# Kafka Minion (Alpha - Still in development)
+
 ![License](https://img.shields.io/github/license/google-cloud-tools/kafka-minion.svg?color=blue)
 [![Go Report Card](https://goreportcard.com/badge/github.com/google-cloud-tools/kafka-minion)](https://goreportcard.com/report/github.com/google-cloud-tools/kafka-minion)
 ![GitHub release](https://img.shields.io/github/release-pre/google-cloud-tools/kafka-minion.svg)
 [![Docker Repository on Quay](https://quay.io/repository/google-cloud-tools/kafka-minion/status "Docker Repository on Quay")](https://quay.io/repository/google-cloud-tools/kafka-minion)
 
-# Kafka Minion (Alpha - Still in development)
-
-Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to expose consumer group lags on a per topic (rather than per partition) basis.
+Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to reliably expose consumer group lag information along with other helpful, unique metrics. Easy to setup on Kubernetes environments.
 
 ## Features
 
