@@ -16,7 +16,9 @@ type Options struct {
 
 	// Exporter settings
 	// IgnoreSystemTopics - Don't expose metrics about system topics (any topic names which are "__" or "_confluent" prefixed)
-	IgnoreSystemTopics bool `envconfig:"EXPORTER_IGNORE_SYSTEM_TOPICS" default:"true"`
+	// MetricsPrefix - A prefix for all exported prometheus metrics
+	IgnoreSystemTopics bool   `envconfig:"EXPORTER_IGNORE_SYSTEM_TOPICS" default:"true"`
+	MetricsPrefix      string `envconfig:"EXPORTER_METRICS_PREFIX" default:"kafka_minion"`
 
 	// Kafka configurations
 	// KafkaBrokers - Addresses of all Kafka Brokers delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")
@@ -43,10 +45,6 @@ type Options struct {
 	TLSCertFilePath          string   `envconfig:"KAFKA_TLS_CERT_FILE_PATH"`
 	TLSInsecureSkipTLSVerify bool     `envconfig:"KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
 	TLSPassphrase            string   `envconfig:"KAFKA_TLS_PASSPHRASE"`
-
-	// Prometheus exporter
-	// MetricsPrefix - A prefix for all exported prometheus metrics
-	MetricsPrefix string `envconfig:"METRICS_PREFIX" default:"kafka_minion"`
 }
 
 // NewOptions provides Application Options
