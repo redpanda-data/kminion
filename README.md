@@ -96,7 +96,7 @@ At a high level Kafka Minion fetches source data in two different ways.
 
    Additionally one can find group metadata messages in this topic.
 
-2. **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, lowest & highest commited offset.
+2. **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, low & high water mark.
 
 ## FAQ
 
