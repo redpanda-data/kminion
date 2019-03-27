@@ -8,6 +8,7 @@ import (
 )
 
 type consumerGroupMetadata struct {
+	Group   string
 	Header  metadataHeader
 	Members []metadataMember
 }
@@ -29,9 +30,9 @@ type metadataMember struct {
 	Assignment       map[string][]int32
 }
 
-func newConsumerGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) (*consumerGroupMetadata, error) {
+func newConsumerGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) (*consumerGroupMetadata, error) {
 	// Decode key (resolves to group id)
-	group, err := readString(keyBuffer)
+	group, err := readString(key)
 	if err != nil {
 		logger.WithFields(log.Fields{
 			"message_type": "metadata",
@@ -42,8 +43,7 @@ func newConsumerGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log
 
 	// Decode value version
 	var valueVersion int16
-	valueBuffer := bytes.NewBuffer(value)
-	err = binary.Read(valueBuffer, binary.BigEndian, &valueVersion)
+	err = binary.Read(value, binary.BigEndian, &valueVersion)
 	if err != nil {
 		logger.WithFields(log.Fields{
 			"message_type": "metadata",
@@ -58,7 +58,7 @@ func newConsumerGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log
 	var metadata *consumerGroupMetadata
 	switch valueVersion {
 	case 0, 1, 2:
-		metadata, err = decodeGroupMetadata(valueVersion, group, valueBuffer, logger.WithFields(log.Fields{
+		metadata, err = decodeGroupMetadata(valueVersion, group, value, logger.WithFields(log.Fields{
 			"message_type": "metadata",
 			"group":        group,
 		}))
@@ -151,6 +151,7 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 		return nil, err
 	}
 
+	members := make([]metadataMember, 0)
 	for i := 0; i < int(memberCount); i++ {
 		member, errorAt := decodeMetadataMember(valueBuffer, valueVersion)
 		if errorAt != "" {
@@ -160,21 +161,14 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 
 			return nil, fmt.Errorf("Decoding member, error at: %v", errorAt)
 		}
-
-		for topic, partitions := range member.Assignment {
-			for _, partition := range partitions {
-				metadataLogger.WithFields(log.Fields{
-					"topic":     topic,
-					"partition": partition,
-					"group":     group,
-					"owner":     member.ClientHost,
-					"client_id": member.ClientID,
-				}).Debug("Got group metadata")
-			}
-		}
+		members = append(members, member)
 	}
 
-	return &consumerGroupMetadata{}, nil
+	return &consumerGroupMetadata{
+		Group:   group,
+		Header:  metadataHeader,
+		Members: members,
+	}, nil
 }
 
 func decodeMetadataMember(buf *bytes.Buffer, memberVersion int16) (metadataMember, string) {

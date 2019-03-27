@@ -34,7 +34,7 @@ func NewOffsetConsumer(opts *options.Options, storageChannel chan *StorageReques
 	})
 
 	// Connect client to at least one of the brokers and verify the connection by requesting metadata
-	connectionLogger := log.WithFields(log.Fields{
+	connectionLogger := logger.WithFields(log.Fields{
 		"address": strings.Join(opts.KafkaBrokers, ","),
 	})
 	clientConfig := saramaClientConfig(opts)
@@ -144,7 +144,7 @@ func (module *OffsetConsumer) processMessage(msg *sarama.ConsumerMessage) {
 	case 0, 1:
 		module.processOffsetCommit(key, value, logger)
 	case 2:
-		// processGroupMetadata(keyBuffer, msg.Value, logger)
+		processGroupMetadata(key, value, logger)
 	default:
 		logger.WithFields(log.Fields{
 			"reason":  "unknown key version",
@@ -229,7 +229,15 @@ func (module *OffsetConsumer) isTopicAllowed(topicName string) bool {
 	return true
 }
 
-func processGroupMetadata(keyBuffer *bytes.Buffer, value []byte, logger *log.Entry) {
+func processGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
+	isTombstone := false
+	if value.Len() == 0 {
+		isTombstone = true
+	}
+	if isTombstone {
+		return
+	}
+
 	// Group metadata contains client information (such as owner's IP address), how many partitions are assigned to a group member etc
-	newConsumerGroupMetadata(keyBuffer, value, logger)
+	// newConsumerGroupMetadata(key, value, logger)
 }
