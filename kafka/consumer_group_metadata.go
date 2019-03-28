@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"strconv"
 )
 
 type consumerGroupMetadata struct {
@@ -53,6 +54,7 @@ func newConsumerGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *lo
 
 		return nil, err
 	}
+	groupMetadata.WithLabelValues(strconv.Itoa(int(valueVersion))).Add(1)
 
 	// Decode value content
 	var metadata *consumerGroupMetadata

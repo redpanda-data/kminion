@@ -108,8 +108,10 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 	for {
 		select {
 		case msg := <-pconsumer.Messages():
+			messagesInSuccess.WithLabelValues(msg.Topic).Add(1)
 			module.processMessage(msg)
 		case err := <-pconsumer.Errors():
+			messagesInFailed.WithLabelValues(err.Topic).Add(1)
 			log.WithFields(log.Fields{
 				"error":     err.Error(),
 				"topic":     err.Topic,
@@ -162,6 +164,7 @@ func (module *OffsetConsumer) processOffsetCommit(key *bytes.Buffer, value *byte
 	// A tombstone on the __consumer_offsets topic indicates that the consumer group either expired
 	// due too configured group retention or that the consumed topic has been deleted
 	if isTombstone {
+		offsetCommitTombstone.Add(1)
 		group, err := readString(key)
 		if err != nil {
 			logger.WithFields(log.Fields{

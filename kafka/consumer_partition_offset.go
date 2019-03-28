@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"strconv"
 )
 
 // ConsumerPartitionOffset represents a consumer group commit which can be decoded from the consumer_offsets topic
@@ -69,6 +70,7 @@ func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *
 
 		return nil, fmt.Errorf("message value has no version")
 	}
+	offsetCommit.WithLabelValues(strconv.Itoa(int(valueVersion))).Add(1)
 
 	// Decode message value using the right decoding function for given version
 	var decodedValue offsetValue
