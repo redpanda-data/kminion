@@ -115,11 +115,16 @@ func decodeOffsetValueV3(value *bytes.Buffer) (offsetValue, error) {
 	if err != nil {
 		return offsetValue, fmt.Errorf("failed to decode 'offset' field for OffsetValue: %v", err)
 	}
+
+	// leaderEpoch refers to the number of leaders previously assigned by the controller.
+	// Every time a leader fails, the controller selects the new leader, increments the current "leader epoch" by 1
 	var leaderEpoch int32
 	err = binary.Read(value, binary.BigEndian, &leaderEpoch)
 	if err != nil {
 		return offsetValue, fmt.Errorf("failed to decode 'leaderEpoch' field for OffsetValue V3: %v", err)
 	}
+
+	// metadata field contains additional metadata information which can optionally be set by a consumer
 	_, err = readString(value)
 	if err != nil {
 		return offsetValue, fmt.Errorf("failed to decode 'metadata' field for OffsetValue V3: %v", err)
