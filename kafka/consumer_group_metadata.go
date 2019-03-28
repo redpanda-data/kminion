@@ -15,8 +15,8 @@ type consumerGroupMetadata struct {
 
 type metadataHeader struct {
 	ProtocolType string
-	Generation   int32
-	Protocol     string
+	Generation   int32  // Upon every completion of the join group phase, the coordinator increments a GenerationId for the group
+	Protocol     string // ProtocolName (e. g. "consumer")
 	Leader       string
 	Timestamp    int64
 }
