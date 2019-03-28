@@ -72,6 +72,10 @@ Current offset of a given group on a given partition.
 
 Number of messages the consumer group is behind for a given partition.
 
+#### `kafka_minion_group_topic_partition_commit_count{group, group_base_name, group_is_latest, group_version, topic, partition}`
+
+Number of commited offset entries bya consumer group for a given partition. You can determine the commit rate to possibly tune the consumer performance.
+
 #### `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}`
 
 Timestamp when consumer group last commited an offset for a given partition.

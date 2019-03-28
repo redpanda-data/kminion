@@ -1,48 +1,48 @@
 package collector
 
 import (
-	"github.com/google-cloud-tools/kafka-minion/kafka"
+	"github.com/google-cloud-tools/kafka-minion/storage"
 	"testing"
 )
 
 func TestGetVersionedConsumerGroups(t *testing.T) {
-	offsets := make(map[string]kafka.ConsumerPartitionOffset)
-	offsets["sample-group-1"] = kafka.ConsumerPartitionOffset{
+	offsets := make(map[string]storage.ConsumerPartitionOffsetMetric)
+	offsets["sample-group-1"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "sample-group-1",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1156,
 		Timestamp: 1552723003465,
 	}
-	offsets["sample-group-2"] = kafka.ConsumerPartitionOffset{
+	offsets["sample-group-2"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "sample-group-2",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1000,
 		Timestamp: 1552723003465,
 	}
-	offsets["sample-group-3"] = kafka.ConsumerPartitionOffset{
+	offsets["sample-group-3"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "sample-group-3",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
 		Timestamp: 1552723003475,
 	}
-	offsets["another-group-v1"] = kafka.ConsumerPartitionOffset{
+	offsets["another-group-v1"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "another-group-v1",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
 		Timestamp: 1552723003485,
 	}
-	offsets["another-group-v3"] = kafka.ConsumerPartitionOffset{
+	offsets["another-group-v3"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "another-group-v3",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
 		Timestamp: 1552723003489,
 	}
-	offsets["console-consumer-40098"] = kafka.ConsumerPartitionOffset{
+	offsets["console-consumer-40098"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "console-consumer-40098",
 		Topic:     "important-topic",
 		Partition: 0,

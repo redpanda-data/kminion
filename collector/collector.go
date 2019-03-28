@@ -12,10 +12,11 @@ import (
 
 var (
 	// Consumer group metrics
-	groupPartitionOffsetDesc     *prometheus.Desc
-	groupPartitionLastCommitDesc *prometheus.Desc
-	groupPartitionLagDesc        *prometheus.Desc
-	groupTopicLagDesc            *prometheus.Desc
+	groupPartitionOffsetDesc      *prometheus.Desc
+	groupPartitionCommitCountDesc *prometheus.Desc
+	groupPartitionLastCommitDesc  *prometheus.Desc
+	groupPartitionLagDesc         *prometheus.Desc
+	groupTopicLagDesc             *prometheus.Desc
 
 	// Partition metrics
 	partitionLowWaterMarkDesc  *prometheus.Desc
@@ -52,6 +53,11 @@ func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collec
 	groupPartitionOffsetDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "offset"),
 		"Newest commited offset of a consumer group for a partition",
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+	)
+	groupPartitionCommitCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "commit_count"),
+		"Number of commits of a consumer group for a partition",
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
 	)
 	groupPartitionLastCommitDesc = prometheus.NewDesc(
@@ -147,7 +153,7 @@ type groupLag struct {
 	lagByTopic     map[string]int64
 }
 
-func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets map[string]kafka.ConsumerPartitionOffset,
+func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets map[string]storage.ConsumerPartitionOffsetMetric,
 	lowWaterMarks map[string]kafka.PartitionWaterMark, highWaterMarks map[string]kafka.PartitionWaterMark) {
 	consumerGroups := getVersionedConsumerGroups(offsets)
 
@@ -157,6 +163,7 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 	// Partition offsets and lags
 	for _, offset := range offsets {
 		group := consumerGroups[offset.Group]
+		// Offset metric
 		ch <- prometheus.MustNewConstMetric(
 			groupPartitionOffsetDesc,
 			prometheus.GaugeValue,
@@ -169,6 +176,20 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			strconv.Itoa(int(offset.Partition)),
 		)
 
+		// Commit count metric
+		ch <- prometheus.MustNewConstMetric(
+			groupPartitionCommitCountDesc,
+			prometheus.CounterValue,
+			offset.TotalCommitCount,
+			offset.Group,
+			group.BaseName,
+			strconv.FormatBool(group.IsLatest),
+			strconv.Itoa(int(group.Version)),
+			offset.Topic,
+			strconv.Itoa(int(offset.Partition)),
+		)
+
+		// Last commit metric
 		ch <- prometheus.MustNewConstMetric(
 			groupPartitionLastCommitDesc,
 			prometheus.GaugeValue,
@@ -260,7 +281,7 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 	}
 }
 
-func getVersionedConsumerGroups(offsets map[string]kafka.ConsumerPartitionOffset) map[string]*versionedConsumerGroup {
+func getVersionedConsumerGroups(offsets map[string]storage.ConsumerPartitionOffsetMetric) map[string]*versionedConsumerGroup {
 	// This map contains all known consumer groups. Key is the full group name
 	groupsByName := make(map[string]*versionedConsumerGroup)
 
