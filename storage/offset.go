@@ -13,6 +13,10 @@ type OffsetStorage struct {
 	consumerOffsetCh chan *kafka.StorageRequest
 	clusterCh        chan *kafka.StorageRequest
 
+	notReadyPartitionConsumers int32
+	offsetTopicConsumed        bool
+
+	consumerStatusLock          sync.RWMutex // Lock is being used if you either access notReadyPartitionConsumers or offsetTopicConsumed
 	consumerOffsetsLock         sync.RWMutex
 	partitionHighWaterMarksLock sync.RWMutex
 	partitionLowWaterMarksLock  sync.RWMutex
@@ -22,6 +26,8 @@ type OffsetStorage struct {
 	consumerOffsets         map[string]ConsumerPartitionOffsetMetric
 	partitionHighWaterMarks map[string]kafka.PartitionWaterMark
 	partitionLowWaterMarks  map[string]kafka.PartitionWaterMark
+
+	logger *log.Entry
 }
 
 // ConsumerPartitionOffsetMetric represents an offset commit but is extended by further fields which can be
@@ -41,6 +47,9 @@ func NewOffsetStorage(consumerOffsetCh chan *kafka.StorageRequest, clusterCh cha
 		consumerOffsetCh: consumerOffsetCh,
 		clusterCh:        clusterCh,
 
+		notReadyPartitionConsumers: 0,
+		offsetTopicConsumed:        false,
+
 		consumerOffsetsLock:         sync.RWMutex{},
 		partitionHighWaterMarksLock: sync.RWMutex{},
 		partitionLowWaterMarksLock:  sync.RWMutex{},
@@ -48,6 +57,10 @@ func NewOffsetStorage(consumerOffsetCh chan *kafka.StorageRequest, clusterCh cha
 		consumerOffsets:         make(map[string]ConsumerPartitionOffsetMetric),
 		partitionHighWaterMarks: make(map[string]kafka.PartitionWaterMark),
 		partitionLowWaterMarks:  make(map[string]kafka.PartitionWaterMark),
+
+		logger: log.WithFields(log.Fields{
+			"module": "storage",
+		}),
 	}
 }
 
@@ -64,6 +77,11 @@ func (module *OffsetStorage) consumerOffsetWorker() {
 			module.storeOffsetEntry(request.ConsumerOffset)
 		case kafka.StorageDeleteConsumerGroup:
 			module.deleteOffsetEntry(request.ConsumerGroupName, request.TopicName, request.PartitionID)
+		case kafka.StorageRegisterOffsetPartition:
+			module.registerOffsetPartition(request.PartitionID)
+		case kafka.StorageMarkOffsetPartitionReady:
+			module.markOffsetPartitionReady(request.PartitionID)
+
 		default:
 			log.WithFields(log.Fields{
 				"request_type": request.RequestType,
@@ -96,6 +114,24 @@ func (module *OffsetStorage) storePartitionHighWaterMark(offset *kafka.Partition
 	module.partitionHighWaterMarksLock.Lock()
 	module.partitionHighWaterMarks[key] = *offset
 	module.partitionHighWaterMarksLock.Unlock()
+}
+
+func (module *OffsetStorage) registerOffsetPartition(partitionID int32) {
+	module.consumerOffsetsLock.Lock()
+	defer module.consumerOffsetsLock.Unlock()
+
+	module.notReadyPartitionConsumers++
+}
+
+func (module *OffsetStorage) markOffsetPartitionReady(partitionID int32) {
+	module.consumerOffsetsLock.Lock()
+	defer module.consumerOffsetsLock.Unlock()
+
+	module.notReadyPartitionConsumers--
+	if module.notReadyPartitionConsumers == 0 {
+		module.logger.Info("Offset topic has been consumed")
+		module.offsetTopicConsumed = true
+	}
 }
 
 func (module *OffsetStorage) storePartitionLowWaterMark(offset *kafka.PartitionWaterMark) {
@@ -169,4 +205,13 @@ func (module *OffsetStorage) PartitionLowWaterMarks() map[string]kafka.Partition
 	}
 
 	return mapCopy
+}
+
+// IsConsumed indicates whether the consumer offsets topic lag has been caught up and therefore
+// the metrics reported by this module are accurate or not
+func (module *OffsetStorage) IsConsumed() bool {
+	module.consumerStatusLock.RLock()
+	defer module.consumerStatusLock.RUnlock()
+
+	return module.offsetTopicConsumed
 }

@@ -15,6 +15,14 @@ const (
 
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
 	StorageDeleteConsumerGroup StorageRequestType = 3
+
+	// StorageRegisterOffsetPartition is the request type to make the storage module aware that a partition consumer for
+	// the consumer offsets partition exists and that it should await it's ready signal before exposing metrics
+	StorageRegisterOffsetPartition StorageRequestType = 4
+
+	// StorageMarkOffsetPartitionReady is the request type to mark a partition consumer of the consumer offsets topic
+	// as ready (=caught up partition lag)
+	StorageMarkOffsetPartitionReady StorageRequestType = 5
 )
 
 // StorageRequest is an entity to send requests to the storage module
@@ -54,5 +62,19 @@ func newDeleteConsumerGroupRequest(group string, topic string, partitionID int32
 		ConsumerGroupName: group,
 		TopicName:         topic,
 		PartitionID:       partitionID,
+	}
+}
+
+func newRegisterOffsetPartition(partitionID int32) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageRegisterOffsetPartition,
+		PartitionID: partitionID,
+	}
+}
+
+func newMarkOffsetPartitionReady(partitionID int32) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageMarkOffsetPartitionReady,
+		PartitionID: partitionID,
 	}
 }

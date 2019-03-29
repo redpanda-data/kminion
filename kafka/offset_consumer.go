@@ -6,9 +6,16 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	log "github.com/sirupsen/logrus"
+	"math"
 	"strings"
 	"sync"
+	"time"
 )
+
+type consumerStatus struct {
+	PartitionLag int64
+	IsReady      bool // Indicates whether a partition consumer has caught up the partition lag or not
+}
 
 // OffsetConsumer is a consumer module which reads consumer group information from the offsets topic in a Kafka cluster.
 // The offsets topic is typically named __consumer_offsets. All messages in this topic are binary and therefore they
@@ -81,6 +88,8 @@ func (module *OffsetConsumer) Start() {
 	}).Infof("Starting '%d' partition consumers", len(partitions))
 	for _, partition := range partitions {
 		module.wg.Add(1)
+		registerPartitionRequest := newRegisterOffsetPartition(partition)
+		module.storageChannel <- registerPartitionRequest
 		go module.partitionConsumer(consumer, partition)
 	}
 	log.WithFields(log.Fields{
@@ -105,11 +114,15 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 	log.Debugf("Started consumer %d", partitionID)
 	defer pconsumer.AsyncClose()
 
+	ticker := time.NewTicker(5 * time.Second)
+	var consumedOffset int64
+
 	for {
 		select {
 		case msg := <-pconsumer.Messages():
 			messagesInSuccess.WithLabelValues(msg.Topic).Add(1)
 			module.processMessage(msg)
+			consumedOffset = msg.Offset
 		case err := <-pconsumer.Errors():
 			messagesInFailed.WithLabelValues(err.Topic).Add(1)
 			log.WithFields(log.Fields{
@@ -117,6 +130,22 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 				"topic":     err.Topic,
 				"partition": err.Partition,
 			}).Errorf("partition consume error")
+		case <-ticker.C:
+			var highWaterMark int64
+			highWaterMark = math.MaxInt64
+			offsetWaterMarks.Lock.RLock()
+			if val, exists := offsetWaterMarks.PartitionsByID[partitionID]; exists {
+				// Not sure why -1 is needed here, but otherwise there are lots of partition consumers with a remaining lag of 1
+				highWaterMark = val.HighWaterMark - 1
+			}
+			offsetWaterMarks.Lock.RUnlock()
+			if consumedOffset >= highWaterMark {
+				request := newMarkOffsetPartitionReady(partitionID)
+				module.storageChannel <- request
+				ticker.Stop()
+			} else {
+				log.Debugf("Not ready, Lag is: %v (consumed: %v)", highWaterMark-consumedOffset, consumedOffset)
+			}
 		}
 	}
 }

@@ -108,6 +108,12 @@ func (e *Collector) Describe(ch chan<- *prometheus.Desc) {
 // Collect is triggered by the Prometheus registry when the metrics endpoint has been invoked
 func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
+
+	if e.storage.IsConsumed() == false {
+		log.Info("Offets topic has not yet been consumed until the end")
+		return
+	}
+
 	consumerOffsets := e.storage.ConsumerOffsets()
 	partitionLowWaterMarks := e.storage.PartitionLowWaterMarks()
 	partitionHighWaterMarks := e.storage.PartitionHighWaterMarks()

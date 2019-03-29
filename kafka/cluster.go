@@ -29,6 +29,23 @@ type PartitionWaterMark struct {
 	Timestamp   int64
 }
 
+type consumerOffsetTopic struct {
+	Lock           sync.RWMutex
+	PartitionsByID map[int32]consumerOffsetPartition
+}
+
+type consumerOffsetPartition struct {
+	PartitionID   int32
+	HighWaterMark int64
+}
+
+var (
+	offsetWaterMarks = consumerOffsetTopic{
+		Lock:           sync.RWMutex{},
+		PartitionsByID: make(map[int32]consumerOffsetPartition),
+	}
+)
+
 // NewCluster creates a new cluster module and tries to connect to the kafka cluster
 // If it cannot connect to the cluster it will panic
 func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageRequest) *Cluster {
@@ -190,9 +207,6 @@ func (module *Cluster) getHighWaterMarks(wg *sync.WaitGroup, broker *sarama.Brok
 	}
 	ts := time.Now().Unix() * 1000
 	for topicName, responseBlock := range response.Blocks {
-		if !module.isTopicAllowed(topicName) {
-			continue
-		}
 
 		for partitionID, offsetResponse := range responseBlock {
 			if offsetResponse.Err != sarama.ErrNoError {
@@ -204,6 +218,19 @@ func (module *Cluster) getHighWaterMarks(wg *sync.WaitGroup, broker *sarama.Brok
 				continue
 			}
 
+			if topicName == module.options.ConsumerOffsetsTopicName {
+				offsetWaterMarks.Lock.Lock()
+				offsetWaterMarks.PartitionsByID[partitionID] = consumerOffsetPartition{
+					PartitionID:   partitionID,
+					HighWaterMark: offsetResponse.Offsets[0],
+				}
+				offsetWaterMarks.Lock.Unlock()
+			}
+
+			// Skip topic in this for loop (instead of the outer one) because we still need __consumer_offset information
+			if !module.isTopicAllowed(topicName) {
+				continue
+			}
 			logger.WithFields(log.Fields{
 				"topic":     topicName,
 				"partition": partitionID,
