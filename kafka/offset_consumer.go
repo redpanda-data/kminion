@@ -98,7 +98,9 @@ func (module *OffsetConsumer) Start() {
 	}).Info("Spawned all consumers")
 }
 
-// partitionConsumer is a worker routine which consumes a single partition in the __consumer_offsets topic
+// partitionConsumer is a worker routine which consumes a single partition in the __consumer_offsets topic.
+// It processes all it's messages and pushes the information into the storage module. Additionally it
+// reports to the storage module when it has initially caught up the partition lag.
 func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partitionID int32) {
 	defer module.wg.Done()
 
@@ -191,6 +193,7 @@ func (module *OffsetConsumer) processMessage(msg *sarama.ConsumerMessage) {
 	}
 }
 
+// processOffsetCommit decodes all offset commit messages and sends them to the storage module
 func (module *OffsetConsumer) processOffsetCommit(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
 	isTombstone := false
 	if value.Len() == 0 {
@@ -268,6 +271,7 @@ func (module *OffsetConsumer) isTopicAllowed(topicName string) bool {
 	return true
 }
 
+// processGroupMetadata decodes all group metadata messages and sends them to the storage module
 func processGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
 	isTombstone := false
 	if value.Len() == 0 {

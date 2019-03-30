@@ -11,8 +11,8 @@ import (
 )
 
 // Cluster is a module which connects to a Kafka Cluster and periodically fetches all topic and
-// partition information (e. g. HighWaterMark). This information is passed to the storage module so that it can be used
-// for consumer lag calculations.
+// partition information (e. g. High & Low water marks). This information is passed to the storage
+// module where it can be retrieved by the prometheus collector to expose metrics.
 type Cluster struct {
 	// partitionWaterMarksCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
 	partitionWaterMarksCh chan *StorageRequest

@@ -8,7 +8,11 @@ import (
 	"strconv"
 )
 
-type consumerGroupMetadata struct {
+// ConsumerGroupMetadata contains additional information about consumer groups, such as:
+// - Partition assignments (which hosts are assigned to partitions)
+// - Session timeouts (hosts which haven't sent the keep alive in time)
+// - Group rebalancing
+type ConsumerGroupMetadata struct {
 	Group   string
 	Header  metadataHeader
 	Members []metadataMember
@@ -31,7 +35,10 @@ type metadataMember struct {
 	Assignment       map[string][]int32
 }
 
-func newConsumerGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) (*consumerGroupMetadata, error) {
+// newConsumerGroupMetadata decodes a kafka message (key and value) to return an instance of
+// the struct consumerGroupMetadata. It returns an error if it could not completely decode
+// the message.
+func newConsumerGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) (*ConsumerGroupMetadata, error) {
 	// Decode key (resolves to group id)
 	group, err := readString(key)
 	if err != nil {
@@ -57,7 +64,7 @@ func newConsumerGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *lo
 	groupMetadata.WithLabelValues(strconv.Itoa(int(valueVersion))).Add(1)
 
 	// Decode value content
-	var metadata *consumerGroupMetadata
+	var metadata *ConsumerGroupMetadata
 	switch valueVersion {
 	case 0, 1, 2:
 		metadata, err = decodeGroupMetadata(valueVersion, group, value, logger.WithFields(log.Fields{
@@ -82,7 +89,7 @@ func newConsumerGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *lo
 	return metadata, err
 }
 
-func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Buffer, logger *log.Entry) (*consumerGroupMetadata, error) {
+func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Buffer, logger *log.Entry) (*ConsumerGroupMetadata, error) {
 	// First decode header fields
 	var err error
 	metadataHeader := metadataHeader{}
@@ -166,7 +173,7 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 		members = append(members, member)
 	}
 
-	return &consumerGroupMetadata{
+	return &ConsumerGroupMetadata{
 		Group:   group,
 		Header:  metadataHeader,
 		Members: members,

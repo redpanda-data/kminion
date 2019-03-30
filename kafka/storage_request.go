@@ -1,6 +1,8 @@
 package kafka
 
-// StorageRequestType is used in StorageRequest to indicate the type of request.
+// StorageRequestType is used to determine the message type / request when communicating with the
+// storage module via channel. Depending on the request type you must provide additional information
+// so that the request can be processed.
 type StorageRequestType int
 
 const (
@@ -25,7 +27,7 @@ const (
 	StorageMarkOffsetPartitionReady StorageRequestType = 5
 )
 
-// StorageRequest is an entity to send requests to the storage module
+// StorageRequest is an entity to send messages / requests to the storage module.
 type StorageRequest struct {
 	RequestType        StorageRequestType
 	ConsumerOffset     *ConsumerPartitionOffset

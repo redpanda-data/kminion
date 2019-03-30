@@ -12,6 +12,9 @@ import (
 	"os"
 )
 
+// saramaClientConfig returns a sarama config pre initialized with SASL / TLS settings
+// This function panics if the config can not be validated, for example due to a
+// wrong TLS passphrase to decrypt the certificate.
 func saramaClientConfig(opts *options.Options) *sarama.Config {
 	clientConfig := sarama.NewConfig()
 	clientConfig.ClientID = "kafka-lag-collector-1"

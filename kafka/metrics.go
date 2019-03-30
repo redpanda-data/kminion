@@ -4,6 +4,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// This file creates prometheus metrics about the internal state of kafka minion:
+// - How many kafka messages have been consumed (successfully and failed)
+// - How many offset commits (tombstones) have been decoded
+// - How many group metadata (tombstones) have been decoded
+
 const internalMetricsName = "kafka_minion_internal"
 
 var (

@@ -6,6 +6,8 @@ import (
 	"fmt"
 )
 
+// readString tries to read a string following the Kafka binary protocol. Strings are size delimited.
+// It returns an error if it can not read a string on the given buffer.
 func readString(buf *bytes.Buffer) (string, error) {
 	var strlen int16
 	err := binary.Read(buf, binary.BigEndian, &strlen)
