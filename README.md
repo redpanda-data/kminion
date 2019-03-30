@@ -80,7 +80,7 @@ Below metrics have a variety of different labels, explained in this section:
 
 #### Internal metrics
 
-| Metirc                                                                          | Description                                                 |
+| Metric                                                                          | Description                                                 |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `kafka_minion_internal_offset_consumer_offset_commits_read{version}`            | Number of read offset commit messages                       |
 | `kafka_minion_internal_offset_consumer_offset_commits_tombstones_read{version}` | Number of tombstone messages of all offset commit messages  |
