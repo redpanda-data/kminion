@@ -60,37 +60,34 @@ Below metrics have a variety of different labels, explained in this section:
 
 ### Metrics
 
-#### `kafka_minion_group_topic_lag{group, group_base_name, group_is_latest, group_version, topic}`
+#### Consumer group metrics
 
-Number of messages the consumer group is behind for a given topic.
+| Metric                                                                                                                      | Description                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kafka_minion_group_topic_lag{group, group_base_name, group_is_latest, group_version, topic}`                               | Number of messages the consumer group is behind for a given topic.                                                                                           |
+| `kafka_minion_group_topic_partition_lag{group, group_base_name, group_is_latest, group_version, topic, partition}`          | Number of messages the consumer group is behind for a given partition.                                                                                       |
+| `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}`       | Current offset of a given group on a given partition.                                                                                                        |
+| `kafka_minion_group_topic_partition_commit_count{group, group_base_name, group_is_latest, group_version, topic, partition}` | Number of commited offset entries by a consumer group for a given partition. Helpful to determine the commit rate to possibly tune the consumer performance. |
+| `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}`  | Timestamp of last consumer group commit on a given partition                                                                                                 |
 
-#### `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}`
+#### Topic / Partition metrics
 
-Current offset of a given group on a given partition.
+| Metric                                                           | Description                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kafka_minion_topic_partition_high_water_mark{topic, partition}` | Latest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one.                                                                                                      |
+| `kafka_minion_topic_partition_low_water_mark{topic, partition}`  | Oldest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one.                                                                                                      |
+| `kafka_minion_topic_partition_message_count{topic, partition}`   | Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic. |
 
-#### `kafka_minion_group_topic_partition_lag{group, group_base_name, group_is_latest, group_version, topic, partition}`
+#### Internal metrics
 
-Number of messages the consumer group is behind for a given partition.
-
-#### `kafka_minion_group_topic_partition_commit_count{group, group_base_name, group_is_latest, group_version, topic, partition}`
-
-Number of commited offset entries bya consumer group for a given partition. You can determine the commit rate to possibly tune the consumer performance.
-
-#### `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}`
-
-Timestamp when consumer group last commited an offset for a given partition.
-
-#### `kafka_minion_topic_partition_high_water_mark{topic, partition}`
-
-Latest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one.
-
-#### `kafka_minion_topic_partition_low_water_mark{topic, partition}`
-
-Oldest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one.
-
-#### `kafka_minion_topic_partition_message_count{topic, partition}`
-
-Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic.
+| Metirc                                                                          | Description                                                 |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `kafka_minion_internal_offset_consumer_offset_commits_read{version}`            | Number of read offset commit messages                       |
+| `kafka_minion_internal_offset_consumer_offset_commits_tombstones_read{version}` | Number of tombstone messages of all offset commit messages  |
+| `kafka_minion_internal_offset_consumer_group_metadata_read{version}`            | Number of read group metadata messages                      |
+| `kafka_minion_internal_offset_consumer_group_metadata_tombstones_read{version}` | Number of tombstone messages of all group metadata messages |
+| `kafka_minion_internal_kafka_messages_in_success{topic}`                        | Number of successfully received kafka messages              |
+| `kafka_minion_internal_kafka_messages_in_failed{topic]`                         | Number of errors while consuming kafka messages             |
 
 ## How does it work
 
