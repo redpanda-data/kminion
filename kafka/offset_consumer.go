@@ -131,6 +131,8 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 				"partition": err.Partition,
 			}).Errorf("partition consume error")
 		case <-ticker.C:
+			// Regularly check if we have completely consumed the offsets topic
+			// If that's the case report it to our storage module
 			var highWaterMark int64
 			highWaterMark = math.MaxInt64
 			offsetWaterMarks.Lock.RLock()
@@ -144,7 +146,12 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 				module.storageChannel <- request
 				ticker.Stop()
 			} else {
-				log.Debugf("Not ready, Lag is: %v (consumed: %v)", highWaterMark-consumedOffset, consumedOffset)
+				log.WithFields(log.Fields{
+					"partition":       partitionID,
+					"high_water_mark": highWaterMark,
+					"consumed_offset": consumedOffset,
+					"remaining_lag":   highWaterMark - consumedOffset,
+				}).Debug("partition consumer has not caught up the lag yet")
 			}
 		}
 	}
