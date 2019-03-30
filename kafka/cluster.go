@@ -40,6 +40,7 @@ type consumerOffsetPartition struct {
 }
 
 var (
+	// offsetWaterMarks is used to determine if partition consumers have caught up the partition lag
 	offsetWaterMarks = consumerOffsetTopic{
 		Lock:           sync.RWMutex{},
 		PartitionsByID: make(map[int32]consumerOffsetPartition),
@@ -111,14 +112,14 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 		logger := module.logger.WithFields(log.Fields{
 			"broker_id": brokerID,
 		})
-		go module.getHighWaterMarks(&wg, brokers[brokerID], request, logger)
+		go module.processHighWaterMarks(&wg, brokers[brokerID], request, logger)
 	}
 	for brokerID, request := range lowRequests {
 		wg.Add(1)
 		logger := module.logger.WithFields(log.Fields{
 			"broker_id": brokerID,
 		})
-		go module.getLowWaterMarks(&wg, brokers[brokerID], request, logger)
+		go module.processLowWaterMarks(&wg, brokers[brokerID], request, logger)
 	}
 	wg.Wait()
 	module.logger.Debug("collected topic offsets")
@@ -195,7 +196,7 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 	return highWaterMarkRequests, lowWaterMarkRequests, brokers
 }
 
-func (module *Cluster) getHighWaterMarks(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
+func (module *Cluster) processHighWaterMarks(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
 	defer wg.Done()
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
@@ -248,7 +249,7 @@ func (module *Cluster) getHighWaterMarks(wg *sync.WaitGroup, broker *sarama.Brok
 	}
 }
 
-func (module *Cluster) getLowWaterMarks(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
+func (module *Cluster) processLowWaterMarks(wg *sync.WaitGroup, broker *sarama.Broker, request *sarama.OffsetRequest, logger *log.Entry) {
 	defer wg.Done()
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
