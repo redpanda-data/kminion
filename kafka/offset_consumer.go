@@ -136,7 +136,7 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 			offsetWaterMarks.Lock.RLock()
 			if val, exists := offsetWaterMarks.PartitionsByID[partitionID]; exists {
 				// Not sure why -1 is needed here, but otherwise there are lots of partition consumers with a remaining lag of 1
-				highWaterMark = val.HighWaterMark - 1
+				highWaterMark = int64(math.Min(0, float64(val.HighWaterMark-1)))
 			}
 			offsetWaterMarks.Lock.RUnlock()
 			if consumedOffset >= highWaterMark {
