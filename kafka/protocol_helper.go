@@ -6,6 +6,9 @@ import (
 	"fmt"
 )
 
+// Protocol primitives helper file, see:
+// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ProtocolPrimitiveTypes
+
 // readString tries to read a string following the Kafka binary protocol. Strings are size delimited.
 // It returns an error if it can not read a string on the given buffer.
 func readString(buf *bytes.Buffer) (string, error) {
