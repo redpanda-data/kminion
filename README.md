@@ -103,7 +103,7 @@ At a high level Kafka Minion fetches source data in two different ways.
 
 ### Why did you create yet another kafka lag exporter?
 
-1. As of writing the exporter there is no publicly available prometheus exporter which is lightweight, robust and supports Kafka v0.11 - v2.1+ (to my knowledge)
+1. As of writing the exporter there is no publicly available prometheus exporter (to my knowledge) which is lightweight, robust and supports Kafka v0.11 - v2.1+
 
 2. We are primarily interested in per consumergroup:topic lags. Some exporters export either only consumer group lags (of all topics alltogether) or they export only per partition metrics. While you can obviously aggregate those partition metrics in Grafana as well, it adds unnecessary complexity in Grafana dashboards. This exporter adds both.
 
