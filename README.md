@@ -15,6 +15,13 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 - [x] Provides per consumergroup:topic lag metrics (removes a topic's metrics if a single partition metric in that topic couldn't be fetched)
 - [x] Created to use in Kubernetes clusters (has liveness/readiness check and helm chart for easier setup)
 
+## Roadmap
+
+- [ ] Adding more tests, especially for decoding all the kafka binary messages. The binary format sometimes changes with newer kafka versions. To ensure that all kafka versions will be supported and future kafka minion changes are compatible, I'd like to add tests on this
+- [ ] Getting more feedback from users who run Kafka Minion in other environments
+- [ ] Add processing of group meta data messages, so that more information about consumer groups can be exposed
+- [ ] Add sample Grafana dashboard
+
 ## Setup
 
 ### Environment variables
