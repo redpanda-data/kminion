@@ -21,6 +21,7 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 - [ ] Getting more feedback from users who run Kafka Minion in other environments
 - [ ] Add processing of group meta data messages, so that more information about consumer groups can be exposed
 - [ ] Add sample Grafana dashboard
+- [ ] Add more metrics about topics and partitions (partition count and cleanup policy)
 
 ## Setup
 
