@@ -184,7 +184,7 @@ func (module *OffsetConsumer) processMessage(msg *sarama.ConsumerMessage) {
 	case 0, 1:
 		module.processOffsetCommit(key, value, logger)
 	case 2:
-		processGroupMetadata(key, value, logger)
+		// module.processGroupMetadata(key, value, logger)
 	default:
 		logger.WithFields(log.Fields{
 			"reason":  "unknown key version",
@@ -272,7 +272,7 @@ func (module *OffsetConsumer) isTopicAllowed(topicName string) bool {
 }
 
 // processGroupMetadata decodes all group metadata messages and sends them to the storage module
-func processGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
+func (module *OffsetConsumer) processGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) {
 	isTombstone := false
 	if value.Len() == 0 {
 		isTombstone = true
@@ -282,5 +282,10 @@ func processGroupMetadata(key *bytes.Buffer, value *bytes.Buffer, logger *log.En
 	}
 
 	// Group metadata contains client information (such as owner's IP address), how many partitions are assigned to a group member etc
-	// newConsumerGroupMetadata(key, value, logger)
+	metadata, err := newConsumerGroupMetadata(key, value, logger)
+	if err != nil {
+		// Error is already logged inside of the function
+		return
+	}
+	module.storageChannel <- newAddGroupMetadata(metadata)
 }

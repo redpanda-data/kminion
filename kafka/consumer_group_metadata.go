@@ -96,14 +96,15 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 	metadataHeader.ProtocolType, err = readString(valueBuffer)
 	if err != nil {
 		logger.WithFields(log.Fields{
-			"reason": "metadata header protocol type",
+			"error_at": "metadata header protocol type",
 		}).Warn("failed to decode")
 		return nil, err
 	}
 	err = binary.Read(valueBuffer, binary.BigEndian, &metadataHeader.Generation)
 	if err != nil {
 		logger.WithFields(log.Fields{
-			"reason":        "metadata header generation",
+			"error_at":      "metadata header generation",
+			"error":         err.Error(),
 			"protocol_type": metadataHeader.ProtocolType,
 		}).Warn("failed to decode")
 		return nil, err
@@ -111,7 +112,7 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 	metadataHeader.Protocol, err = readString(valueBuffer)
 	if err != nil {
 		logger.WithFields(log.Fields{
-			"reason":        "metadata header protocol",
+			"error_at":      "metadata header protocol",
 			"protocol_type": metadataHeader.ProtocolType,
 			"generation":    metadataHeader.Generation,
 		}).Warn("failed to decode")
@@ -120,7 +121,7 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 	metadataHeader.Leader, err = readString(valueBuffer)
 	if err != nil {
 		logger.WithFields(log.Fields{
-			"reason":        "metadata header leader",
+			"error_at":      "metadata header leader",
 			"protocol_type": metadataHeader.ProtocolType,
 			"generation":    metadataHeader.Generation,
 			"protocol":      metadataHeader.Protocol,
@@ -132,7 +133,7 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 		err = binary.Read(valueBuffer, binary.BigEndian, &metadataHeader.Timestamp)
 		if err != nil {
 			logger.WithFields(log.Fields{
-				"reason":        "metadata header leader",
+				"error_at":      "metadata header timestamp",
 				"protocol_type": metadataHeader.ProtocolType,
 				"generation":    metadataHeader.Generation,
 				"protocol":      metadataHeader.Protocol,
@@ -155,7 +156,8 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 	err = binary.Read(valueBuffer, binary.BigEndian, &memberCount)
 	if err != nil {
 		metadataLogger.WithFields(log.Fields{
-			"reason": "no member size",
+			"error_at": "member count",
+			"reason":   "no member size",
 		}).Warn("failed to decode")
 		return nil, err
 	}
@@ -165,8 +167,9 @@ func decodeGroupMetadata(valueVersion int16, group string, valueBuffer *bytes.Bu
 		member, errorAt := decodeMetadataMember(valueBuffer, valueVersion)
 		if errorAt != "" {
 			metadataLogger.WithFields(log.Fields{
-				"reason": errorAt,
-			}).Warn("Failed to decode")
+				"error_at": "metadata member",
+				"reason":   errorAt,
+			}).Warn("failed to decode")
 
 			return nil, fmt.Errorf("Decoding member, error at: %v", errorAt)
 		}

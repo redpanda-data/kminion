@@ -76,9 +76,9 @@ func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *
 	var decodedValue offsetValue
 	switch valueVersion {
 	case 0, 1:
-		decodedValue, err = decodeOffsetValueV0(value)
+		decodedValue, err = decodeOffsetValueV0(value, offsetLogger.WithField("value_version", valueVersion))
 	case 3:
-		decodedValue, err = decodeOffsetValueV3(value)
+		decodedValue, err = decodeOffsetValueV3(value, offsetLogger.WithField("value_version", valueVersion))
 	default:
 		err = fmt.Errorf("unknown value version to decode offsetValue. Given version: '%v'", valueVersion)
 	}
@@ -91,30 +91,46 @@ func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *
 	return &entry, nil
 }
 
-func decodeOffsetValueV0(value *bytes.Buffer) (offsetValue, error) {
+func decodeOffsetValueV0(value *bytes.Buffer, logger *log.Entry) (offsetValue, error) {
 	offset := offsetValue{}
 
 	err := binary.Read(value, binary.BigEndian, &offset.Offset)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "offset",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offset, fmt.Errorf("failed to decode 'offset' field for OffsetValue V0: %v", err)
 	}
 	_, err = readString(value)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "metadata",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offset, fmt.Errorf("failed to decode 'metadata' field for OffsetValue V0: %v", err)
 	}
 	err = binary.Read(value, binary.BigEndian, &offset.Timestamp)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "timestamp",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offset, fmt.Errorf("failed to decode 'timestamp' field for OffsetValue V0: %v", err)
 	}
 
 	return offset, nil
 }
 
-func decodeOffsetValueV3(value *bytes.Buffer) (offsetValue, error) {
+func decodeOffsetValueV3(value *bytes.Buffer, logger *log.Entry) (offsetValue, error) {
 	offsetValue := offsetValue{}
 
 	err := binary.Read(value, binary.BigEndian, &offsetValue.Offset)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "offset",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offsetValue, fmt.Errorf("failed to decode 'offset' field for OffsetValue: %v", err)
 	}
 
@@ -123,16 +139,28 @@ func decodeOffsetValueV3(value *bytes.Buffer) (offsetValue, error) {
 	var leaderEpoch int32
 	err = binary.Read(value, binary.BigEndian, &leaderEpoch)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "leaderEpoch",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offsetValue, fmt.Errorf("failed to decode 'leaderEpoch' field for OffsetValue V3: %v", err)
 	}
 
 	// metadata field contains additional metadata information which can optionally be set by a consumer
 	_, err = readString(value)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "metadata",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offsetValue, fmt.Errorf("failed to decode 'metadata' field for OffsetValue V3: %v", err)
 	}
 	err = binary.Read(value, binary.BigEndian, &offsetValue.Timestamp)
 	if err != nil {
+		logger.WithFields(log.Fields{
+			"error_at": "timestamp",
+			"error":    err.Error(),
+		}).Error("failed to decode offset value")
 		return offsetValue, fmt.Errorf("failed to decode 'timestamp' field for OffsetValue: %v", err)
 	}
 

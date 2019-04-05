@@ -15,16 +15,22 @@ const (
 	// StorageAddConsumerOffset is the request type to add a consumer's offset commit
 	StorageAddConsumerOffset StorageRequestType = 2
 
+	// StorageAddGroupMetadata is the request type to add a group member's partition assignment
+	StorageAddGroupMetadata StorageRequestType = 3
+
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
-	StorageDeleteConsumerGroup StorageRequestType = 3
+	StorageDeleteConsumerGroup StorageRequestType = 4
 
 	// StorageRegisterOffsetPartition is the request type to make the storage module aware that a partition consumer for
 	// the consumer offsets partition exists and that it should await it's ready signal before exposing metrics
-	StorageRegisterOffsetPartition StorageRequestType = 4
+	StorageRegisterOffsetPartition StorageRequestType = 5
 
 	// StorageMarkOffsetPartitionReady is the request type to mark a partition consumer of the consumer offsets topic
 	// as ready (=caught up partition lag)
-	StorageMarkOffsetPartitionReady StorageRequestType = 5
+	StorageMarkOffsetPartitionReady StorageRequestType = 6
+
+	// StorageDeleteGroupMetadata is the request type to delete a group member's partition assignment
+	StorageDeleteGroupMetadata StorageRequestType = 7
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
@@ -32,6 +38,7 @@ type StorageRequest struct {
 	RequestType        StorageRequestType
 	ConsumerOffset     *ConsumerPartitionOffset
 	PartitionWaterMark *PartitionWaterMark
+	GroupMetadata      *ConsumerGroupMetadata
 	ConsumerGroupName  string
 	TopicName          string
 	PartitionID        int32
@@ -58,6 +65,13 @@ func newAddConsumerOffsetRequest(offset *ConsumerPartitionOffset) *StorageReques
 	}
 }
 
+func newAddGroupMetadata(metadata *ConsumerGroupMetadata) *StorageRequest {
+	return &StorageRequest{
+		RequestType:   StorageAddGroupMetadata,
+		GroupMetadata: metadata,
+	}
+}
+
 func newDeleteConsumerGroupRequest(group string, topic string, partitionID int32) *StorageRequest {
 	return &StorageRequest{
 		RequestType:       StorageDeleteConsumerGroup,
@@ -78,5 +92,12 @@ func newMarkOffsetPartitionReady(partitionID int32) *StorageRequest {
 	return &StorageRequest{
 		RequestType: StorageMarkOffsetPartitionReady,
 		PartitionID: partitionID,
+	}
+}
+
+func newDeleteGroupMetadata(group string) *StorageRequest {
+	return &StorageRequest{
+		RequestType:       StorageDeleteGroupMetadata,
+		ConsumerGroupName: group,
 	}
 }

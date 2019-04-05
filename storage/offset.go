@@ -20,12 +20,16 @@ type OffsetStorage struct {
 	consumerOffsetsLock         sync.RWMutex
 	partitionHighWaterMarksLock sync.RWMutex
 	partitionLowWaterMarksLock  sync.RWMutex
+	groupMetadataLock           sync.RWMutex
 
 	// consumerOffsets key is "group:topic:partition" (e.g. "sample-consumer:order:20")
 	// partitionHighWaterMarks key is "topicname:partitionId" (e.g. "order:20")
+	// partitionLowWaterMarks key is "topicname:partitionId" (e.g. "order:20")
+	// groupMetadata key is the group id (e.g. "sample-consumer")
 	consumerOffsets         map[string]ConsumerPartitionOffsetMetric
 	partitionHighWaterMarks map[string]kafka.PartitionWaterMark
 	partitionLowWaterMarks  map[string]kafka.PartitionWaterMark
+	groupMetadata           map[string]kafka.ConsumerGroupMetadata
 
 	logger *log.Entry
 }
@@ -57,6 +61,7 @@ func NewOffsetStorage(consumerOffsetCh chan *kafka.StorageRequest, clusterCh cha
 		consumerOffsets:         make(map[string]ConsumerPartitionOffsetMetric),
 		partitionHighWaterMarks: make(map[string]kafka.PartitionWaterMark),
 		partitionLowWaterMarks:  make(map[string]kafka.PartitionWaterMark),
+		groupMetadata:           make(map[string]kafka.ConsumerGroupMetadata),
 
 		logger: log.WithFields(log.Fields{
 			"module": "storage",
@@ -75,6 +80,8 @@ func (module *OffsetStorage) consumerOffsetWorker() {
 		switch request.RequestType {
 		case kafka.StorageAddConsumerOffset:
 			module.storeOffsetEntry(request.ConsumerOffset)
+		case kafka.StorageAddGroupMetadata:
+			module.storeGroupMetadata(request.GroupMetadata)
 		case kafka.StorageDeleteConsumerGroup:
 			module.deleteOffsetEntry(request.ConsumerGroupName, request.TopicName, request.PartitionID)
 		case kafka.StorageRegisterOffsetPartition:
@@ -112,8 +119,16 @@ func (module *OffsetStorage) clusterWorker() {
 func (module *OffsetStorage) storePartitionHighWaterMark(offset *kafka.PartitionWaterMark) {
 	key := fmt.Sprintf("%v:%v", offset.TopicName, offset.PartitionID)
 	module.partitionHighWaterMarksLock.Lock()
+	defer module.partitionHighWaterMarksLock.Unlock()
+
 	module.partitionHighWaterMarks[key] = *offset
-	module.partitionHighWaterMarksLock.Unlock()
+}
+
+func (module *OffsetStorage) storeGroupMetadata(metadata *kafka.ConsumerGroupMetadata) {
+	module.groupMetadataLock.Lock()
+	defer module.groupMetadataLock.Unlock()
+
+	module.groupMetadata[metadata.Group] = *metadata
 }
 
 func (module *OffsetStorage) registerOffsetPartition(partitionID int32) {
@@ -137,8 +152,9 @@ func (module *OffsetStorage) markOffsetPartitionReady(partitionID int32) {
 func (module *OffsetStorage) storePartitionLowWaterMark(offset *kafka.PartitionWaterMark) {
 	key := fmt.Sprintf("%v:%v", offset.TopicName, offset.PartitionID)
 	module.partitionLowWaterMarksLock.Lock()
+	defer module.partitionLowWaterMarksLock.Unlock()
+
 	module.partitionLowWaterMarks[key] = *offset
-	module.partitionLowWaterMarksLock.Unlock()
 }
 
 func (module *OffsetStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOffset) {
@@ -163,11 +179,12 @@ func (module *OffsetStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOff
 func (module *OffsetStorage) deleteOffsetEntry(consumerGroupName string, topicName string, partitionID int32) {
 	key := fmt.Sprintf("%v:%v:%v", consumerGroupName, topicName, partitionID)
 	module.consumerOffsetsLock.Lock()
+	defer module.consumerOffsetsLock.Unlock()
+
 	delete(module.consumerOffsets, key)
-	module.consumerOffsetsLock.Unlock()
 }
 
-// ConsumerOffsets returns a copy of the current known consumer group offsets, so that they can safely be processed
+// ConsumerOffsets returns a copy of the currently known consumer group offsets, so that they can safely be processed
 // in another go routine
 func (module *OffsetStorage) ConsumerOffsets() map[string]ConsumerPartitionOffsetMetric {
 	module.consumerOffsetsLock.RLock()
@@ -175,6 +192,19 @@ func (module *OffsetStorage) ConsumerOffsets() map[string]ConsumerPartitionOffse
 
 	mapCopy := make(map[string]ConsumerPartitionOffsetMetric)
 	for key, value := range module.consumerOffsets {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
+}
+
+// GroupMetadata returns a copy of the currently known group metadata
+func (module *OffsetStorage) GroupMetadata() map[string]kafka.ConsumerGroupMetadata {
+	module.groupMetadataLock.RLock()
+	defer module.groupMetadataLock.RUnlock()
+
+	mapCopy := make(map[string]kafka.ConsumerGroupMetadata)
+	for key, value := range module.groupMetadata {
 		mapCopy[key] = value
 	}
 
