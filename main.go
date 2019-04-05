@@ -57,14 +57,18 @@ func main() {
 
 	// Start listening on /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
-	http.Handle("/healthcheck", healthcheck())
+	http.Handle("/healthcheck", healthcheck(cluster))
 	listenAddress := fmt.Sprintf("%v:%d", opts.TelemetryHost, opts.TelemetryPort)
 	log.Infof("Listening on: '%s", listenAddress)
 	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
 
-func healthcheck() http.HandlerFunc {
+func healthcheck(cluster *kafka.Cluster) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Status: Healthy"))
+		if cluster.IsHealthy() {
+			w.Write([]byte("Healthy"))
+		} else {
+			http.Error(w, "Healthcheck failed", http.StatusServiceUnavailable)
+		}
 	})
 }

@@ -86,6 +86,15 @@ func (module *Cluster) Start() {
 	go module.mainLoop(offsetRefresh)
 }
 
+// IsHealthy returns true if there is at least one broker which can be talked to
+func (module *Cluster) IsHealthy() bool {
+	if len(module.client.Brokers()) > 0 {
+		return true
+	}
+
+	return false
+}
+
 func (module *Cluster) mainLoop(offsetRefresh *time.Ticker) {
 	for {
 		select {
