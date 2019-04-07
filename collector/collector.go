@@ -18,6 +18,9 @@ var (
 	groupPartitionLagDesc         *prometheus.Desc
 	groupTopicLagDesc             *prometheus.Desc
 
+	// Topic metrics
+	partitionCountDesc *prometheus.Desc
+
 	// Partition metrics
 	partitionLowWaterMarkDesc  *prometheus.Desc
 	partitionHighWaterMarkDesc *prometheus.Desc
@@ -76,6 +79,13 @@ func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collec
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic"}, prometheus.Labels{},
 	)
 
+	// Topic metrics
+	partitionCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "partition_count"),
+		"Partition count for a given topic along with cleanup policy as label",
+		[]string{"topic", "cleanup_policy"}, prometheus.Labels{},
+	)
+
 	// Partition metrics
 	partitionHighWaterMarkDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "high_water_mark"),
@@ -117,8 +127,19 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	consumerOffsets := e.storage.ConsumerOffsets()
 	partitionLowWaterMarks := e.storage.PartitionLowWaterMarks()
 	partitionHighWaterMarks := e.storage.PartitionHighWaterMarks()
+	topicConfigs := e.storage.TopicConfigs()
 
 	e.collectConsumerOffsets(ch, consumerOffsets, partitionLowWaterMarks, partitionHighWaterMarks)
+
+	for _, config := range topicConfigs {
+		ch <- prometheus.MustNewConstMetric(
+			partitionCountDesc,
+			prometheus.GaugeValue,
+			float64(config.PartitionCount),
+			config.TopicName,
+			config.CleanupPolicy,
+		)
+	}
 
 	for _, partition := range partitionLowWaterMarks {
 		ch <- prometheus.MustNewConstMetric(

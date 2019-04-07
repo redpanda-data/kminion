@@ -5,6 +5,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	log "github.com/sirupsen/logrus"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ type Cluster struct {
 	// partitionWaterMarksCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
 	partitionWaterMarksCh chan *StorageRequest
 	client                sarama.Client
+	admin                 sarama.ClusterAdmin
 	logger                *log.Entry
 	options               *options.Options
 }
@@ -27,6 +29,13 @@ type PartitionWaterMark struct {
 	PartitionID int32
 	WaterMark   int64
 	Timestamp   int64
+}
+
+// TopicConfiguration indicates config entries for a topic along with the partition count
+type TopicConfiguration struct {
+	TopicName      string
+	PartitionCount int
+	CleanupPolicy  string
 }
 
 type consumerOffsetTopic struct {
@@ -67,11 +76,19 @@ func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageReques
 			"reason": err,
 		}).Panicf("failed to start client")
 	}
+
+	admin, err := sarama.NewClusterAdmin(opts.KafkaBrokers, clientConfig)
+	if err != nil {
+		connectionLogger.WithFields(log.Fields{
+			"reason": err,
+		}).Panicf("failed to start admin client")
+	}
 	connectionLogger.Info("successfully connected to kafka cluster")
 
 	return &Cluster{
 		partitionWaterMarksCh: partitionWaterMarksCh,
 		client:                client,
+		admin:                 admin,
 		logger:                logger,
 		options:               opts,
 	}
@@ -79,11 +96,7 @@ func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageReques
 
 // Start starts cluster module
 func (module *Cluster) Start() {
-	// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
-	module.refreshAndSendTopicMetadata()
-
-	offsetRefresh := time.NewTicker(time.Second * 5)
-	go module.mainLoop(offsetRefresh)
+	go module.mainLoop()
 }
 
 // IsHealthy returns true if there is at least one broker which can be talked to
@@ -95,12 +108,80 @@ func (module *Cluster) IsHealthy() bool {
 	return false
 }
 
-func (module *Cluster) mainLoop(offsetRefresh *time.Ticker) {
+func (module *Cluster) mainLoop() {
+	// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
+	module.refreshAndSendTopicMetadata()
+	module.refreshAndSendTopicConfig()
+
+	offsetRefresh := time.NewTicker(time.Second * 5)
+	topicConfigRefresh := time.NewTicker(time.Second * 60)
+
 	for {
 		select {
 		case <-offsetRefresh.C:
 			module.refreshAndSendTopicMetadata()
+		case <-topicConfigRefresh.C:
+			module.refreshAndSendTopicConfig()
 		}
+	}
+}
+
+func (module *Cluster) refreshAndSendTopicConfig() {
+	broker := module.getAnyBroker()
+	if broker == nil {
+		module.logger.WithFields(log.Fields{
+			"error": "no brokers available",
+		}).Warn("failed to get active broker to refresh topic config")
+		return
+	}
+
+	metadataReq := &sarama.MetadataRequest{}
+	metadata, err := broker.GetMetadata(metadataReq)
+	if err != nil {
+		module.logger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Warn("failed to get metadata")
+		return
+	}
+	module.logger.Info(metadata)
+
+	// Prepare config request which contains all topic requests.
+	// This way we can avoid sending many requests
+	var describeConfigsResources []*sarama.ConfigResource
+	topicByName := make(map[string]*sarama.TopicMetadata)
+	for _, topic := range metadata.Topics {
+		topicByName[topic.Name] = topic
+		topicResource := &sarama.ConfigResource{
+			Type:        sarama.TopicResource,
+			Name:        topic.Name,
+			ConfigNames: []string{"cleanup.policy"},
+		}
+		describeConfigsResources = append(describeConfigsResources, topicResource)
+	}
+
+	request := &sarama.DescribeConfigsRequest{
+		Resources: describeConfigsResources,
+	}
+	response, err := broker.DescribeConfigs(request)
+	if err != nil {
+		module.logger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Warn("failed to get describe configs response")
+		return
+	}
+
+	for _, resource := range response.Resources {
+		if resource.ErrorCode != 0 || len(resource.Configs) == 0 {
+			continue
+		}
+
+		partitionCount := len(topicByName[resource.Name].Partitions)
+		config := &TopicConfiguration{
+			TopicName:      resource.Name,
+			PartitionCount: partitionCount,
+			CleanupPolicy:  resource.Configs[0].Value,
+		}
+		module.partitionWaterMarksCh <- newAddTopicConfig(config)
 	}
 }
 
@@ -154,6 +235,9 @@ func (module *Cluster) topicPartitions() (map[string][]int32, error) {
 
 	partitionIDsByTopicName := make(map[string][]int32)
 	for _, topicName := range topicNames {
+		if !module.isTopicAllowed(topicName) {
+			continue
+		}
 		// Partitions() response is served from cached metadata if available. So there's usually no need to launch go routines for that
 		partitionIDs, err := module.client.Partitions(topicName)
 		if err != nil {
@@ -299,6 +383,20 @@ func (module *Cluster) processLowWaterMarks(wg *sync.WaitGroup, broker *sarama.B
 			module.partitionWaterMarksCh <- newAddPartitionLowWaterMarkRequest(entry)
 		}
 	}
+}
+
+// getAnyBroker return a random item from the brokers slice
+func (module *Cluster) getAnyBroker() *sarama.Broker {
+	brokers := module.client.Brokers()
+	length := len(brokers)
+	if length == 0 {
+		return nil
+	}
+
+	rand.Seed(time.Now().Unix())
+	n := rand.Int() % len(brokers)
+
+	return brokers[n]
 }
 
 func (module *Cluster) isTopicAllowed(topicName string) bool {

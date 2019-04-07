@@ -21,6 +21,7 @@ type OffsetStorage struct {
 	partitionHighWaterMarksLock sync.RWMutex
 	partitionLowWaterMarksLock  sync.RWMutex
 	groupMetadataLock           sync.RWMutex
+	topicConfigLock             sync.RWMutex
 
 	// consumerOffsets key is "group:topic:partition" (e.g. "sample-consumer:order:20")
 	// partitionHighWaterMarks key is "topicname:partitionId" (e.g. "order:20")
@@ -30,6 +31,7 @@ type OffsetStorage struct {
 	partitionHighWaterMarks map[string]kafka.PartitionWaterMark
 	partitionLowWaterMarks  map[string]kafka.PartitionWaterMark
 	groupMetadata           map[string]kafka.ConsumerGroupMetadata
+	topicConfig             map[string]kafka.TopicConfiguration
 
 	logger *log.Entry
 }
@@ -57,10 +59,12 @@ func NewOffsetStorage(consumerOffsetCh chan *kafka.StorageRequest, clusterCh cha
 		consumerOffsetsLock:         sync.RWMutex{},
 		partitionHighWaterMarksLock: sync.RWMutex{},
 		partitionLowWaterMarksLock:  sync.RWMutex{},
+		topicConfigLock:             sync.RWMutex{},
 
 		consumerOffsets:         make(map[string]ConsumerPartitionOffsetMetric),
 		partitionHighWaterMarks: make(map[string]kafka.PartitionWaterMark),
 		partitionLowWaterMarks:  make(map[string]kafka.PartitionWaterMark),
+		topicConfig:             make(map[string]kafka.TopicConfiguration),
 		groupMetadata:           make(map[string]kafka.ConsumerGroupMetadata),
 
 		logger: log.WithFields(log.Fields{
@@ -106,6 +110,9 @@ func (module *OffsetStorage) clusterWorker() {
 			module.storePartitionLowWaterMark(request.PartitionWaterMark)
 		case kafka.StorageAddPartitionHighWaterMark:
 			module.storePartitionHighWaterMark(request.PartitionWaterMark)
+		case kafka.StorageAddTopicConfiguration:
+			module.storeTopicConfig(request.TopicConfig)
+
 		default:
 			log.WithFields(log.Fields{
 				"request_type": request.RequestType,
@@ -129,6 +136,13 @@ func (module *OffsetStorage) storeGroupMetadata(metadata *kafka.ConsumerGroupMet
 	defer module.groupMetadataLock.Unlock()
 
 	module.groupMetadata[metadata.Group] = *metadata
+}
+
+func (module *OffsetStorage) storeTopicConfig(config *kafka.TopicConfiguration) {
+	module.topicConfigLock.Lock()
+	defer module.topicConfigLock.Unlock()
+
+	module.topicConfig[config.TopicName] = *config
 }
 
 func (module *OffsetStorage) registerOffsetPartition(partitionID int32) {
@@ -205,6 +219,19 @@ func (module *OffsetStorage) GroupMetadata() map[string]kafka.ConsumerGroupMetad
 
 	mapCopy := make(map[string]kafka.ConsumerGroupMetadata)
 	for key, value := range module.groupMetadata {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
+}
+
+// TODO remove outdated data
+func (module *OffsetStorage) TopicConfigs() map[string]kafka.TopicConfiguration {
+	module.topicConfigLock.RLock()
+	defer module.topicConfigLock.RUnlock()
+
+	mapCopy := make(map[string]kafka.TopicConfiguration)
+	for key, value := range module.topicConfig {
 		mapCopy[key] = value
 	}
 

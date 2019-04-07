@@ -18,19 +18,22 @@ const (
 	// StorageAddGroupMetadata is the request type to add a group member's partition assignment
 	StorageAddGroupMetadata StorageRequestType = 3
 
+	// StorageAddTopicConfiguration is the request type to add configuration entries for a topic
+	StorageAddTopicConfiguration StorageRequestType = 4
+
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
-	StorageDeleteConsumerGroup StorageRequestType = 4
+	StorageDeleteConsumerGroup StorageRequestType = 5
 
 	// StorageRegisterOffsetPartition is the request type to make the storage module aware that a partition consumer for
 	// the consumer offsets partition exists and that it should await it's ready signal before exposing metrics
-	StorageRegisterOffsetPartition StorageRequestType = 5
+	StorageRegisterOffsetPartition StorageRequestType = 6
 
 	// StorageMarkOffsetPartitionReady is the request type to mark a partition consumer of the consumer offsets topic
 	// as ready (=caught up partition lag)
-	StorageMarkOffsetPartitionReady StorageRequestType = 6
+	StorageMarkOffsetPartitionReady StorageRequestType = 7
 
 	// StorageDeleteGroupMetadata is the request type to delete a group member's partition assignment
-	StorageDeleteGroupMetadata StorageRequestType = 7
+	StorageDeleteGroupMetadata StorageRequestType = 8
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
@@ -38,6 +41,7 @@ type StorageRequest struct {
 	RequestType        StorageRequestType
 	ConsumerOffset     *ConsumerPartitionOffset
 	PartitionWaterMark *PartitionWaterMark
+	TopicConfig        *TopicConfiguration
 	GroupMetadata      *ConsumerGroupMetadata
 	ConsumerGroupName  string
 	TopicName          string
@@ -69,6 +73,13 @@ func newAddGroupMetadata(metadata *ConsumerGroupMetadata) *StorageRequest {
 	return &StorageRequest{
 		RequestType:   StorageAddGroupMetadata,
 		GroupMetadata: metadata,
+	}
+}
+
+func newAddTopicConfig(config *TopicConfiguration) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageAddTopicConfiguration,
+		TopicConfig: config,
 	}
 }
 
