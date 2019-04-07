@@ -21,6 +21,7 @@ type Cluster struct {
 	admin                 sarama.ClusterAdmin
 	logger                *log.Entry
 	options               *options.Options
+	topicByName           map[string]*sarama.TopicMetadata
 }
 
 // PartitionWaterMark contains either the first or last known commited offset (water mark) for a partition
@@ -126,6 +127,24 @@ func (module *Cluster) mainLoop() {
 	}
 }
 
+// deleteTopicIfNeeded checks a current map of available topics against a previously fetched
+// map and sends a delete topic request for topics which are not existent anymore.
+func (module *Cluster) deleteTopicIfNeeded(topicByName map[string]*sarama.TopicMetadata) {
+	if module.topicByName != nil {
+		for topicName := range module.topicByName {
+			if _, exists := topicByName[topicName]; !exists {
+				// Topic previously existed, but now it doesn't exist anymore, send delete request
+				module.logger.WithFields(log.Fields{
+					"topic": topicName,
+				}).Info("topic no longer exists, deleting it from storage")
+				module.partitionWaterMarksCh <- newDeleteTopicRequest(topicName)
+			}
+		}
+	}
+
+	module.topicByName = topicByName
+}
+
 func (module *Cluster) refreshAndSendTopicConfig() {
 	broker := module.getAnyBroker()
 	if broker == nil {
@@ -143,7 +162,6 @@ func (module *Cluster) refreshAndSendTopicConfig() {
 		}).Warn("failed to get metadata")
 		return
 	}
-	module.logger.Info(metadata)
 
 	// Prepare config request which contains all topic requests.
 	// This way we can avoid sending many requests
@@ -158,6 +176,7 @@ func (module *Cluster) refreshAndSendTopicConfig() {
 		}
 		describeConfigsResources = append(describeConfigsResources, topicResource)
 	}
+	module.deleteTopicIfNeeded(topicByName)
 
 	request := &sarama.DescribeConfigsRequest{
 		Resources: describeConfigsResources,
@@ -235,9 +254,6 @@ func (module *Cluster) topicPartitions() (map[string][]int32, error) {
 
 	partitionIDsByTopicName := make(map[string][]int32)
 	for _, topicName := range topicNames {
-		if !module.isTopicAllowed(topicName) {
-			continue
-		}
 		// Partitions() response is served from cached metadata if available. So there's usually no need to launch go routines for that
 		partitionIDs, err := module.client.Partitions(topicName)
 		if err != nil {

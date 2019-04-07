@@ -7,6 +7,9 @@ import (
 	"sync"
 )
 
+// PartitionWaterMarks represents a map of PartitionWaterMarks grouped by PartitionID
+type PartitionWaterMarks = map[int32]kafka.PartitionWaterMark
+
 // OffsetStorage stores the latest commited offsets for each group, topic, partition combination and offers an interface
 // to access these information
 type OffsetStorage struct {
@@ -28,8 +31,8 @@ type OffsetStorage struct {
 	// partitionLowWaterMarks key is "topicname:partitionId" (e.g. "order:20")
 	// groupMetadata key is the group id (e.g. "sample-consumer")
 	consumerOffsets         map[string]ConsumerPartitionOffsetMetric
-	partitionHighWaterMarks map[string]kafka.PartitionWaterMark
-	partitionLowWaterMarks  map[string]kafka.PartitionWaterMark
+	partitionHighWaterMarks map[string]PartitionWaterMarks
+	partitionLowWaterMarks  map[string]PartitionWaterMarks
 	groupMetadata           map[string]kafka.ConsumerGroupMetadata
 	topicConfig             map[string]kafka.TopicConfiguration
 
@@ -62,8 +65,8 @@ func NewOffsetStorage(consumerOffsetCh chan *kafka.StorageRequest, clusterCh cha
 		topicConfigLock:             sync.RWMutex{},
 
 		consumerOffsets:         make(map[string]ConsumerPartitionOffsetMetric),
-		partitionHighWaterMarks: make(map[string]kafka.PartitionWaterMark),
-		partitionLowWaterMarks:  make(map[string]kafka.PartitionWaterMark),
+		partitionHighWaterMarks: make(map[string]PartitionWaterMarks),
+		partitionLowWaterMarks:  make(map[string]PartitionWaterMarks),
 		topicConfig:             make(map[string]kafka.TopicConfiguration),
 		groupMetadata:           make(map[string]kafka.ConsumerGroupMetadata),
 
@@ -112,6 +115,8 @@ func (module *OffsetStorage) clusterWorker() {
 			module.storePartitionHighWaterMark(request.PartitionWaterMark)
 		case kafka.StorageAddTopicConfiguration:
 			module.storeTopicConfig(request.TopicConfig)
+		case kafka.StorageDeleteTopic:
+			module.deleteTopic(request.TopicName)
 
 		default:
 			log.WithFields(log.Fields{
@@ -123,12 +128,41 @@ func (module *OffsetStorage) clusterWorker() {
 	log.Panic("Partition Offset storage channel closed")
 }
 
+func (module *OffsetStorage) deleteTopic(topicName string) {
+	module.topicConfigLock.Lock()
+	module.partitionLowWaterMarksLock.Lock()
+	module.partitionHighWaterMarksLock.Lock()
+	defer module.topicConfigLock.Unlock()
+	defer module.partitionHighWaterMarksLock.Unlock()
+	defer module.partitionLowWaterMarksLock.Unlock()
+
+	delete(module.partitionLowWaterMarks, topicName)
+	delete(module.partitionHighWaterMarks, topicName)
+	delete(module.topicConfig, topicName)
+}
+
 func (module *OffsetStorage) storePartitionHighWaterMark(offset *kafka.PartitionWaterMark) {
-	key := fmt.Sprintf("%v:%v", offset.TopicName, offset.PartitionID)
 	module.partitionHighWaterMarksLock.Lock()
 	defer module.partitionHighWaterMarksLock.Unlock()
 
-	module.partitionHighWaterMarks[key] = *offset
+	// Initialize entry if needed
+	if _, exists := module.partitionHighWaterMarks[offset.TopicName]; !exists {
+		module.partitionHighWaterMarks[offset.TopicName] = make(PartitionWaterMarks)
+	}
+
+	module.partitionHighWaterMarks[offset.TopicName][offset.PartitionID] = *offset
+}
+
+func (module *OffsetStorage) storePartitionLowWaterMark(offset *kafka.PartitionWaterMark) {
+	module.partitionLowWaterMarksLock.Lock()
+	defer module.partitionLowWaterMarksLock.Unlock()
+
+	// Initialize entry if needed
+	if _, exists := module.partitionLowWaterMarks[offset.TopicName]; !exists {
+		module.partitionLowWaterMarks[offset.TopicName] = make(PartitionWaterMarks)
+	}
+
+	module.partitionLowWaterMarks[offset.TopicName][offset.PartitionID] = *offset
 }
 
 func (module *OffsetStorage) storeGroupMetadata(metadata *kafka.ConsumerGroupMetadata) {
@@ -161,14 +195,6 @@ func (module *OffsetStorage) markOffsetPartitionReady(partitionID int32) {
 		module.logger.Info("Offset topic has been consumed")
 		module.offsetTopicConsumed = true
 	}
-}
-
-func (module *OffsetStorage) storePartitionLowWaterMark(offset *kafka.PartitionWaterMark) {
-	key := fmt.Sprintf("%v:%v", offset.TopicName, offset.PartitionID)
-	module.partitionLowWaterMarksLock.Lock()
-	defer module.partitionLowWaterMarksLock.Unlock()
-
-	module.partitionLowWaterMarks[key] = *offset
 }
 
 func (module *OffsetStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOffset) {
@@ -225,7 +251,8 @@ func (module *OffsetStorage) GroupMetadata() map[string]kafka.ConsumerGroupMetad
 	return mapCopy
 }
 
-// TODO remove outdated data
+// TopicConfigs returns all topic configurations in a copied map, so that it
+// is safe to process in another go routine
 func (module *OffsetStorage) TopicConfigs() map[string]kafka.TopicConfiguration {
 	module.topicConfigLock.RLock()
 	defer module.topicConfigLock.RUnlock()
@@ -238,12 +265,13 @@ func (module *OffsetStorage) TopicConfigs() map[string]kafka.TopicConfiguration 
 	return mapCopy
 }
 
-// TODO remove outdated data
-func (module *OffsetStorage) PartitionHighWaterMarks() map[string]kafka.PartitionWaterMark {
+// PartitionHighWaterMarks returns all partition high water marks in a copied map, so that it
+// is safe to process in another go routine
+func (module *OffsetStorage) PartitionHighWaterMarks() map[string]PartitionWaterMarks {
 	module.partitionHighWaterMarksLock.RLock()
 	defer module.partitionHighWaterMarksLock.RUnlock()
 
-	mapCopy := make(map[string]kafka.PartitionWaterMark)
+	mapCopy := make(map[string]PartitionWaterMarks)
 	for key, value := range module.partitionHighWaterMarks {
 		mapCopy[key] = value
 	}
@@ -251,12 +279,13 @@ func (module *OffsetStorage) PartitionHighWaterMarks() map[string]kafka.Partitio
 	return mapCopy
 }
 
-// TODO remove outdated data
-func (module *OffsetStorage) PartitionLowWaterMarks() map[string]kafka.PartitionWaterMark {
+// PartitionLowWaterMarks returns all partition low water marks in a copied map, so that it
+// is safe to process in another go routine
+func (module *OffsetStorage) PartitionLowWaterMarks() map[string]PartitionWaterMarks {
 	module.partitionLowWaterMarksLock.RLock()
 	defer module.partitionLowWaterMarksLock.RUnlock()
 
-	mapCopy := make(map[string]kafka.PartitionWaterMark)
+	mapCopy := make(map[string]PartitionWaterMarks)
 	for key, value := range module.partitionLowWaterMarks {
 		mapCopy[key] = value
 	}

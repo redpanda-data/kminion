@@ -34,6 +34,9 @@ const (
 
 	// StorageDeleteGroupMetadata is the request type to delete a group member's partition assignment
 	StorageDeleteGroupMetadata StorageRequestType = 8
+
+	// StorageDeleteTopic is the request type to delete all topic information
+	StorageDeleteTopic StorageRequestType = 9
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
@@ -110,5 +113,12 @@ func newDeleteGroupMetadata(group string) *StorageRequest {
 	return &StorageRequest{
 		RequestType:       StorageDeleteGroupMetadata,
 		ConsumerGroupName: group,
+	}
+}
+
+func newDeleteTopicRequest(topic string) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageDeleteTopic,
+		TopicName:   topic,
 	}
 }

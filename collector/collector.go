@@ -1,8 +1,6 @@
 package collector
 
 import (
-	"fmt"
-	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/google-cloud-tools/kafka-minion/storage"
 	"github.com/prometheus/client_golang/prometheus"
@@ -141,36 +139,43 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 		)
 	}
 
-	for _, partition := range partitionLowWaterMarks {
-		ch <- prometheus.MustNewConstMetric(
-			partitionLowWaterMarkDesc,
-			prometheus.GaugeValue,
-			float64(partition.WaterMark),
-			partition.TopicName,
-			strconv.Itoa(int(partition.PartitionID)),
-		)
-	}
-
-	for _, partition := range partitionHighWaterMarks {
-		ch <- prometheus.MustNewConstMetric(
-			partitionHighWaterMarkDesc,
-			prometheus.GaugeValue,
-			float64(partition.WaterMark),
-			partition.TopicName,
-			strconv.Itoa(int(partition.PartitionID)),
-		)
-	}
-
-	for _, partition := range partitionHighWaterMarks {
-		key := fmt.Sprintf("%v:%v", partition.TopicName, partition.PartitionID)
-		if lowWaterMark, exists := partitionLowWaterMarks[key]; exists {
+	for _, partitions := range partitionLowWaterMarks {
+		for _, partition := range partitions {
 			ch <- prometheus.MustNewConstMetric(
-				partitionMessageCountDesc,
+				partitionLowWaterMarkDesc,
 				prometheus.GaugeValue,
-				float64(partition.WaterMark-lowWaterMark.WaterMark),
+				float64(partition.WaterMark),
 				partition.TopicName,
 				strconv.Itoa(int(partition.PartitionID)),
 			)
+		}
+	}
+
+	for _, partitions := range partitionHighWaterMarks {
+		for _, partition := range partitions {
+			ch <- prometheus.MustNewConstMetric(
+				partitionHighWaterMarkDesc,
+				prometheus.GaugeValue,
+				float64(partition.WaterMark),
+				partition.TopicName,
+				strconv.Itoa(int(partition.PartitionID)),
+			)
+		}
+	}
+
+	for _, partitions := range partitionHighWaterMarks {
+		for _, partition := range partitions {
+			topicName := partition.TopicName
+			partitionID := partition.PartitionID
+			if lowWaterMark, exists := partitionLowWaterMarks[topicName][partitionID]; exists {
+				ch <- prometheus.MustNewConstMetric(
+					partitionMessageCountDesc,
+					prometheus.GaugeValue,
+					float64(partition.WaterMark-lowWaterMark.WaterMark),
+					partition.TopicName,
+					strconv.Itoa(int(partition.PartitionID)),
+				)
+			}
 		}
 	}
 }
@@ -181,7 +186,7 @@ type groupLag struct {
 }
 
 func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets map[string]storage.ConsumerPartitionOffsetMetric,
-	lowWaterMarks map[string]kafka.PartitionWaterMark, highWaterMarks map[string]kafka.PartitionWaterMark) {
+	lowWaterMarks map[string]storage.PartitionWaterMarks, highWaterMarks map[string]storage.PartitionWaterMarks) {
 	consumerGroups := getVersionedConsumerGroups(offsets)
 
 	errorTopics := make(map[string]bool)
@@ -229,9 +234,7 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			strconv.Itoa(int(offset.Partition)),
 		)
 
-		// Key in partition water mark map is "topic:partition"
-		key := fmt.Sprintf("%v:%v", offset.Topic, offset.Partition)
-		if _, exists := lowWaterMarks[key]; !exists {
+		if _, exists := lowWaterMarks[offset.Topic][offset.Partition]; !exists {
 			errorTopics[offset.Topic] = true
 			e.logger.WithFields(log.Fields{
 				"topic":     offset.Topic,
@@ -239,8 +242,8 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			}).Warn("could not calculate partition lag because low water mark is missing")
 			continue
 		}
-		partitionLowWaterMark := lowWaterMarks[key].WaterMark
-		if _, exists := highWaterMarks[key]; !exists {
+		partitionLowWaterMark := lowWaterMarks[offset.Topic][offset.Partition].WaterMark
+		if _, exists := highWaterMarks[offset.Topic][offset.Partition]; !exists {
 			errorTopics[offset.Topic] = true
 			e.logger.WithFields(log.Fields{
 				"topic":     offset.Topic,
@@ -248,7 +251,7 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			}).Warn("could not calculate partition lag because high water mark is missing")
 			continue
 		}
-		partitionHighWaterMark := highWaterMarks[key].WaterMark
+		partitionHighWaterMark := highWaterMarks[offset.Topic][offset.Partition].WaterMark
 
 		var lag int64
 		if offset.Offset > partitionHighWaterMark {
