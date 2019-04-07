@@ -95,7 +95,7 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_internal_offset_consumer_group_metadata_read{version}`            | Number of read group metadata messages                      |
 | `kafka_minion_internal_offset_consumer_group_metadata_tombstones_read{version}` | Number of tombstone messages of all group metadata messages |
 | `kafka_minion_internal_kafka_messages_in_success{topic}`                        | Number of successfully received kafka messages              |
-| `kafka_minion_internal_kafka_messages_in_failed{topic]`                         | Number of errors while consuming kafka messages             |
+| `kafka_minion_internal_kafka_messages_in_failed{topic}`                         | Number of errors while consuming kafka messages             |
 
 ## How does it work
 
