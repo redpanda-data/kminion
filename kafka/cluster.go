@@ -15,13 +15,13 @@ import (
 // partition information (e. g. High & Low water marks). This information is passed to the storage
 // module where it can be retrieved by the prometheus collector to expose metrics.
 type Cluster struct {
-	// partitionWaterMarksCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
-	partitionWaterMarksCh chan *StorageRequest
-	client                sarama.Client
-	admin                 sarama.ClusterAdmin
-	logger                *log.Entry
-	options               *options.Options
-	topicByName           map[string]*sarama.TopicMetadata
+	// storageCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
+	storageCh   chan *StorageRequest
+	client      sarama.Client
+	admin       sarama.ClusterAdmin
+	logger      *log.Entry
+	options     *options.Options
+	topicByName map[string]*sarama.TopicMetadata
 }
 
 // PartitionWaterMark contains either the first or last known commited offset (water mark) for a partition
@@ -59,7 +59,7 @@ var (
 
 // NewCluster creates a new cluster module and tries to connect to the kafka cluster
 // If it cannot connect to the cluster it will panic
-func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageRequest) *Cluster {
+func NewCluster(opts *options.Options, storageCh chan *StorageRequest) *Cluster {
 	logger := log.WithFields(log.Fields{
 		"module": "cluster",
 	})
@@ -87,11 +87,11 @@ func NewCluster(opts *options.Options, partitionWaterMarksCh chan *StorageReques
 	connectionLogger.Info("successfully connected to kafka cluster")
 
 	return &Cluster{
-		partitionWaterMarksCh: partitionWaterMarksCh,
-		client:                client,
-		admin:                 admin,
-		logger:                logger,
-		options:               opts,
+		storageCh: storageCh,
+		client:    client,
+		admin:     admin,
+		logger:    logger,
+		options:   opts,
 	}
 }
 
@@ -137,7 +137,7 @@ func (module *Cluster) deleteTopicIfNeeded(topicByName map[string]*sarama.TopicM
 				module.logger.WithFields(log.Fields{
 					"topic": topicName,
 				}).Info("topic no longer exists, deleting it from storage")
-				module.partitionWaterMarksCh <- newDeleteTopicRequest(topicName)
+				module.storageCh <- newDeleteTopicRequest(topicName)
 			}
 		}
 	}
@@ -200,7 +200,7 @@ func (module *Cluster) refreshAndSendTopicConfig() {
 			PartitionCount: partitionCount,
 			CleanupPolicy:  resource.Configs[0].Value,
 		}
-		module.partitionWaterMarksCh <- newAddTopicConfig(config)
+		module.storageCh <- newAddTopicConfig(config)
 	}
 }
 
@@ -353,7 +353,7 @@ func (module *Cluster) processHighWaterMarks(wg *sync.WaitGroup, broker *sarama.
 				WaterMark:   offsetResponse.Offsets[0],
 				Timestamp:   ts,
 			}
-			module.partitionWaterMarksCh <- newAddPartitionHighWaterMarkRequest(entry)
+			module.storageCh <- newAddPartitionHighWaterMarkRequest(entry)
 		}
 	}
 }
@@ -396,7 +396,7 @@ func (module *Cluster) processLowWaterMarks(wg *sync.WaitGroup, broker *sarama.B
 				WaterMark:   offsetResponse.Offsets[0],
 				Timestamp:   ts,
 			}
-			module.partitionWaterMarksCh <- newAddPartitionLowWaterMarkRequest(entry)
+			module.storageCh <- newAddPartitionLowWaterMarkRequest(entry)
 		}
 	}
 }
