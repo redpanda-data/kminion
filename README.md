@@ -118,3 +118,11 @@ At a high level Kafka Minion fetches source data in two different ways.
 3. In our environment developers occasionally replay data by creating a new consumer group. They do so by incrementing a trailing number (e. g. "sample-group-1" becomes "sample-group-2"). In order to setup a proper alerting based on increasing lags for all consumer groups in a cluster, we need to ignore those "outdated" consumer groups. In this illustration "sample-group-1" as it's not being used anymore. This exporter adds 3 labels on each exporter consumergroup:topic lag metric to make that possible: `group_base_name`, `group_version`, `group_is_latest`. The meaning of each label is explained in the section [Labels](#labels)
 
 4. More (unique) metrics which are not available in other exporters. Likely some of these features are not desired in other exporters too.
+
+### How does Kafka Minion compare to Burrow?
+
+- Similiar data sources (consuming \_\_consumer_offsets topic and polling broker requests for topic watermarks)
+- Kafka Minion offers prometheus metrics natively, while Burrow needs an additional metrics exporter
+- Burrow has a more sophisticated approach to evaluate consumer lag health, while Kafka Minion leaves this to Grafana (query + alerts)
+- Kafka Minion is more lightweight and less complex because it does not offer such lag evaluation
+- Kafka Minion offers different/additional metrics and labels which aren't offered by Burrow and vice versa
