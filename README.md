@@ -124,5 +124,6 @@ At a high level Kafka Minion fetches source data in two different ways.
 - Similiar data sources (consuming \_\_consumer_offsets topic and polling broker requests for topic watermarks)
 - Kafka Minion offers prometheus metrics natively, while Burrow needs an additional metrics exporter
 - Burrow has a more sophisticated approach to evaluate consumer lag health, while Kafka Minion leaves this to Grafana (query + alerts)
-- Kafka Minion is more lightweight and less complex because it does not offer such lag evaluation
+- Burrow supports multiple Kafka clusters, Kafka Minion is designed to be deployed once for each kafka cluster
+- Kafka Minion is more lightweight and less complex because it does not offer such lag evaluation or multiple cluster support
 - Kafka Minion offers different/additional metrics and labels which aren't offered by Burrow and vice versa
