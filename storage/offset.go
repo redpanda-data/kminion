@@ -187,8 +187,8 @@ func (module *OffsetStorage) registerOffsetPartition(partitionID int32) {
 }
 
 func (module *OffsetStorage) markOffsetPartitionReady(partitionID int32) {
-	module.consumerOffsetsLock.Lock()
-	defer module.consumerOffsetsLock.Unlock()
+	module.consumerStatusLock.Lock()
+	defer module.consumerStatusLock.Unlock()
 
 	module.notReadyPartitionConsumers--
 	if module.notReadyPartitionConsumers == 0 {
