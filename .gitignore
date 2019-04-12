@@ -11,4 +11,5 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 zk-single-kafka-single
+zk-multiple-kafka-multiple
 .vscode
