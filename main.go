@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/google-cloud-tools/kafka-minion/collector"
 	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
@@ -10,8 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
+	"net"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -58,7 +59,7 @@ func main() {
 	// Start listening on /metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/healthcheck", healthcheck(cluster))
-	listenAddress := fmt.Sprintf("%v:%d", opts.TelemetryHost, opts.TelemetryPort)
+	listenAddress := net.JoinHostPort(opts.TelemetryHost, strconv.Itoa(opts.TelemetryPort))
 	log.Infof("Listening on: '%s", listenAddress)
 	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
