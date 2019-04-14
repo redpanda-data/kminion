@@ -59,11 +59,6 @@ func NewOffsetStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 		notReadyPartitionConsumers: 0,
 		offsetTopicConsumed:        false,
 
-		consumerOffsetsLock:         sync.RWMutex{},
-		partitionHighWaterMarksLock: sync.RWMutex{},
-		partitionLowWaterMarksLock:  sync.RWMutex{},
-		topicConfigLock:             sync.RWMutex{},
-
 		consumerOffsets:         make(map[string]ConsumerPartitionOffsetMetric),
 		partitionHighWaterMarks: make(map[string]PartitionWaterMarks),
 		partitionLowWaterMarks:  make(map[string]PartitionWaterMarks),

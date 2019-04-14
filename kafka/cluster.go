@@ -52,7 +52,6 @@ type consumerOffsetPartition struct {
 var (
 	// offsetWaterMarks is used to determine if partition consumers have caught up the partition lag
 	offsetWaterMarks = consumerOffsetTopic{
-		Lock:           sync.RWMutex{},
 		PartitionsByID: make(map[int32]consumerOffsetPartition),
 	}
 )
