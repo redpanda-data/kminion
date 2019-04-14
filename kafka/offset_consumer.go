@@ -25,7 +25,7 @@ type OffsetConsumer struct {
 	wg sync.WaitGroup
 
 	// StorageChannel is used to persist processed messages in memory so that they can be exposed with prometheus
-	storageChannel chan *StorageRequest
+	storageChannel chan<- *StorageRequest
 
 	logger           *log.Entry
 	client           sarama.Client
@@ -35,7 +35,7 @@ type OffsetConsumer struct {
 
 // NewOffsetConsumer creates a consumer which process all messages in the __consumer_offsets topic
 // If it cannot connect to the cluster it will panic
-func NewOffsetConsumer(opts *options.Options, storageChannel chan *StorageRequest) *OffsetConsumer {
+func NewOffsetConsumer(opts *options.Options, storageChannel chan<- *StorageRequest) *OffsetConsumer {
 	logger := log.WithFields(log.Fields{
 		"module": "offset_consumer",
 	})

@@ -16,7 +16,7 @@ import (
 // module where it can be retrieved by the prometheus collector to expose metrics.
 type Cluster struct {
 	// storageCh is used to persist partition watermarks in memory so that they can be exposed with prometheus
-	storageCh   chan *StorageRequest
+	storageCh   chan<- *StorageRequest
 	client      sarama.Client
 	admin       sarama.ClusterAdmin
 	logger      *log.Entry
@@ -59,7 +59,7 @@ var (
 
 // NewCluster creates a new cluster module and tries to connect to the kafka cluster
 // If it cannot connect to the cluster it will panic
-func NewCluster(opts *options.Options, storageCh chan *StorageRequest) *Cluster {
+func NewCluster(opts *options.Options, storageCh chan<- *StorageRequest) *Cluster {
 	logger := log.WithFields(log.Fields{
 		"module": "cluster",
 	})

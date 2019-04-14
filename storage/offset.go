@@ -13,8 +13,8 @@ type PartitionWaterMarks = map[int32]kafka.PartitionWaterMark
 // OffsetStorage stores the latest commited offsets for each group, topic, partition combination and offers an interface
 // to access these information
 type OffsetStorage struct {
-	consumerOffsetCh chan *kafka.StorageRequest
-	clusterCh        chan *kafka.StorageRequest
+	consumerOffsetCh <-chan *kafka.StorageRequest
+	clusterCh        <-chan *kafka.StorageRequest
 
 	notReadyPartitionConsumers int32
 	offsetTopicConsumed        bool
@@ -51,7 +51,7 @@ type ConsumerPartitionOffsetMetric struct {
 }
 
 // NewOffsetStorage creates a new storage and preinitializes the required maps which store the PartitionOffset information
-func NewOffsetStorage(consumerOffsetCh chan *kafka.StorageRequest, clusterCh chan *kafka.StorageRequest) *OffsetStorage {
+func NewOffsetStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <-chan *kafka.StorageRequest) *OffsetStorage {
 	return &OffsetStorage{
 		consumerOffsetCh: consumerOffsetCh,
 		clusterCh:        clusterCh,
