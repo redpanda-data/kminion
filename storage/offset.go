@@ -13,30 +13,45 @@ type PartitionWaterMarks = map[int32]kafka.PartitionWaterMark
 // OffsetStorage stores the latest commited offsets for each group, topic, partition combination and offers an interface
 // to access these information
 type OffsetStorage struct {
+	logger *log.Entry
+
+	// Channels for receiving storage requests
 	consumerOffsetCh <-chan *kafka.StorageRequest
 	clusterCh        <-chan *kafka.StorageRequest
 
-	notReadyPartitionConsumers int32
-	offsetTopicConsumed        bool
+	status     *consumerStatus
+	groups     *consumerGroup
+	partitions *partition
+	topics     *topic
+}
 
-	consumerStatusLock          sync.RWMutex // Lock is being used if you either access notReadyPartitionConsumers or offsetTopicConsumed
-	consumerOffsetsLock         sync.RWMutex
-	partitionHighWaterMarksLock sync.RWMutex
-	partitionLowWaterMarksLock  sync.RWMutex
-	groupMetadataLock           sync.RWMutex
-	topicConfigLock             sync.RWMutex
+// consumerStatus holds information about the partition consumers consuming the __consumer_offsets topic
+type consumerStatus struct {
+	Lock                       sync.RWMutex
+	NotReadyPartitionConsumers int32
+	OffsetTopicConsumed        bool
+}
 
-	// consumerOffsets key is "group:topic:partition" (e.g. "sample-consumer:order:20")
-	// partitionHighWaterMarks key is "topicname:partitionId" (e.g. "order:20")
-	// partitionLowWaterMarks key is "topicname:partitionId" (e.g. "order:20")
-	// groupMetadata key is the group id (e.g. "sample-consumer")
-	consumerOffsets         map[string]ConsumerPartitionOffsetMetric
-	partitionHighWaterMarks map[string]PartitionWaterMarks
-	partitionLowWaterMarks  map[string]PartitionWaterMarks
-	groupMetadata           map[string]kafka.ConsumerGroupMetadata
-	topicConfig             map[string]kafka.TopicConfiguration
+// consumerGroup contains all consumer group data such as offsets or metadata
+type consumerGroup struct {
+	OffsetsLock sync.RWMutex
+	Offsets     map[string]ConsumerPartitionOffsetMetric
 
-	logger *log.Entry
+	MetadataLock sync.RWMutex
+	Metadata     map[string]kafka.ConsumerGroupMetadata
+}
+
+type partition struct {
+	LowWaterMarksLock sync.RWMutex
+	LowWaterMarks     map[string]PartitionWaterMarks
+
+	HighWaterMarksLock sync.RWMutex
+	HighWaterMarks     map[string]PartitionWaterMarks
+}
+
+type topic struct {
+	ConfigsLock sync.RWMutex
+	Configs     map[string]kafka.TopicConfiguration
 }
 
 // ConsumerPartitionOffsetMetric represents an offset commit but is extended by further fields which can be
@@ -52,22 +67,37 @@ type ConsumerPartitionOffsetMetric struct {
 
 // NewOffsetStorage creates a new storage and preinitializes the required maps which store the PartitionOffset information
 func NewOffsetStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <-chan *kafka.StorageRequest) *OffsetStorage {
+	groups := &consumerGroup{
+		Offsets:  make(map[string]ConsumerPartitionOffsetMetric),
+		Metadata: make(map[string]kafka.ConsumerGroupMetadata),
+	}
+
+	status := &consumerStatus{
+		NotReadyPartitionConsumers: 0,
+		OffsetTopicConsumed:        false,
+	}
+
+	partitions := &partition{
+		LowWaterMarks:  make(map[string]PartitionWaterMarks),
+		HighWaterMarks: make(map[string]PartitionWaterMarks),
+	}
+
+	topics := &topic{
+		Configs: make(map[string]kafka.TopicConfiguration),
+	}
+
 	return &OffsetStorage{
-		consumerOffsetCh: consumerOffsetCh,
-		clusterCh:        clusterCh,
-
-		notReadyPartitionConsumers: 0,
-		offsetTopicConsumed:        false,
-
-		consumerOffsets:         make(map[string]ConsumerPartitionOffsetMetric),
-		partitionHighWaterMarks: make(map[string]PartitionWaterMarks),
-		partitionLowWaterMarks:  make(map[string]PartitionWaterMarks),
-		topicConfig:             make(map[string]kafka.TopicConfiguration),
-		groupMetadata:           make(map[string]kafka.ConsumerGroupMetadata),
-
 		logger: log.WithFields(log.Fields{
 			"module": "storage",
 		}),
+
+		consumerOffsetCh: consumerOffsetCh,
+		clusterCh:        clusterCh,
+
+		status:     status,
+		groups:     groups,
+		partitions: partitions,
+		topics:     topics,
 	}
 }
 
@@ -124,83 +154,85 @@ func (module *OffsetStorage) clusterWorker() {
 }
 
 func (module *OffsetStorage) deleteTopic(topicName string) {
-	module.topicConfigLock.Lock()
-	module.partitionLowWaterMarksLock.Lock()
-	module.partitionHighWaterMarksLock.Lock()
-	defer module.topicConfigLock.Unlock()
-	defer module.partitionHighWaterMarksLock.Unlock()
-	defer module.partitionLowWaterMarksLock.Unlock()
+	module.topics.ConfigsLock.Lock()
+	module.partitions.LowWaterMarksLock.Lock()
+	module.partitions.HighWaterMarksLock.Lock()
+	defer module.topics.ConfigsLock.Unlock()
+	defer module.partitions.LowWaterMarksLock.Unlock()
+	defer module.partitions.HighWaterMarksLock.Unlock()
 
-	delete(module.partitionLowWaterMarks, topicName)
-	delete(module.partitionHighWaterMarks, topicName)
-	delete(module.topicConfig, topicName)
+	delete(module.partitions.LowWaterMarks, topicName)
+	delete(module.partitions.HighWaterMarks, topicName)
+	delete(module.topics.Configs, topicName)
 }
 
 func (module *OffsetStorage) storePartitionHighWaterMark(offset *kafka.PartitionWaterMark) {
-	module.partitionHighWaterMarksLock.Lock()
-	defer module.partitionHighWaterMarksLock.Unlock()
+	module.partitions.HighWaterMarksLock.Lock()
+	defer module.partitions.HighWaterMarksLock.Unlock()
 
 	// Initialize entry if needed
-	if _, exists := module.partitionHighWaterMarks[offset.TopicName]; !exists {
-		module.partitionHighWaterMarks[offset.TopicName] = make(PartitionWaterMarks)
+	if _, exists := module.partitions.HighWaterMarks[offset.TopicName]; !exists {
+		module.partitions.HighWaterMarks[offset.TopicName] = make(PartitionWaterMarks)
 	}
 
-	module.partitionHighWaterMarks[offset.TopicName][offset.PartitionID] = *offset
+	module.partitions.HighWaterMarks[offset.TopicName][offset.PartitionID] = *offset
 }
 
 func (module *OffsetStorage) storePartitionLowWaterMark(offset *kafka.PartitionWaterMark) {
-	module.partitionLowWaterMarksLock.Lock()
-	defer module.partitionLowWaterMarksLock.Unlock()
+	module.partitions.LowWaterMarksLock.Lock()
+	defer module.partitions.LowWaterMarksLock.Unlock()
 
 	// Initialize entry if needed
-	if _, exists := module.partitionLowWaterMarks[offset.TopicName]; !exists {
-		module.partitionLowWaterMarks[offset.TopicName] = make(PartitionWaterMarks)
+	if _, exists := module.partitions.LowWaterMarks[offset.TopicName]; !exists {
+		module.partitions.LowWaterMarks[offset.TopicName] = make(PartitionWaterMarks)
 	}
 
-	module.partitionLowWaterMarks[offset.TopicName][offset.PartitionID] = *offset
+	module.partitions.LowWaterMarks[offset.TopicName][offset.PartitionID] = *offset
 }
 
 func (module *OffsetStorage) storeGroupMetadata(metadata *kafka.ConsumerGroupMetadata) {
-	module.groupMetadataLock.Lock()
-	defer module.groupMetadataLock.Unlock()
+	module.groups.MetadataLock.Lock()
+	defer module.groups.MetadataLock.Unlock()
 
-	module.groupMetadata[metadata.Group] = *metadata
+	module.groups.Metadata[metadata.Group] = *metadata
 }
 
 func (module *OffsetStorage) storeTopicConfig(config *kafka.TopicConfiguration) {
-	module.topicConfigLock.Lock()
-	defer module.topicConfigLock.Unlock()
+	module.topics.ConfigsLock.Lock()
+	defer module.topics.ConfigsLock.Unlock()
 
-	module.topicConfig[config.TopicName] = *config
+	module.topics.Configs[config.TopicName] = *config
 }
 
 func (module *OffsetStorage) registerOffsetPartition(partitionID int32) {
-	module.consumerOffsetsLock.Lock()
-	defer module.consumerOffsetsLock.Unlock()
+	module.status.Lock.Lock()
+	defer module.status.Lock.Unlock()
 
-	module.notReadyPartitionConsumers++
+	module.status.NotReadyPartitionConsumers++
 }
 
 func (module *OffsetStorage) markOffsetPartitionReady(partitionID int32) {
-	module.consumerStatusLock.Lock()
-	defer module.consumerStatusLock.Unlock()
+	module.status.Lock.Lock()
+	defer module.status.Lock.Unlock()
 
-	module.notReadyPartitionConsumers--
-	if module.notReadyPartitionConsumers == 0 {
+	module.status.NotReadyPartitionConsumers--
+	if module.status.NotReadyPartitionConsumers == 0 {
 		module.logger.Info("Offset topic has been consumed")
-		module.offsetTopicConsumed = true
+		module.status.OffsetTopicConsumed = true
 	}
 }
 
 func (module *OffsetStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOffset) {
+	module.groups.OffsetsLock.Lock()
+	defer module.groups.OffsetsLock.Unlock()
+
 	key := fmt.Sprintf("%v:%v:%v", offset.Group, offset.Topic, offset.Partition)
-	module.consumerOffsetsLock.Lock()
 	var commitCount float64
-	if entry, exists := module.consumerOffsets[key]; exists {
+	if entry, exists := module.groups.Offsets[key]; exists {
 		commitCount = entry.TotalCommitCount
 	}
 	commitCount++
-	module.consumerOffsets[key] = ConsumerPartitionOffsetMetric{
+	module.groups.Offsets[key] = ConsumerPartitionOffsetMetric{
 		Group:            offset.Group,
 		Topic:            offset.Topic,
 		Partition:        offset.Partition,
@@ -208,25 +240,24 @@ func (module *OffsetStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOff
 		Timestamp:        offset.Timestamp,
 		TotalCommitCount: commitCount,
 	}
-	module.consumerOffsetsLock.Unlock()
 }
 
 func (module *OffsetStorage) deleteOffsetEntry(consumerGroupName string, topicName string, partitionID int32) {
 	key := fmt.Sprintf("%v:%v:%v", consumerGroupName, topicName, partitionID)
-	module.consumerOffsetsLock.Lock()
-	defer module.consumerOffsetsLock.Unlock()
+	module.groups.OffsetsLock.Lock()
+	defer module.groups.OffsetsLock.Unlock()
 
-	delete(module.consumerOffsets, key)
+	delete(module.groups.Offsets, key)
 }
 
 // ConsumerOffsets returns a copy of the currently known consumer group offsets, so that they can safely be processed
 // in another go routine
 func (module *OffsetStorage) ConsumerOffsets() map[string]ConsumerPartitionOffsetMetric {
-	module.consumerOffsetsLock.RLock()
-	defer module.consumerOffsetsLock.RUnlock()
+	module.groups.OffsetsLock.RLock()
+	defer module.groups.OffsetsLock.RUnlock()
 
 	mapCopy := make(map[string]ConsumerPartitionOffsetMetric)
-	for key, value := range module.consumerOffsets {
+	for key, value := range module.groups.Offsets {
 		mapCopy[key] = value
 	}
 
@@ -235,11 +266,11 @@ func (module *OffsetStorage) ConsumerOffsets() map[string]ConsumerPartitionOffse
 
 // GroupMetadata returns a copy of the currently known group metadata
 func (module *OffsetStorage) GroupMetadata() map[string]kafka.ConsumerGroupMetadata {
-	module.groupMetadataLock.RLock()
-	defer module.groupMetadataLock.RUnlock()
+	module.groups.MetadataLock.RLock()
+	defer module.groups.MetadataLock.RUnlock()
 
 	mapCopy := make(map[string]kafka.ConsumerGroupMetadata)
-	for key, value := range module.groupMetadata {
+	for key, value := range module.groups.Metadata {
 		mapCopy[key] = value
 	}
 
@@ -249,11 +280,11 @@ func (module *OffsetStorage) GroupMetadata() map[string]kafka.ConsumerGroupMetad
 // TopicConfigs returns all topic configurations in a copied map, so that it
 // is safe to process in another go routine
 func (module *OffsetStorage) TopicConfigs() map[string]kafka.TopicConfiguration {
-	module.topicConfigLock.RLock()
-	defer module.topicConfigLock.RUnlock()
+	module.topics.ConfigsLock.RLock()
+	defer module.topics.ConfigsLock.RUnlock()
 
 	mapCopy := make(map[string]kafka.TopicConfiguration)
-	for key, value := range module.topicConfig {
+	for key, value := range module.topics.Configs {
 		mapCopy[key] = value
 	}
 
@@ -263,11 +294,11 @@ func (module *OffsetStorage) TopicConfigs() map[string]kafka.TopicConfiguration 
 // PartitionHighWaterMarks returns all partition high water marks in a copied map, so that it
 // is safe to process in another go routine
 func (module *OffsetStorage) PartitionHighWaterMarks() map[string]PartitionWaterMarks {
-	module.partitionHighWaterMarksLock.RLock()
-	defer module.partitionHighWaterMarksLock.RUnlock()
+	module.partitions.HighWaterMarksLock.RLock()
+	defer module.partitions.HighWaterMarksLock.RUnlock()
 
 	mapCopy := make(map[string]PartitionWaterMarks)
-	for key, value := range module.partitionHighWaterMarks {
+	for key, value := range module.partitions.HighWaterMarks {
 		mapCopy[key] = value
 	}
 
@@ -277,11 +308,11 @@ func (module *OffsetStorage) PartitionHighWaterMarks() map[string]PartitionWater
 // PartitionLowWaterMarks returns all partition low water marks in a copied map, so that it
 // is safe to process in another go routine
 func (module *OffsetStorage) PartitionLowWaterMarks() map[string]PartitionWaterMarks {
-	module.partitionLowWaterMarksLock.RLock()
-	defer module.partitionLowWaterMarksLock.RUnlock()
+	module.partitions.LowWaterMarksLock.RLock()
+	defer module.partitions.LowWaterMarksLock.RUnlock()
 
 	mapCopy := make(map[string]PartitionWaterMarks)
-	for key, value := range module.partitionLowWaterMarks {
+	for key, value := range module.partitions.LowWaterMarks {
 		mapCopy[key] = value
 	}
 
@@ -291,8 +322,8 @@ func (module *OffsetStorage) PartitionLowWaterMarks() map[string]PartitionWaterM
 // IsConsumed indicates whether the consumer offsets topic lag has been caught up and therefore
 // the metrics reported by this module are accurate or not
 func (module *OffsetStorage) IsConsumed() bool {
-	module.consumerStatusLock.RLock()
-	defer module.consumerStatusLock.RUnlock()
+	module.status.Lock.RLock()
+	defer module.status.Lock.RUnlock()
 
-	return module.offsetTopicConsumed
+	return module.status.OffsetTopicConsumed
 }
