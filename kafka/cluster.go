@@ -39,11 +39,13 @@ type TopicConfiguration struct {
 	CleanupPolicy  string
 }
 
+// consumerOffsetTopic holds PartitionHighWatermarks for the __consumer_offsets topic
 type consumerOffsetTopic struct {
 	Lock           sync.RWMutex
 	PartitionsByID map[int32]consumerOffsetPartition
 }
 
+// consumerOffsetPartition represents the high water mark for a single partition of the __consumer_offsets topic
 type consumerOffsetPartition struct {
 	PartitionID   int32
 	HighWaterMark int64
