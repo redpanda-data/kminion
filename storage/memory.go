@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google-cloud-tools/kafka-minion/kafka"
 	log "github.com/sirupsen/logrus"
+	"math"
 	"sync"
 )
 
@@ -73,7 +74,7 @@ func NewOffsetStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 	}
 
 	status := &consumerStatus{
-		NotReadyPartitionConsumers: 0,
+		NotReadyPartitionConsumers: math.MaxInt32,
 		OffsetTopicConsumed:        false,
 	}
 
