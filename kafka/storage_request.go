@@ -24,9 +24,9 @@ const (
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
 	StorageDeleteConsumerGroup StorageRequestType = 5
 
-	// StorageRegisterOffsetPartition is the request type to make the storage module aware that a partition consumer for
-	// the consumer offsets partition exists and that it should await it's ready signal before exposing metrics
-	StorageRegisterOffsetPartition StorageRequestType = 6
+	// StorageRegisterOffsetPartitions is the request type to make the storage module aware that the offset consumer
+	// first has to fully consume a specific number of partitions before it should expose any metrics
+	StorageRegisterOffsetPartitions StorageRequestType = 6
 
 	// StorageMarkOffsetPartitionReady is the request type to mark a partition consumer of the consumer offsets topic
 	// as ready (=caught up partition lag)
@@ -49,6 +49,7 @@ type StorageRequest struct {
 	ConsumerGroupName  string
 	TopicName          string
 	PartitionID        int32
+	PartitionCount     int
 }
 
 func newAddPartitionLowWaterMarkRequest(lowWaterMark *PartitionWaterMark) *StorageRequest {
@@ -95,21 +96,21 @@ func newDeleteConsumerGroupRequest(group string, topic string, partitionID int32
 	}
 }
 
-func newRegisterOffsetPartition(partitionID int32) *StorageRequest {
+func newRegisterOffsetPartitionsRequest(partitionCount int) *StorageRequest {
 	return &StorageRequest{
-		RequestType: StorageRegisterOffsetPartition,
-		PartitionID: partitionID,
+		RequestType:    StorageRegisterOffsetPartitions,
+		PartitionCount: partitionCount,
 	}
 }
 
-func newMarkOffsetPartitionReady(partitionID int32) *StorageRequest {
+func newMarkOffsetPartitionReadyRequest(partitionID int32) *StorageRequest {
 	return &StorageRequest{
 		RequestType: StorageMarkOffsetPartitionReady,
 		PartitionID: partitionID,
 	}
 }
 
-func newDeleteGroupMetadata(group string) *StorageRequest {
+func newDeleteGroupMetadataRequest(group string) *StorageRequest {
 	return &StorageRequest{
 		RequestType:       StorageDeleteGroupMetadata,
 		ConsumerGroupName: group,

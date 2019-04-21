@@ -28,7 +28,7 @@ type OffsetStorage struct {
 // consumerStatus holds information about the partition consumers consuming the __consumer_offsets topic
 type consumerStatus struct {
 	Lock                       sync.RWMutex
-	NotReadyPartitionConsumers int32
+	NotReadyPartitionConsumers int
 	OffsetTopicConsumed        bool
 }
 
@@ -116,8 +116,8 @@ func (module *OffsetStorage) consumerOffsetWorker() {
 			module.storeGroupMetadata(request.GroupMetadata)
 		case kafka.StorageDeleteConsumerGroup:
 			module.deleteOffsetEntry(request.ConsumerGroupName, request.TopicName, request.PartitionID)
-		case kafka.StorageRegisterOffsetPartition:
-			module.registerOffsetPartition(request.PartitionID)
+		case kafka.StorageRegisterOffsetPartitions:
+			module.registerOffsetPartitions(request.PartitionCount)
 		case kafka.StorageMarkOffsetPartitionReady:
 			module.markOffsetPartitionReady(request.PartitionID)
 
@@ -204,11 +204,12 @@ func (module *OffsetStorage) storeTopicConfig(config *kafka.TopicConfiguration) 
 	module.topics.Configs[config.TopicName] = *config
 }
 
-func (module *OffsetStorage) registerOffsetPartition(partitionID int32) {
+func (module *OffsetStorage) registerOffsetPartitions(partitionCount int) {
 	module.status.Lock.Lock()
 	defer module.status.Lock.Unlock()
 
-	module.status.NotReadyPartitionConsumers++
+	module.logger.Infof("Registered %v __consumer_offsets partitions which have to be consumed before metrics can be exposed", partitionCount)
+	module.status.NotReadyPartitionConsumers = partitionCount
 }
 
 func (module *OffsetStorage) markOffsetPartitionReady(partitionID int32) {

@@ -86,10 +86,10 @@ func (module *OffsetConsumer) Start() {
 		"topic": module.offsetsTopicName,
 		"count": len(partitions),
 	}).Infof("Starting '%d' partition consumers", len(partitions))
+	registerPartitionRequest := newRegisterOffsetPartitionsRequest(len(partitions))
+	module.storageChannel <- registerPartitionRequest
 	for _, partition := range partitions {
 		module.wg.Add(1)
-		registerPartitionRequest := newRegisterOffsetPartition(partition)
-		module.storageChannel <- registerPartitionRequest
 		go module.partitionConsumer(consumer, partition)
 	}
 	log.WithFields(log.Fields{
@@ -144,7 +144,7 @@ func (module *OffsetConsumer) partitionConsumer(consumer sarama.Consumer, partit
 			}
 			offsetWaterMarks.Lock.RUnlock()
 			if consumedOffset >= highWaterMark {
-				request := newMarkOffsetPartitionReady(partitionID)
+				request := newMarkOffsetPartitionReadyRequest(partitionID)
 				module.storageChannel <- request
 				ticker.Stop()
 			} else {
