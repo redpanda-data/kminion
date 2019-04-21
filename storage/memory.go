@@ -11,7 +11,7 @@ import (
 // PartitionWaterMarks represents a map of PartitionWaterMarks grouped by PartitionID
 type PartitionWaterMarks = map[int32]kafka.PartitionWaterMark
 
-// OffsetStorage stores the latest commited offsets for each group, topic, partition combination and offers an interface
+// OffsetStorage stores the latest committed offsets for each group, topic, partition combination and offers an interface
 // to access these information
 type OffsetStorage struct {
 	logger *log.Entry

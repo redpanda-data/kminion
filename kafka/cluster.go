@@ -24,7 +24,7 @@ type Cluster struct {
 	topicByName map[string]*sarama.TopicMetadata
 }
 
-// PartitionWaterMark contains either the first or last known commited offset (water mark) for a partition
+// PartitionWaterMark contains either the first or last known committed offset (water mark) for a partition
 type PartitionWaterMark struct {
 	TopicName   string
 	PartitionID int32
@@ -274,7 +274,7 @@ func (module *Cluster) topicPartitions() (map[string][]int32, error) {
 }
 
 func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string][]int32) (map[int32]*sarama.OffsetRequest, map[int32]*sarama.OffsetRequest, map[int32]*sarama.Broker) {
-	// we must create two seperate buckets for high & low watermarks, because adding a request block
+	// we must create two separate buckets for high & low watermarks, because adding a request block
 	// with same topic:partition but different time will still result in just one request, see:
 	// https://github.com/Shopify/sarama/blob/master/offset_request.go AddBlock() method
 	highWaterMarkRequests := make(map[int32]*sarama.OffsetRequest)

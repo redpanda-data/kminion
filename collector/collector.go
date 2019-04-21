@@ -53,7 +53,7 @@ func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collec
 	// Consumer group metrics
 	groupPartitionOffsetDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "offset"),
-		"Newest commited offset of a consumer group for a partition",
+		"Newest committed offset of a consumer group for a partition",
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
 	)
 	groupPartitionCommitCountDesc = prometheus.NewDesc(
@@ -63,7 +63,7 @@ func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collec
 	)
 	groupPartitionLastCommitDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "last_commit"),
-		"Timestamp when consumer group last commited an offset for a partition",
+		"Timestamp when consumer group last committed an offset for a partition",
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
 	)
 	groupPartitionLagDesc = prometheus.NewDesc(
@@ -87,12 +87,12 @@ func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collec
 	// Partition metrics
 	partitionHighWaterMarkDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "high_water_mark"),
-		"Highest known commited offset for this partition",
+		"Highest known committed offset for this partition",
 		[]string{"topic", "partition"}, prometheus.Labels{},
 	)
 	partitionLowWaterMarkDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "low_water_mark"),
-		"Oldest known commited offset for this partition",
+		"Oldest known committed offset for this partition",
 		[]string{"topic", "partition"}, prometheus.Labels{},
 	)
 	partitionMessageCountDesc = prometheus.NewDesc(
@@ -255,11 +255,11 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 
 		var lag int64
 		if offset.Offset > partitionHighWaterMark {
-			// Partition offsets are updated periodically, while consumer offsets continously flow in. Hence it's possible
+			// Partition offsets are updated periodically, while consumer offsets continuously flow in. Hence it's possible
 			// that consumer offset might be ahead of the partition high watermark. For this case mark it as zero lag
 			lag = 0
 		} else if offset.Offset < partitionLowWaterMark {
-			// If last commited offset does not exist anymore due to delete policy (e. g. 1day retention, 3day old commit)
+			// If last committed offset does not exist anymore due to delete policy (e. g. 1day retention, 3day old commit)
 			lag = partitionHighWaterMark - partitionLowWaterMark
 		} else {
 			lag = partitionHighWaterMark - offset.Offset
