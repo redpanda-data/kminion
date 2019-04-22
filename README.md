@@ -121,11 +121,11 @@ At a high level Kafka Minion fetches source data in two different ways.
 
 1. As of writing the exporter there is no publicly available prometheus exporter (to my knowledge) which is lightweight, robust and supports Kafka v0.11 - v2.1+
 
-2. We are primarily interested in per consumergroup:topic lags. Some exporters export either only consumer group lags (of all topics alltogether) or they export only per partition metrics. While you can obviously aggregate those partition metrics in Grafana as well, it adds unnecessary complexity in Grafana dashboards. This exporter adds both.
+2. We are primarily interested in per consumergroup:topic lags. Some exporters export either only group lags of all topics altogether or they export only per partition metrics. While you can obviously aggregate those partition metrics in Grafana as well, this adds unnecessary complexity in Grafana dashboards. This exporter offers metrics on partition and topic granularity.
 
-3. In our environment developers occasionally replay data by creating a new consumer group. They do so by incrementing a trailing number (e. g. "sample-group-1" becomes "sample-group-2"). In order to setup a proper alerting based on increasing lags for all consumer groups in a cluster, we need to ignore those "outdated" consumer groups. In this illustration "sample-group-1" as it's not being used anymore. This exporter adds 3 labels on each exporter consumergroup:topic lag metric to make that possible: `group_base_name`, `group_version`, `group_is_latest`. The meaning of each label is explained in the section [Labels](#labels)
+3. In our environment developers occasionally reconsume a topic by creating a new consumer group. They do so by incrementing a trailing number (e. g. "sample-group-1" becomes "sample-group-2"). In order to setup a proper alerting based on increasing lags for all consumer groups in a cluster, we need to ignore those "outdated" consumer groups. In this illustration "sample-group-1" as it's not being used anymore. This exporter adds 3 labels on each exporter consumergroup:topic lag metric to make that possible: `group_base_name`, `group_version`, `group_is_latest`. The meaning of each label is explained in the section [Labels](#labels)
 
-4. More (unique) metrics which are not available in other exporters. Likely some of these features are not desired in other exporters too.
+4. More (unique) metrics which are not available in other exporters. Likely some of these metrics and features are not desired in other exporters too.
 
 ### How does Kafka Minion compare to Burrow?
 
