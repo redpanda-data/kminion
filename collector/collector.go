@@ -29,7 +29,7 @@ var (
 // https://godoc.org/github.com/prometheus/client_golang/prometheus#hdr-Custom_Collectors_and_constant_Metrics
 type Collector struct {
 	opts    *options.Options
-	storage *storage.OffsetStorage
+	storage *storage.MemoryStorage
 	logger  *log.Entry
 }
 
@@ -45,7 +45,7 @@ type versionedConsumerGroup struct {
 
 // NewCollector returns a new prometheus collector, preinitialized with all the to be exposed metrics under respect
 // of the metrics prefix which can be passed via environment variables
-func NewCollector(opts *options.Options, storage *storage.OffsetStorage) *Collector {
+func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collector {
 	logger := log.WithFields(log.Fields{
 		"module": "collector",
 	})
