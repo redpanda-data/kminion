@@ -7,6 +7,10 @@
 
 Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to reliably expose consumer group lag information along with other helpful, unique metrics. Easy to setup on Kubernetes environments.
 
+![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/grafana-sample-1.png)
+
+![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/grafana-sample-2.png)
+
 ## Features
 
 - [x] Supports Kafka 0.10.1.0 - 2.1.x (last updated 25th Mar 2019)
@@ -19,7 +23,7 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 
 - [ ] Adding more tests, especially for decoding all the kafka binary messages. The binary format sometimes changes with newer kafka versions. To ensure that all kafka versions will be supported and future kafka minion changes are compatible, I'd like to add tests on this
 - [ ] Getting more feedback from users who run Kafka Minion in other environments
-- [ ] Add sample Grafana dashboard
+- [x] **DONE:** Add sample Grafana dashboard
 - [x] **DONE:** Add more metrics about topics and partitions (partition count and cleanup policy)
 
 ## Setup
@@ -46,6 +50,10 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 | KAFKA_TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                             | (No default)         |
 | KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate.   | true                 |
 | KAFKA_TLS_PASSPHRASE               | Passphrase to decrypt the TLS Key                                                                     | (No default)         |
+
+### Grafana Dashboard
+
+You can import our suggested Grafana dashboard and modify it as you wish: https://grafana.com/dashboards/10083 (Dashboard ID 10083)
 
 ## Exposed metrics
 
