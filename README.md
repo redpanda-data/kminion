@@ -18,6 +18,7 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 - [x] Kafka SASL/SSL support
 - [x] Provides per consumergroup:topic lag metrics (removes a topic's metrics if a single partition metric in that topic couldn't be fetched)
 - [x] Created to use in Kubernetes clusters (has liveness/readiness check and helm chart for easier setup)
+- [x] No Zookeeper dependencies
 
 ## Roadmap
 
@@ -135,3 +136,4 @@ At a high level Kafka Minion fetches source data in two different ways.
 - Burrow supports multiple Kafka clusters, Kafka Minion is designed to be deployed once for each kafka cluster
 - Kafka Minion is more lightweight and less complex because it does not offer such lag evaluation or multiple cluster support
 - Kafka Minion offers different/additional metrics and labels which aren't offered by Burrow and vice versa
+- Kafka Minion does not support consumer groups which still commit to Zookeeper, therefore it doesn't has any Zookeeper dependencies while Burrow supports those
