@@ -224,6 +224,7 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 		})
 		go module.processHighWaterMarks(&wg, brokers[brokerID], request, logger)
 	}
+	wg.Wait() // Await offsets first, to prevent concurrent access on brokers
 	for brokerID, request := range lowRequests {
 		wg.Add(1)
 		logger := module.logger.WithFields(log.Fields{
