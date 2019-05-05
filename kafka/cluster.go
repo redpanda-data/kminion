@@ -2,13 +2,14 @@ package kafka
 
 import (
 	"fmt"
-	"github.com/Shopify/sarama"
-	"github.com/google-cloud-tools/kafka-minion/options"
-	log "github.com/sirupsen/logrus"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/google-cloud-tools/kafka-minion/options"
+	log "github.com/sirupsen/logrus"
 )
 
 // Cluster is a module which connects to a Kafka Cluster and periodically fetches all topic and
@@ -111,21 +112,24 @@ func (module *Cluster) IsHealthy() bool {
 }
 
 func (module *Cluster) mainLoop() {
-	// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
-	module.refreshAndSendTopicMetadata()
-	module.refreshAndSendTopicConfig()
 
-	offsetRefresh := time.NewTicker(time.Second * 5)
-	topicConfigRefresh := time.NewTicker(time.Second * 60)
-
-	for {
-		select {
-		case <-offsetRefresh.C:
+	go func() {
+		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
+		module.refreshAndSendTopicMetadata()
+		offsetRefresh := time.NewTicker(time.Second * 5)
+		for range offsetRefresh.C {
 			module.refreshAndSendTopicMetadata()
-		case <-topicConfigRefresh.C:
-			module.refreshAndSendTopicConfig()
 		}
-	}
+	}()
+
+	go func() {
+		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
+		module.refreshAndSendTopicMetadata()
+		topicConfigRefresh := time.NewTicker(time.Second * 60)
+		for range topicConfigRefresh.C {
+			module.refreshAndSendTopicMetadata()
+		}
+	}()
 }
 
 // deleteTopicIfNeeded checks a current map of available topics against a previously fetched
