@@ -124,10 +124,10 @@ func (module *Cluster) mainLoop() {
 
 	go func() {
 		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
-		module.refreshAndSendTopicMetadata()
+		module.refreshAndSendTopicConfig()
 		topicConfigRefresh := time.NewTicker(time.Second * 60)
 		for range topicConfigRefresh.C {
-			module.refreshAndSendTopicMetadata()
+			module.refreshAndSendTopicConfig()
 		}
 	}()
 }
@@ -410,15 +410,23 @@ func (module *Cluster) processLowWaterMarks(wg *sync.WaitGroup, broker *sarama.B
 // getAnyBroker return a random item from the brokers slice
 func (module *Cluster) getAnyBroker() *sarama.Broker {
 	brokers := module.client.Brokers()
-	length := len(brokers)
+
+	connectedBrokers := make([]*sarama.Broker, 0)
+	for _, broker := range brokers {
+		connected, err := broker.Connected()
+		if err == nil && connected == true {
+			connectedBrokers = append(connectedBrokers, broker)
+		}
+	}
+	length := len(connectedBrokers)
 	if length == 0 {
 		return nil
 	}
 
 	rand.Seed(time.Now().Unix())
-	n := rand.Int() % len(brokers)
+	n := rand.Int() % len(connectedBrokers)
 
-	return brokers[n]
+	return connectedBrokers[n]
 }
 
 func (module *Cluster) isTopicAllowed(topicName string) bool {
