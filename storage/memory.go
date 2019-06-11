@@ -301,7 +301,10 @@ func (module *MemoryStorage) PartitionHighWaterMarks() map[string]PartitionWater
 
 	mapCopy := make(map[string]PartitionWaterMarks)
 	for key, value := range module.partitions.HighWaterMarks {
-		mapCopy[key] = value
+		mapCopy[key] = make(PartitionWaterMarks)
+		for partition, partitionData := range value {
+			mapCopy[key][partition] = partitionData
+		}
 	}
 
 	return mapCopy
@@ -315,7 +318,10 @@ func (module *MemoryStorage) PartitionLowWaterMarks() map[string]PartitionWaterM
 
 	mapCopy := make(map[string]PartitionWaterMarks)
 	for key, value := range module.partitions.LowWaterMarks {
-		mapCopy[key] = value
+		mapCopy[key] = make(PartitionWaterMarks)
+		for partition, partitionData := range value {
+			mapCopy[key][partition] = partitionData
+		}
 	}
 
 	return mapCopy
