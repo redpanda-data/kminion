@@ -1,11 +1,8 @@
-# Kafka Minion (Alpha - Still in development)
+# Kafka Minion
 
-![License](https://img.shields.io/github/license/google-cloud-tools/kafka-minion.svg?color=blue)
-[![Go Report Card](https://goreportcard.com/badge/github.com/google-cloud-tools/kafka-minion)](https://goreportcard.com/report/github.com/google-cloud-tools/kafka-minion)
-![GitHub release](https://img.shields.io/github/release-pre/google-cloud-tools/kafka-minion.svg)
-[![Docker Repository on Quay](https://quay.io/repository/google-cloud-tools/kafka-minion/status "Docker Repository on Quay")](https://quay.io/repository/google-cloud-tools/kafka-minion)
+![License](https://img.shields.io/github/license/cloudworkz/kafka-minion.svg?color=blue) [![Go Report Card](https://goreportcard.com/badge/github.com/cloudworkz/kafka-minion)](https://goreportcard.com/report/github.com/cloudworkz/kafka-minion) ![GitHub release](https://img.shields.io/github/release-pre/cloudworkz/kafka-minion.svg) [![Docker Repository on Quay](https://quay.io/repository/cloudworkz/kafka-minion/status "Docker Repository on Quay")](https://quay.io/repository/cloudworkz/kafka-minion)
 
-Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to reliably expose consumer group lag information along with other helpful, unique metrics. Easy to setup on Kubernetes environments.
+Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to reliably expose consumer group lag information along with other helpful, unique metrics. Easy to setup on Kubernetes environments.
 
 ![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/grafana-sample-1.png)
 
@@ -13,7 +10,7 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 
 ## Features
 
-- [x] Supports Kafka 0.10.1.0 - 2.1.x (last updated 25th Mar 2019)
+- [x] Supports Kafka 0.11.0.2 - 2.2.x (last updated 16th Jun 2019)
 - [x] Fetches consumer group information directly from `__consumer_offsets` topic instead of querying single brokers for consumer group lags to ensure robustness in case of broker failures or leader elections
 - [x] Kafka SASL/SSL support
 - [x] Provides per consumergroup:topic lag metrics (removes a topic's metrics if a single partition metric in that topic couldn't be fetched)
@@ -31,26 +28,26 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.10.0+), created to re
 
 ### Environment variables
 
-| Variable name                      | Description                                                                                           | Default              |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------- |
-| TELEMETRY_HOST                     | Host to listen on for the prometheus exporter                                                         | 0.0.0.0              |
-| TELEMETRY_PORT                     | HTTP Port to listen on for the prometheus exporter                                                    | 8080                 |
-| LOG_LEVEL                          | Log granularity (debug, info, warn, error, fatal, panic)                                              | info                 |
-| VERSION                            | Application version (env variable is set in Dockerfile)                                               | (from Dockerfile)    |
-| EXPORTER_IGNORE_SYSTEM_TOPICS      | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true                 |
-| EXPORTER_METRICS_PREFIX            | A prefix for all exported prometheus metrics                                                          | kafka_minion         |
-| KAFKA_BROKERS                      | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092")                    | (No default)         |
-| KAFKA_CONSUMER_OFFSETS_TOPIC_NAME  | Topic name of topic where kafka commits the consumer offsets                                          | \_\_consumer_offsets |
-| KAFKA_SASL_ENABLED                 | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported)                         | false                |
-| KAFKA_SASL_USE_HANDSHAKE           | Whether or not to send the Kafka SASL handshake first                                                 | true                 |
-| KAFKA_SASL_USERNAME                | SASL Username                                                                                         | (No default)         |
-| KAFKA_SASL_PASSWORD                | SASL Password                                                                                         | (No default)         |
-| KAFKA_TLS_ENABLED                  | Whether or not to use TLS when connecting to the broker                                               | false                |
-| KAFKA_TLS_CA_FILE_PATH             | Path to the TLS CA file                                                                               | (No default)         |
-| KAFKA_TLS_KEY_FILE_PATH            | Path to the TLS key file                                                                              | (No default)         |
-| KAFKA_TLS_CERT_FILE_PATH           | Path to the TLS cert file                                                                             | (No default)         |
-| KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate.   | true                 |
-| KAFKA_TLS_PASSPHRASE               | Passphrase to decrypt the TLS Key                                                                     | (No default)         |
+| Variable name | Description | Default |
+| --- | --- | --- |
+| TELEMETRY_HOST | Host to listen on for the prometheus exporter | 0.0.0.0 |
+| TELEMETRY_PORT | HTTP Port to listen on for the prometheus exporter | 8080 |
+| LOG_LEVEL | Log granularity (debug, info, warn, error, fatal, panic) | info |
+| VERSION | Application version (env variable is set in Dockerfile) | (from Dockerfile) |
+| EXPORTER_IGNORE_SYSTEM_TOPICS | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true |
+| EXPORTER_METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
+| KAFKA_BROKERS | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default) |
+| KAFKA_CONSUMER_OFFSETS_TOPIC_NAME | Topic name of topic where kafka commits the consumer offsets | \_\_consumer_offsets |
+| KAFKA_SASL_ENABLED | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported) | false |
+| KAFKA_SASL_USE_HANDSHAKE | Whether or not to send the Kafka SASL handshake first | true |
+| KAFKA_SASL_USERNAME | SASL Username | (No default) |
+| KAFKA_SASL_PASSWORD | SASL Password | (No default) |
+| KAFKA_TLS_ENABLED | Whether or not to use TLS when connecting to the broker | false |
+| KAFKA_TLS_CA_FILE_PATH | Path to the TLS CA file | (No default) |
+| KAFKA_TLS_KEY_FILE_PATH | Path to the TLS key file | (No default) |
+| KAFKA_TLS_CERT_FILE_PATH | Path to the TLS cert file | (No default) |
+| KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true |
+| KAFKA_TLS_PASSPHRASE | Passphrase to decrypt the TLS Key | (No default) |
 
 ### Grafana Dashboard
 
@@ -78,33 +75,33 @@ Below metrics have a variety of different labels, explained in this section:
 
 #### Consumer group metrics
 
-| Metric                                                                                                                      | Description                                                                                                                                                  |
-| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kafka_minion_group_topic_lag{group, group_base_name, group_is_latest, group_version, topic}`                               | Number of messages the consumer group is behind for a given topic.                                                                                           |
-| `kafka_minion_group_topic_partition_lag{group, group_base_name, group_is_latest, group_version, topic, partition}`          | Number of messages the consumer group is behind for a given partition.                                                                                       |
-| `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}`       | Current offset of a given group on a given partition.                                                                                                        |
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_group_topic_lag{group, group_base_name, group_is_latest, group_version, topic}` | Number of messages the consumer group is behind for a given topic. |
+| `kafka_minion_group_topic_partition_lag{group, group_base_name, group_is_latest, group_version, topic, partition}` | Number of messages the consumer group is behind for a given partition. |
+| `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}` | Current offset of a given group on a given partition. |
 | `kafka_minion_group_topic_partition_commit_count{group, group_base_name, group_is_latest, group_version, topic, partition}` | Number of commited offset entries by a consumer group for a given partition. Helpful to determine the commit rate to possibly tune the consumer performance. |
-| `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}`  | Timestamp of last consumer group commit on a given partition                                                                                                 |
+| `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}` | Timestamp of last consumer group commit on a given partition |
 
 #### Topic / Partition metrics
 
-| Metric                                                           | Description                                                                                                                                                                                                                                                   |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kafka_minion_topic_partition_count{topic, cleanup_policy}`      | Partition count for a given topic along with cleanup policy as label                                                                                                                                                                                          |
-| `kafka_minion_topic_partition_high_water_mark{topic, partition}` | Latest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one.                                                                                                      |
-| `kafka_minion_topic_partition_low_water_mark{topic, partition}`  | Oldest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one.                                                                                                      |
-| `kafka_minion_topic_partition_message_count{topic, partition}`   | Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic. |
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_topic_partition_count{topic, cleanup_policy}` | Partition count for a given topic along with cleanup policy as label |
+| `kafka_minion_topic_partition_high_water_mark{topic, partition}` | Latest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one. |
+| `kafka_minion_topic_partition_low_water_mark{topic, partition}` | Oldest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one. |
+| `kafka_minion_topic_partition_message_count{topic, partition}` | Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic. |
 
 #### Internal metrics
 
-| Metric                                                                          | Description                                                 |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `kafka_minion_internal_offset_consumer_offset_commits_read{version}`            | Number of read offset commit messages                       |
-| `kafka_minion_internal_offset_consumer_offset_commits_tombstones_read{version}` | Number of tombstone messages of all offset commit messages  |
-| `kafka_minion_internal_offset_consumer_group_metadata_read{version}`            | Number of read group metadata messages                      |
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_internal_offset_consumer_offset_commits_read{version}` | Number of read offset commit messages |
+| `kafka_minion_internal_offset_consumer_offset_commits_tombstones_read{version}` | Number of tombstone messages of all offset commit messages |
+| `kafka_minion_internal_offset_consumer_group_metadata_read{version}` | Number of read group metadata messages |
 | `kafka_minion_internal_offset_consumer_group_metadata_tombstones_read{version}` | Number of tombstone messages of all group metadata messages |
-| `kafka_minion_internal_kafka_messages_in_success{topic}`                        | Number of successfully received kafka messages              |
-| `kafka_minion_internal_kafka_messages_in_failed{topic}`                         | Number of errors while consuming kafka messages             |
+| `kafka_minion_internal_kafka_messages_in_success{topic}` | Number of successfully received kafka messages |
+| `kafka_minion_internal_kafka_messages_in_failed{topic}` | Number of errors while consuming kafka messages |
 
 ## How does it work
 
