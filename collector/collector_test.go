@@ -1,8 +1,9 @@
 package collector
 
 import (
-	"github.com/google-cloud-tools/kafka-minion/storage"
 	"testing"
+
+	"github.com/google-cloud-tools/kafka-minion/storage"
 )
 
 func TestGetVersionedConsumerGroups(t *testing.T) {
@@ -49,6 +50,13 @@ func TestGetVersionedConsumerGroups(t *testing.T) {
 		Offset:    936,
 		Timestamp: 1552723003485,
 	}
+	offsets["nongroupedconsumer"] = storage.ConsumerPartitionOffsetMetric{
+		Group:     "nongroupedconsumer",
+		Topic:     "important-topic",
+		Partition: 0,
+		Offset:    936,
+		Timestamp: 1552723003485,
+	}
 
 	tables := []struct {
 		groupName    string
@@ -89,9 +97,10 @@ func TestParseConsumerGroupName(t *testing.T) {
 		baseName  string
 		isLatest  bool
 	}{
-		{"sample-group-2", 2, "sample-group", false},
-		{"sample-group-3", 3, "sample-group", false},
+		{"sample-group-2", 2, "sample-group-", false},
+		{"sample-group-3", 3, "sample-group-", false},
 		{"another-group", 0, "another-group", false},
+		{"14", 0, "14", false},
 	}
 	for _, table := range tables {
 		versioned := parseConsumerGroupName(table.groupName)

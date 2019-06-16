@@ -1,11 +1,12 @@
 package collector
 
 import (
+	"strconv"
+
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/google-cloud-tools/kafka-minion/storage"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"strconv"
 )
 
 var (
@@ -375,6 +376,11 @@ func parseVersion(groupName string, versionString string, digitIndexCursor int) 
 	// parse as int when we are done
 	newVersionedString := lastCharacter + versionString
 	indexCursor := digitIndexCursor - 1
+
+	// If we've got a consumer group name which only has digits, the indexCursor will ultimately be -1
+	if indexCursor < 0 {
+		return 0, groupName
+	}
 
 	return parseVersion(groupName, newVersionedString, indexCursor)
 }
