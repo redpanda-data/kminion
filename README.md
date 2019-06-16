@@ -1,6 +1,6 @@
 # Kafka Minion
 
-![License](https://img.shields.io/github/license/cloudworkz/kafka-minion.svg?color=blue) [![Go Report Card](https://goreportcard.com/badge/github.com/cloudworkz/kafka-minion)](https://goreportcard.com/report/github.com/cloudworkz/kafka-minion) ![GitHub release](https://img.shields.io/github/release-pre/cloudworkz/kafka-minion.svg) [![Docker Repository on Quay](https://quay.io/repository/cloudworkz/kafka-minion/status "Docker Repository on Quay")](https://quay.io/repository/cloudworkz/kafka-minion)
+![License](https://img.shields.io/github/license/cloudworkz/kafka-minion.svg?color=blue) [![Go Report Card](https://goreportcard.com/badge/github.com/cloudworkz/kafka-minion)](https://goreportcard.com/report/github.com/cloudworkz/kafka-minion) ![GitHub release](https://img.shields.io/github/release/cloudworkz/kafka-minion.svg) [![Docker Repository on Quay](https://quay.io/repository/cloudworkz/kafka-minion/status "Docker Repository on Quay")](https://quay.io/repository/cloudworkz/kafka-minion)
 
 Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to reliably expose consumer group lag information along with other helpful, unique metrics. Easy to setup on Kubernetes environments.
 
