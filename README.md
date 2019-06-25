@@ -35,7 +35,7 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to 
 | LOG_LEVEL | Log granularity (debug, info, warn, error, fatal, panic) | info |
 | VERSION | Application version (env variable is set in Dockerfile) | (from Dockerfile) |
 | EXPORTER_IGNORE_SYSTEM_TOPICS | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true |
-| EXPORTER_METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
+| METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
 | KAFKA_BROKERS | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default) |
 | KAFKA_CONSUMER_OFFSETS_TOPIC_NAME | Topic name of topic where kafka commits the consumer offsets | \_\_consumer_offsets |
 | KAFKA_SASL_ENABLED | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported) | false |
