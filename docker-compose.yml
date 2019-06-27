@@ -2,7 +2,7 @@ version: "2.1"
 
 services:
   kafkahq:
-    image: tchiotludo/kafkahq:0.7.2
+    image: tchiotludo/kafkahq:0.8.0
     environment:
       MICRONAUT_APPLICATION_JSON: |
         {
