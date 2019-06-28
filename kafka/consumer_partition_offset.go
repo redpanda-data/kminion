@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // ConsumerPartitionOffset represents a consumer group commit which can be decoded from the consumer_offsets topic
@@ -24,10 +25,10 @@ type offsetValue struct {
 
 // newConsumerPartitionOffset decodes a key and value buffer to ConsumerPartitionOffset entry
 func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *log.Entry) (*ConsumerPartitionOffset, error) {
-	// Decode key which contains group, topic and partition information first
 	var err error
 	entry := ConsumerPartitionOffset{}
 
+	// Decode key which contains group, topic and partition information first
 	entry.Group, err = readString(key)
 	if err != nil {
 		logger.WithFields(log.Fields{
@@ -60,6 +61,7 @@ func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *
 		"partition":    entry.Partition,
 	})
 
+	// Decode value
 	// Decode value version so that we decode the message correctly
 	var valueVersion int16
 	err = binary.Read(value, binary.BigEndian, &valueVersion)
