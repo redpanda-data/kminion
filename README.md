@@ -107,9 +107,9 @@ Below metrics have a variety of different labels, explained in this section:
 
 At a high level Kafka Minion fetches source data in two different ways.
 
-1. **Consumer Group Data:** Since Kafka version 0.10 Zookeeper is no longer in charge of maintaining the consumer group offsets. Instead Kafka itself utilizes an internal Kafka topic called `__consumer_offsets`. Messages in that topic are binary and the protocol may change with broker upgrades. On each succesful client commit a message is created in that topic which contains the current offset for the according `groupId`, `topic` and `partition`.
+- **Consumer Group Data:** Since Kafka version 0.10 Zookeeper is no longer in charge of maintaining the consumer group offsets. Instead Kafka itself utilizes an internal Kafka topic called `__consumer_offsets`. Messages in that topic are binary and the protocol may change with broker upgrades. On each succesful offset commit from a consumer group member a message is created and produced to that topic. The message key is a combination of the `groupId`, `topic` and `partition`. The value is the offset index.
 
-   Additionally one can find group metadata messages in this topic.
+  The `__consumer_offsets` topic is a compacted topic. Once an offset expires Kafka produces a tombstone for the given key, which will Kafka Minion use to delete the offset information as well. Therefore Kafka Minion has to consume all messages from earliest, so that it gets all consumer group offsets which have not yet been expired.
 
 2. **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, low & high water mark.
 
