@@ -18,7 +18,8 @@ var (
 	groupTopicLagDesc             *prometheus.Desc
 
 	// Topic metrics
-	partitionCountDesc *prometheus.Desc
+	partitionCountDesc        *prometheus.Desc
+	subscribedGroupsCountDesc *prometheus.Desc
 
 	// Partition metrics
 	partitionLowWaterMarkDesc  *prometheus.Desc
@@ -83,6 +84,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "partition_count"),
 		"Partition count for a given topic along with cleanup policy as label",
 		[]string{"topic", "cleanup_policy"}, prometheus.Labels{},
+	)
+	subscribedGroupsCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "subscribed_groups_count"),
+		"Number of consumer groups which have at least one consumer group offset for any of the topics partitions",
+		[]string{"topic"}, prometheus.Labels{},
 	)
 
 	// Partition metrics
@@ -288,9 +294,13 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 		)
 	}
 
-	// Group lags
+	// Group lags and subscribed consumer group count per topicname
+	subscribedGroupsByTopic := make(map[string]int32)
 	for groupName, groupLag := range groupLagsByGroupName {
 		for topicName, topicLag := range groupLag.lagByTopic {
+			// Bump subscribed consumer group count for this topic
+			subscribedGroupsByTopic[topicName]++
+
 			if _, hasErrors := errorTopics[topicName]; hasErrors {
 				e.logger.WithFields(log.Fields{
 					"group": groupName,
@@ -309,6 +319,17 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 				topicName,
 			)
 		}
+	}
+
+	for topicName := range lowWaterMarks {
+		subscribedGroups := subscribedGroupsByTopic[topicName]
+
+		ch <- prometheus.MustNewConstMetric(
+			subscribedGroupsCountDesc,
+			prometheus.GaugeValue,
+			float64(subscribedGroups),
+			topicName,
+		)
 	}
 }
 
