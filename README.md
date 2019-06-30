@@ -106,13 +106,13 @@ Below metrics have a variety of different labels, explained in this section:
 
 ## How does it work
 
-At a high level Kafka Minion fetches source data in two different ways.
+At a high level Kafka Minion fetches data from two different sources (see below). Kafka Minion provides lots of metrics by connecting these datasets. For instance a partition high water mark with a consumer group's current offset to calculate the lag on that partition. Invocating the `/metrics` endpoint starts the calculation of these metrics on a snapshot of the current data.
 
 - **Consumer Group Data:** Since Kafka version 0.10 Zookeeper is no longer in charge of maintaining the consumer group offsets. Instead Kafka itself utilizes an internal Kafka topic called `__consumer_offsets`. Messages in that topic are binary and the protocol may change with broker upgrades. On each succesful offset commit from a consumer group member a message is created and produced to that topic. The message key is a combination of the `groupId`, `topic` and `partition`. The value is the offset index.
 
   The `__consumer_offsets` topic is a compacted topic. Once an offset expires Kafka produces a tombstone for the given key, which will Kafka Minion use to delete the offset information as well. Therefore Kafka Minion has to consume all messages from earliest, so that it gets all consumer group offsets which have not yet been expired.
 
-2. **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, low & high water mark.
+- **Broker requests:** Brokers are being queried to get topic metadata information, such as partition count, topic configuration, low & high water mark.
 
 ## FAQ
 
