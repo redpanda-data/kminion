@@ -4,9 +4,14 @@
 
 Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to reliably expose consumer group lag information along with other helpful, unique metrics. Easy to setup on Kubernetes environments.
 
-![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/grafana-sample-1.png)
+![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/docs/screenshots/grafana-main-1.png)
 
-![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/grafana-sample-2.png)
+![Grafana Dashboard for Kafka Consumer Group Lag Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/docs/screenshots/grafana-main-2.png)
+
+![Grafana Dashboard for Kafka Topic Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/docs/screenshots/grafana-ops-1.png)
+
+![Grafana Dashboard for Kafka Cluster Monitoring](https://raw.githubusercontent.com/cloudworkz/kafka-minion/master/docs/screenshots/grafana-ops-2.png)
+
 
 ## Features
 
@@ -51,7 +56,9 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to 
 
 ### Grafana Dashboard
 
-You can import our suggested Grafana dashboard and modify it as you wish: https://grafana.com/dashboards/10083 (Dashboard ID 10083)
+You can import our suggested Grafana dashboards and modify them as you wish:
+ - https://grafana.com/dashboards/10083 (Kafka Minion Dashboard ID 10083)
+ - https://grafana.com/dashboards/10466 (Kafka Minion OPS Dashbaord ID 10466)
 
 ## Exposed metrics
 
