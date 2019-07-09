@@ -31,6 +31,10 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to 
 
 ## Setup
 
+### Helm Chart
+
+Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://github.com/cloudworkz/kafka-minion-helm-chart
+
 ### Environment variables
 
 | Variable name | Description | Default |
