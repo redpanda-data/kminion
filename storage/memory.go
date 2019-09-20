@@ -12,7 +12,7 @@ import (
 type PartitionWaterMarks = map[int32]kafka.PartitionWaterMark
 
 // MemoryStorage stores the latest committed offsets for each group, topic, partition combination and offers an interface
-// to access these information
+// to access this information
 type MemoryStorage struct {
 	logger *log.Entry
 
@@ -48,6 +48,9 @@ type partition struct {
 
 	HighWaterMarksLock sync.RWMutex
 	HighWaterMarks     map[string]PartitionWaterMarks
+
+	ReplicationStatusLock sync.RWMutex
+	Underreplicated       map[string][]bool
 }
 
 type topic struct {
@@ -79,8 +82,9 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 	}
 
 	partitions := &partition{
-		LowWaterMarks:  make(map[string]PartitionWaterMarks),
-		HighWaterMarks: make(map[string]PartitionWaterMarks),
+		LowWaterMarks:   make(map[string]PartitionWaterMarks),
+		HighWaterMarks:  make(map[string]PartitionWaterMarks),
+		Underreplicated: make(map[string][]bool),
 	}
 
 	topics := &topic{
@@ -143,6 +147,8 @@ func (module *MemoryStorage) clusterWorker() {
 			module.storeTopicConfig(request.TopicConfig)
 		case kafka.StorageDeleteTopic:
 			module.deleteTopic(request.TopicName)
+		case kafka.StorageReplicationStatus:
+			module.storeReplicationStatus(request.TopicName, request.PartitionID, request.ReplicationStatus)
 
 		default:
 			log.WithFields(log.Fields{
@@ -158,12 +164,15 @@ func (module *MemoryStorage) deleteTopic(topicName string) {
 	module.topics.ConfigsLock.Lock()
 	module.partitions.LowWaterMarksLock.Lock()
 	module.partitions.HighWaterMarksLock.Lock()
+	module.partitions.ReplicationStatusLock.Lock()
 	defer module.topics.ConfigsLock.Unlock()
 	defer module.partitions.LowWaterMarksLock.Unlock()
 	defer module.partitions.HighWaterMarksLock.Unlock()
+	defer module.partitions.ReplicationStatusLock.Unlock()
 
 	delete(module.partitions.LowWaterMarks, topicName)
 	delete(module.partitions.HighWaterMarks, topicName)
+	delete(module.partitions.Underreplicated, topicName)
 	delete(module.topics.Configs, topicName)
 }
 
@@ -244,6 +253,26 @@ func (module *MemoryStorage) storeOffsetEntry(offset *kafka.ConsumerPartitionOff
 	}
 }
 
+func (module *MemoryStorage) storeReplicationStatus(topicName string, partitionID int32, status bool) {
+	module.partitions.ReplicationStatusLock.Lock()
+	defer module.partitions.ReplicationStatusLock.Unlock()
+
+	neededSize := partitionID + 1
+	// create if it doesn't exist
+	if _, exists := module.partitions.Underreplicated[topicName]; !exists {
+		module.partitions.Underreplicated[topicName] = make([]bool, neededSize)
+	}
+
+	// resize if it's too small
+	if int32(len(module.partitions.Underreplicated[topicName])) < neededSize {
+		temp := make([]bool, neededSize)
+		copy(temp, module.partitions.Underreplicated[topicName])
+		module.partitions.Underreplicated[topicName] = temp
+	}
+
+	module.partitions.Underreplicated[topicName][partitionID] = status
+}
+
 func (module *MemoryStorage) deleteOffsetEntry(consumerGroupName string, topicName string, partitionID int32) {
 	key := fmt.Sprintf("%v:%v:%v", consumerGroupName, topicName, partitionID)
 	module.groups.OffsetsLock.Lock()
@@ -321,6 +350,23 @@ func (module *MemoryStorage) PartitionLowWaterMarks() map[string]PartitionWaterM
 		mapCopy[key] = make(PartitionWaterMarks)
 		for partition, partitionData := range value {
 			mapCopy[key][partition] = partitionData
+		}
+	}
+
+	return mapCopy
+}
+
+// ReplicaSets returns all replica sets in a copied map, so that it
+// is safe to process in another go routine
+func (module *MemoryStorage) ReplicationStatus() map[string][]bool {
+	module.partitions.ReplicationStatusLock.RLock()
+	defer module.partitions.ReplicationStatusLock.RUnlock()
+
+	mapCopy := make(map[string][]bool)
+	for topicName, partitions := range module.partitions.Underreplicated {
+		mapCopy[topicName] = make([]bool, len(partitions))
+		for partitionID, status := range partitions {
+			mapCopy[topicName][partitionID] = status
 		}
 	}
 

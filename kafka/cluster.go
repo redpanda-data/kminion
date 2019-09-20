@@ -130,6 +130,13 @@ func (module *Cluster) mainLoop() {
 			module.refreshAndSendTopicConfig()
 		}
 	}()
+
+	go func() {
+		offsetRefresh := time.NewTicker(time.Second * 20)
+		for range offsetRefresh.C {
+			module.getConnectedBrokersAndSendReplicationStatus()
+		}
+	}()
 }
 
 // deleteTopicIfNeeded checks a current map of available topics against a previously fetched
@@ -212,13 +219,21 @@ func (module *Cluster) refreshAndSendTopicConfig() {
 // refreshAndSendTopicMetadata fetches topic offsets and partitionIDs for each topic:partition and
 // sends this information to the storage module
 func (module *Cluster) refreshAndSendTopicMetadata() {
+	var wg = sync.WaitGroup{}
+
+	err := module.client.RefreshMetadata()
+	if err != nil {
+		module.logger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Warn("could not refresh topic metadata")
+	}
+
 	partitionIDsByTopicName, err := module.topicPartitions()
 	if err != nil {
 		return
 	}
 
 	// Send requests in bulk to each broker for those partitions it is responsible/leader for
-	var wg = sync.WaitGroup{}
 	module.logger.Debug("starting to collect topic offsets")
 	highRequests, lowRequests, brokers := module.generateOffsetRequests(partitionIDsByTopicName)
 	for brokerID, request := range highRequests {
@@ -242,13 +257,6 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 
 // topicPartitions returns a map of all partition IDs (value) grouped by topic name (key)
 func (module *Cluster) topicPartitions() (map[string][]int32, error) {
-	err := module.client.RefreshMetadata()
-	if err != nil {
-		module.logger.WithFields(log.Fields{
-			"error": err.Error(),
-		}).Warn("could not refresh topic metadata")
-	}
-
 	// Get the current list of topics and make a map
 	topicNames, err := module.client.Topics()
 	if err != nil {
@@ -318,7 +326,7 @@ func (module *Cluster) processHighWaterMarks(wg *sync.WaitGroup, broker *sarama.
 		logger.WithFields(log.Fields{
 			"error": err.Error(),
 		}).Error("failed to fetch high watermarks from broker")
-		broker.Close()
+		_ = broker.Close()
 		return
 	}
 	ts := time.Now().Unix() * 1000
@@ -371,7 +379,7 @@ func (module *Cluster) processLowWaterMarks(wg *sync.WaitGroup, broker *sarama.B
 		logger.WithFields(log.Fields{
 			"error": err.Error(),
 		}).Error("failed to fetch low watermarks from broker")
-		broker.Close()
+		_ = broker.Close()
 		return
 	}
 	ts := time.Now().Unix() * 1000
@@ -409,24 +417,60 @@ func (module *Cluster) processLowWaterMarks(wg *sync.WaitGroup, broker *sarama.B
 
 // getAnyBroker return a random item from the brokers slice
 func (module *Cluster) getAnyBroker() *sarama.Broker {
-	brokers := module.client.Brokers()
+	connectedBrokers := module.getConnectedBrokersAndSendReplicationStatus()
 
+	if 0 < len(connectedBrokers) {
+		rand.Seed(time.Now().Unix())
+		n := rand.Int() % len(connectedBrokers)
+
+		return connectedBrokers[n]
+	}
+	return nil
+}
+
+func (module *Cluster) getConnectedBrokersAndSendReplicationStatus() []*sarama.Broker {
+
+	brokers := module.client.Brokers()
 	connectedBrokers := make([]*sarama.Broker, 0)
 	for _, broker := range brokers {
 		connected, err := broker.Connected()
 		if err == nil && connected == true {
-			connectedBrokers = append(connectedBrokers, broker)
+			metadata, err := broker.GetMetadata(&sarama.MetadataRequest{})
+
+			if err != nil {
+				module.logger.WithFields(log.Fields{"error": err, "broker": broker.ID()}).Warn("metadata request failed")
+
+				err2 := broker.Close()
+				if err2 != nil {
+					module.logger.WithFields(log.Fields{"error": err2, "broker": broker.ID()}).Warn("broker close failed")
+				}
+				continue
+			}
+
+			for _, data := range metadata.Topics {
+				topicReplicaMap := make(map[int32][]int32, len(data.Partitions))
+				topicInSyncReplicaMap := make(map[int32][]int32, len(data.Partitions))
+
+				for p := range data.Partitions {
+					var underreplicated = false
+					partitionID := int32(p)
+					if data.Partitions[partitionID].Err == sarama.ErrReplicaNotAvailable {
+						underreplicated = true
+					} else {
+						topicReplicaMap[partitionID] = data.Partitions[partitionID].Replicas
+						topicInSyncReplicaMap[partitionID] = data.Partitions[partitionID].Isr
+						underreplicated = 0 < (len(topicReplicaMap[partitionID]) - len(topicInSyncReplicaMap[partitionID]))
+					}
+					module.storageCh <- newReplicationStatusRequest(data.Name, partitionID, underreplicated)
+				}
+			}
 		}
+		connectedBrokers = append(connectedBrokers, broker)
 	}
-	length := len(connectedBrokers)
-	if length == 0 {
+	if len(connectedBrokers) == 0 {
 		return nil
 	}
-
-	rand.Seed(time.Now().Unix())
-	n := rand.Int() % len(connectedBrokers)
-
-	return connectedBrokers[n]
+	return connectedBrokers
 }
 
 func (module *Cluster) isTopicAllowed(topicName string) bool {

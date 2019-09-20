@@ -37,6 +37,9 @@ const (
 
 	// StorageDeleteTopic is the request type to delete all topic information
 	StorageDeleteTopic StorageRequestType = 9
+
+	// StorageReplicationStatus is the request type to store the current replication status
+	StorageReplicationStatus StorageRequestType = 10
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
@@ -50,6 +53,7 @@ type StorageRequest struct {
 	TopicName          string
 	PartitionID        int32
 	PartitionCount     int
+	ReplicationStatus  bool
 }
 
 func newAddPartitionLowWaterMarkRequest(lowWaterMark *PartitionWaterMark) *StorageRequest {
@@ -121,5 +125,14 @@ func newDeleteTopicRequest(topic string) *StorageRequest {
 	return &StorageRequest{
 		RequestType: StorageDeleteTopic,
 		TopicName:   topic,
+	}
+}
+
+func newReplicationStatusRequest(topic string, partitionID int32, status bool) *StorageRequest {
+	return &StorageRequest{
+		RequestType:       StorageReplicationStatus,
+		TopicName:         topic,
+		ReplicationStatus: status,
+		PartitionID:       partitionID,
 	}
 }

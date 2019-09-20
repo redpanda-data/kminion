@@ -25,6 +25,7 @@ var (
 	partitionLowWaterMarkDesc  *prometheus.Desc
 	partitionHighWaterMarkDesc *prometheus.Desc
 	partitionMessageCountDesc  *prometheus.Desc
+	partitionIsUnderReplicated *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics on each /metrics invocation, see:
@@ -107,6 +108,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		"Number of messages for a given topic. Calculated by subtracting high water mark by low water mark.",
 		[]string{"topic", "partition"}, prometheus.Labels{},
 	)
+	partitionIsUnderReplicated = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "under_replicated"),
+		"Whether the current in-sync replicas are less than the configured replicas for the current partition.",
+		[]string{"topic", "partition"}, prometheus.Labels{},
+	)
 
 	return &Collector{
 		opts,
@@ -118,6 +124,13 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 // Describe sends a description of all to be exposed metric types to Prometheus
 func (e *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- groupPartitionOffsetDesc
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // Collect is triggered by the Prometheus registry when the metrics endpoint has been invoked
@@ -133,6 +146,7 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	partitionLowWaterMarks := e.storage.PartitionLowWaterMarks()
 	partitionHighWaterMarks := e.storage.PartitionHighWaterMarks()
 	topicConfigs := e.storage.TopicConfigs()
+	replicationStatus := e.storage.ReplicationStatus()
 
 	e.collectConsumerOffsets(ch, consumerOffsets, partitionLowWaterMarks, partitionHighWaterMarks)
 
@@ -144,6 +158,18 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 			config.TopicName,
 			config.CleanupPolicy,
 		)
+	}
+
+	for topic, partitions := range replicationStatus {
+		for partitionID, replicationState := range partitions {
+			ch <- prometheus.MustNewConstMetric(
+				partitionIsUnderReplicated,
+				prometheus.GaugeValue,
+				float64(btoi(replicationState)),
+				topic,
+				strconv.Itoa(partitionID),
+			)
+		}
 	}
 
 	for _, partitions := range partitionLowWaterMarks {

@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 // saramaClientConfig returns a sarama config pre initialized with SASL / TLS settings
@@ -19,6 +20,7 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 	clientConfig := sarama.NewConfig()
 	clientConfig.ClientID = "kafka-lag-collector-1"
 	clientConfig.Version = sarama.V0_11_0_2
+	clientConfig.Metadata.RefreshFrequency = 1 * time.Minute
 
 	// SASL
 	if opts.SASLEnabled {

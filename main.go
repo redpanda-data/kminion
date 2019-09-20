@@ -35,7 +35,7 @@ func main() {
 	}
 	log.SetLevel(level)
 
-	log.Infof("Starting kafka minion version%v", opts.Version)
+	log.Infof("Starting kafka minion version %v", opts.Version)
 	// Create cross package shared dependencies
 	consumerOffsetsCh := make(chan *kafka.StorageRequest, 1000)
 	clusterCh := make(chan *kafka.StorageRequest, 200)
