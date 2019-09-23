@@ -16,6 +16,7 @@ var (
 	groupPartitionLastCommitDesc  *prometheus.Desc
 	groupPartitionLagDesc         *prometheus.Desc
 	groupTopicLagDesc             *prometheus.Desc
+	groupMemberCountDesc          *prometheus.Desc
 
 	// Topic metrics
 	partitionCountDesc        *prometheus.Desc
@@ -78,6 +79,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		"Number of messages the consumer group is behind for a topic",
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic"}, prometheus.Labels{},
 	)
+	groupMemberCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "group_member", "count"),
+		"Number of members in a consumer group",
+		[]string{"group"}, prometheus.Labels{},
+	)
 
 	// Topic metrics
 	partitionCountDesc = prometheus.NewDesc(
@@ -133,8 +139,18 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	partitionLowWaterMarks := e.storage.PartitionLowWaterMarks()
 	partitionHighWaterMarks := e.storage.PartitionHighWaterMarks()
 	topicConfigs := e.storage.TopicConfigs()
+	groupMetadata := e.storage.GroupMetadata()
 
 	e.collectConsumerOffsets(ch, consumerOffsets, partitionLowWaterMarks, partitionHighWaterMarks)
+
+	for _, metadata := range groupMetadata {
+		ch <- prometheus.MustNewConstMetric(
+			groupMemberCountDesc,
+			prometheus.GaugeValue,
+			float64(len(metadata.Members)),
+			metadata.Group,
+		)
+	}
 
 	for _, config := range topicConfigs {
 		ch <- prometheus.MustNewConstMetric(

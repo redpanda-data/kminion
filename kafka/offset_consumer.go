@@ -3,13 +3,14 @@ package kafka
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/Shopify/sarama"
-	"github.com/google-cloud-tools/kafka-minion/options"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/google-cloud-tools/kafka-minion/options"
+	log "github.com/sirupsen/logrus"
 )
 
 type consumerStatus struct {
@@ -187,7 +188,7 @@ func (module *OffsetConsumer) processMessage(msg *sarama.ConsumerMessage) {
 	case 0, 1:
 		module.processOffsetCommit(key, value, logger)
 	case 2:
-		// module.processGroupMetadata(key, value, logger)
+		module.processGroupMetadata(key, value, logger)
 	default:
 		logger.WithFields(log.Fields{
 			"reason":  "unknown key version",
