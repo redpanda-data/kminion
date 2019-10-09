@@ -116,7 +116,8 @@ func (module *Cluster) mainLoop() {
 	go func() {
 		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
 		module.refreshAndSendTopicMetadata()
-		offsetRefresh := time.NewTicker(time.Second * 5)
+		module.logger.Infof("Updating offsets (topic metadata) every %d seconds", module.options.OffsetsUpdateInterval)
+		offsetRefresh := time.NewTicker(time.Second * time.Duration(module.options.OffsetsUpdateInterval))
 		for range offsetRefresh.C {
 			module.refreshAndSendTopicMetadata()
 		}
@@ -125,14 +126,16 @@ func (module *Cluster) mainLoop() {
 	go func() {
 		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
 		module.refreshAndSendTopicConfig()
-		topicConfigRefresh := time.NewTicker(time.Second * 60)
+		module.logger.Infof("Updating config metadata every %d seconds", module.options.MetadataUpdateInterval)
+		topicConfigRefresh := time.NewTicker(time.Second * time.Duration(module.options.MetadataUpdateInterval))
 		for range topicConfigRefresh.C {
 			module.refreshAndSendTopicConfig()
 		}
 	}()
 
 	go func() {
-		offsetRefresh := time.NewTicker(time.Second * 20)
+		module.logger.Infof("Updating connected brokers every %d seconds", module.options.BrokerUpdateInterval)
+		offsetRefresh := time.NewTicker(time.Second * time.Duration(module.options.BrokerUpdateInterval))
 		for range offsetRefresh.C {
 			module.getConnectedBrokersAndSendReplicationStatus()
 		}
@@ -219,8 +222,6 @@ func (module *Cluster) refreshAndSendTopicConfig() {
 // refreshAndSendTopicMetadata fetches topic offsets and partitionIDs for each topic:partition and
 // sends this information to the storage module
 func (module *Cluster) refreshAndSendTopicMetadata() {
-	var wg = sync.WaitGroup{}
-
 	err := module.client.RefreshMetadata()
 	if err != nil {
 		module.logger.WithFields(log.Fields{
@@ -233,6 +234,7 @@ func (module *Cluster) refreshAndSendTopicMetadata() {
 		return
 	}
 
+	var wg = sync.WaitGroup{}
 	// Send requests in bulk to each broker for those partitions it is responsible/leader for
 	module.logger.Debug("starting to collect topic offsets")
 	highRequests, lowRequests, brokers := module.generateOffsetRequests(partitionIDsByTopicName)
@@ -470,6 +472,9 @@ func (module *Cluster) getConnectedBrokersAndSendReplicationStatus() []*sarama.B
 	if len(connectedBrokers) == 0 {
 		return nil
 	}
+
+	module.storageCh <- newBrokerCountRequest(len(connectedBrokers))
+
 	return connectedBrokers
 }
 

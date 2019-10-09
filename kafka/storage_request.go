@@ -40,6 +40,9 @@ const (
 
 	// StorageReplicationStatus is the request type to store the current replication status
 	StorageReplicationStatus StorageRequestType = 10
+
+	// StorageBrokerCount is the request type to store the current number of connected brokers
+	StorageBrokerCount StorageRequestType = 11
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
@@ -53,6 +56,7 @@ type StorageRequest struct {
 	TopicName          string
 	PartitionID        int32
 	PartitionCount     int
+	BrokerCount        int
 	ReplicationStatus  bool
 }
 
@@ -134,5 +138,12 @@ func newReplicationStatusRequest(topic string, partitionID int32, status bool) *
 		TopicName:         topic,
 		ReplicationStatus: status,
 		PartitionID:       partitionID,
+	}
+}
+
+func newBrokerCountRequest(number int) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageBrokerCount,
+		BrokerCount: number,
 	}
 }

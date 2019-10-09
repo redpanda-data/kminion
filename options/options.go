@@ -43,6 +43,9 @@ type Options struct {
 	TLSCertFilePath          string   `envconfig:"KAFKA_TLS_CERT_FILE_PATH"`
 	TLSInsecureSkipTLSVerify bool     `envconfig:"KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
 	TLSPassphrase            string   `envconfig:"KAFKA_TLS_PASSPHRASE"`
+	OffsetsUpdateInterval    int      `envconfig:"OFFSETS_UPDATE_INTERVAL" default:"5"`
+	MetadataUpdateInterval   int      `envconfig:"METADATA_UPDATE_INTERVAL" default:"60"`
+	BrokerUpdateInterval     int      `envconfig:"BROKER_UPDATE_INTERVAL" default:"30"`
 
 	// Prometheus exporter
 	// MetricsPrefix - A prefix for all exported prometheus metrics

@@ -20,10 +20,11 @@ type MemoryStorage struct {
 	consumerOffsetCh <-chan *kafka.StorageRequest
 	clusterCh        <-chan *kafka.StorageRequest
 
-	status     *consumerStatus
-	groups     *consumerGroup
-	partitions *partition
-	topics     *topic
+	status      *consumerStatus
+	groups      *consumerGroup
+	partitions  *partition
+	topics      *topic
+	brokerCount *brokerCount
 }
 
 // consumerStatus holds information about the partition consumers consuming the __consumer_offsets topic
@@ -51,6 +52,11 @@ type partition struct {
 
 	ReplicationStatusLock sync.RWMutex
 	Underreplicated       map[string][]bool
+}
+
+type brokerCount struct {
+	BrokerCountLock sync.RWMutex
+	BrokerCount     int
 }
 
 type topic struct {
@@ -91,6 +97,10 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 		Configs: make(map[string]kafka.TopicConfiguration),
 	}
 
+	brokerCount := &brokerCount{
+		BrokerCount: 0,
+	}
+
 	return &MemoryStorage{
 		logger: log.WithFields(log.Fields{
 			"module": "storage",
@@ -99,10 +109,11 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 		consumerOffsetCh: consumerOffsetCh,
 		clusterCh:        clusterCh,
 
-		status:     status,
-		groups:     groups,
-		partitions: partitions,
-		topics:     topics,
+		status:      status,
+		groups:      groups,
+		partitions:  partitions,
+		topics:      topics,
+		brokerCount: brokerCount,
 	}
 }
 
@@ -149,6 +160,8 @@ func (module *MemoryStorage) clusterWorker() {
 			module.deleteTopic(request.TopicName)
 		case kafka.StorageReplicationStatus:
 			module.storeReplicationStatus(request.TopicName, request.PartitionID, request.ReplicationStatus)
+		case kafka.StorageBrokerCount:
+			module.storeBrokerCount(request.BrokerCount)
 
 		default:
 			log.WithFields(log.Fields{
@@ -273,6 +286,13 @@ func (module *MemoryStorage) storeReplicationStatus(topicName string, partitionI
 	module.partitions.Underreplicated[topicName][partitionID] = status
 }
 
+func (module *MemoryStorage) storeBrokerCount(number int) {
+	module.brokerCount.BrokerCountLock.Lock()
+	defer module.brokerCount.BrokerCountLock.Unlock()
+
+	module.brokerCount.BrokerCount = number
+}
+
 func (module *MemoryStorage) deleteOffsetEntry(consumerGroupName string, topicName string, partitionID int32) {
 	key := fmt.Sprintf("%v:%v:%v", consumerGroupName, topicName, partitionID)
 	module.groups.OffsetsLock.Lock()
@@ -356,7 +376,7 @@ func (module *MemoryStorage) PartitionLowWaterMarks() map[string]PartitionWaterM
 	return mapCopy
 }
 
-// ReplicaSets returns all replica sets in a copied map, so that it
+// ReplicationStatus returns the replication status of all partitions in a copied map, so that it
 // is safe to process in another go routine
 func (module *MemoryStorage) ReplicationStatus() map[string][]bool {
 	module.partitions.ReplicationStatusLock.RLock()
@@ -371,6 +391,13 @@ func (module *MemoryStorage) ReplicationStatus() map[string][]bool {
 	}
 
 	return mapCopy
+}
+
+func (module *MemoryStorage) BrokerCount() int {
+	module.brokerCount.BrokerCountLock.Lock()
+	defer module.brokerCount.BrokerCountLock.Unlock()
+
+	return module.brokerCount.BrokerCount
 }
 
 // IsConsumed indicates whether the consumer offsets topic lag has been caught up and therefore
