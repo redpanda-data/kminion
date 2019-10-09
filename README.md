@@ -57,6 +57,9 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | KAFKA_TLS_CERT_FILE_PATH | Path to the TLS cert file | (No default) |
 | KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true |
 | KAFKA_TLS_PASSPHRASE | Passphrase to decrypt the TLS Key | (No default) |
+| OFFSETS_UPDATE_INTERVAL | Update interval for the consumer offsets in seconds | 5 |
+| METADATA_UPDATE_INTERVAL | Update interval for the consumer offsets in seconds | 60 |
+| BROKER_UPDATE_INTERVAL | Update interval for the consumer offsets in seconds | 30 |
 
 ### Grafana Dashboard
 
@@ -84,6 +87,12 @@ Below metrics have a variety of different labels, explained in this section:
 
 ### Metrics
 
+#### Cluster metrics
+
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_broker_count` | Number of brokers currently connected to the cluster. |
+
 #### Consumer group metrics
 
 | Metric | Description |
@@ -102,6 +111,7 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_topic_partition_high_water_mark{topic, partition}` | Latest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one. |
 | `kafka_minion_topic_partition_low_water_mark{topic, partition}` | Oldest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one. |
 | `kafka_minion_topic_partition_message_count{topic, partition}` | Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic. |
+| `kafka_minion_topic_partition_under_replicated{topic, partition}` | Whether the partition's replicas are available - either the number of in-sync replicas is less than the number of replicas, or the cluster reports an error "9" (ErrReplicaNotAvailable) for the partition. |
 | `kafka_minion_topic_subscribed_groups_count{topic}` | Number of consumer groups which have at least one consumer group offset for any of the topic's partitions |
 
 #### Internal metrics
