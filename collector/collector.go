@@ -10,6 +10,9 @@ import (
 )
 
 var (
+	// Broker metrics
+	brokerCountDesc *prometheus.Desc
+
 	// Consumer group metrics
 	groupPartitionOffsetDesc      *prometheus.Desc
 	groupPartitionCommitCountDesc *prometheus.Desc
@@ -52,6 +55,13 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 	logger := log.WithFields(log.Fields{
 		"module": "collector",
 	})
+
+	// Broker metrics
+	brokerCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "broker", "count"),
+		"Number of currently connected brokers",
+		nil, prometheus.Labels{},
+	)
 
 	// Consumer group metrics
 	groupPartitionOffsetDesc = prometheus.NewDesc(
@@ -147,8 +157,15 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	partitionHighWaterMarks := e.storage.PartitionHighWaterMarks()
 	topicConfigs := e.storage.TopicConfigs()
 	replicationStatus := e.storage.ReplicationStatus()
+	brokerCount := e.storage.BrokerCount()
 
 	e.collectConsumerOffsets(ch, consumerOffsets, partitionLowWaterMarks, partitionHighWaterMarks)
+
+	ch <- prometheus.MustNewConstMetric(
+		brokerCountDesc,
+		prometheus.GaugeValue,
+		float64(brokerCount),
+	)
 
 	for _, config := range topicConfigs {
 		ch <- prometheus.MustNewConstMetric(
