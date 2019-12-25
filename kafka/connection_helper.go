@@ -67,6 +67,17 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 		}
 	}
 
+	if opts.SASLMechanism == "SCRAM-SHA-512" {
+		log.Debug("Sarama client config has been set for scram 512")
+		clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA512} }
+		clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(sarama.SASLTypeSCRAMSHA512)
+	} else if opts.SASLMechanism == "SCRAM-SHA-256" {
+		log.Debug("Sarama client config has been set for scram256")
+		clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA256} }
+		clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(sarama.SASLTypeSCRAMSHA256)
+	} else {
+		//PLAIN TEXT mode
+	}
 	err := clientConfig.Validate()
 	if err != nil {
 		log.Panicf("Error validating kafka client config. %s", err)

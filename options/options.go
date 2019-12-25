@@ -31,9 +31,11 @@ type Options struct {
 	// TLSCertFilePath - Path to the TLS cert file
 	// TLSInsecureSkipTLSVerify - If InsecureSkipVerify is true, TLS accepts any certificate presented by the server and any host name in that certificate.
 	// TLSPassphrase - Passphrase to decrypt the TLS Key
+	// SASLMechanism - Default to empty : set to SCRAM-SHA-256 or SCRAM-SHA-512 for scram usage
 	KafkaBrokers             []string `envconfig:"KAFKA_BROKERS" required:"true"`
 	ConsumerOffsetsTopicName string   `envconfig:"KAFKA_CONSUMER_OFFSETS_TOPIC_NAME" default:"__consumer_offsets"`
 	SASLEnabled              bool     `envconfig:"KAFKA_SASL_ENABLED" default:"false"`
+	SASLMechanism            string   `envconfig:"KAFKA_SASL_MECHANISM" default:""`
 	UseSASLHandshake         bool     `envconfig:"KAFKA_SASL_USE_HANDSHAKE" default:"true"`
 	SASLUsername             string   `envconfig:"KAFKA_SASL_USERNAME"`
 	SASLPassword             string   `envconfig:"KAFKA_SASL_PASSWORD"`

@@ -57,6 +57,7 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | KAFKA_TLS_CERT_FILE_PATH | Path to the TLS cert file | (No default) |
 | KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true |
 | KAFKA_TLS_PASSPHRASE | Passphrase to decrypt the TLS Key | (No default) |
+| KAFKA_SASL_MECHANISM | Set to SCRAM-SHA-256 or SCRAM-SHA-512 for scram usage | (No default) |
 
 ### Grafana Dashboard
 
