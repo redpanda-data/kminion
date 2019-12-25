@@ -35,6 +35,7 @@ type Options struct {
 	KafkaBrokers             []string `envconfig:"KAFKA_BROKERS" required:"true"`
 	ConsumerOffsetsTopicName string   `envconfig:"KAFKA_CONSUMER_OFFSETS_TOPIC_NAME" default:"__consumer_offsets"`
 	SASLEnabled              bool     `envconfig:"KAFKA_SASL_ENABLED" default:"false"`
+	SASLMechanism            string   `envconfig:"KAFKA_SASL_MECHANISM" default:""`
 	UseSASLHandshake         bool     `envconfig:"KAFKA_SASL_USE_HANDSHAKE" default:"true"`
 	SASLUsername             string   `envconfig:"KAFKA_SASL_USERNAME"`
 	SASLPassword             string   `envconfig:"KAFKA_SASL_PASSWORD"`
@@ -44,7 +45,6 @@ type Options struct {
 	TLSCertFilePath          string   `envconfig:"KAFKA_TLS_CERT_FILE_PATH"`
 	TLSInsecureSkipTLSVerify bool     `envconfig:"KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
 	TLSPassphrase            string   `envconfig:"KAFKA_TLS_PASSPHRASE"`
-	SASLMechanism            string   `envconfig:"KAFKA_SASL_MECHANISM" default:""`
 
 	// Prometheus exporter
 	// MetricsPrefix - A prefix for all exported prometheus metrics
