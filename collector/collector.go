@@ -25,9 +25,6 @@ var (
 	partitionLowWaterMarkDesc  *prometheus.Desc
 	partitionHighWaterMarkDesc *prometheus.Desc
 	partitionMessageCountDesc  *prometheus.Desc
-
-	// General metrics
-	buildInfoDesc *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics on each /metrics invocation, see:
