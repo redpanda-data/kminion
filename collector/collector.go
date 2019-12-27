@@ -25,6 +25,9 @@ var (
 	partitionLowWaterMarkDesc  *prometheus.Desc
 	partitionHighWaterMarkDesc *prometheus.Desc
 	partitionMessageCountDesc  *prometheus.Desc
+
+	// General metrics
+	buildInfoDesc *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics on each /metrics invocation, see:
@@ -107,6 +110,18 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		"Number of messages for a given topic. Calculated by subtracting high water mark by low water mark.",
 		[]string{"topic", "partition"}, prometheus.Labels{},
 	)
+
+	// General metrics
+	buildInfo := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: opts.MetricsPrefix,
+		Name:      "build_info",
+		Help:      "Build Info about Kafka Minion",
+		ConstLabels: prometheus.Labels{
+			"version": opts.Version,
+		},
+	})
+	buildInfo.Set(1)
+	prometheus.MustRegister(buildInfo)
 
 	return &Collector{
 		opts,

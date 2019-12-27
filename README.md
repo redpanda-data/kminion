@@ -116,6 +116,12 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_internal_kafka_messages_in_success{topic}` | Number of successfully received kafka messages |
 | `kafka_minion_internal_kafka_messages_in_failed{topic}` | Number of errors while consuming kafka messages |
 
+#### General metrics
+
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_build_info{version}` | Build version exposed as label. The value for this metric is always set to `1` |
+
 ## How does it work
 
 At a high level Kafka Minion fetches data from two different sources (see below). Kafka Minion provides lots of metrics by connecting these datasets. For instance a partition high water mark with a consumer group's current offset to calculate the lag on that partition. Invocating the `/metrics` endpoint starts the calculation of these metrics on a snapshot of the current data.
