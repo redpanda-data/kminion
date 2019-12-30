@@ -2,10 +2,13 @@ package storage
 
 import (
 	"fmt"
-	"github.com/google-cloud-tools/kafka-minion/kafka"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"sync"
+	"time"
+
+	"github.com/google-cloud-tools/kafka-minion/kafka"
+	"github.com/google-cloud-tools/kafka-minion/options"
+	log "github.com/sirupsen/logrus"
 )
 
 // PartitionWaterMarks represents a map of PartitionWaterMarks grouped by PartitionID
@@ -24,6 +27,7 @@ type MemoryStorage struct {
 	groups     *consumerGroup
 	partitions *partition
 	topics     *topic
+	options    *options.Options
 }
 
 // consumerStatus holds information about the partition consumers consuming the __consumer_offsets topic
@@ -62,12 +66,12 @@ type ConsumerPartitionOffsetMetric struct {
 	Topic            string
 	Partition        int32
 	Offset           int64
-	Timestamp        int64
+	Timestamp        time.Time
 	TotalCommitCount float64
 }
 
 // NewMemoryStorage creates a new storage and preinitializes the required maps which store the PartitionOffset information
-func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <-chan *kafka.StorageRequest) *MemoryStorage {
+func NewMemoryStorage(opts *options.Options, consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <-chan *kafka.StorageRequest) *MemoryStorage {
 	groups := &consumerGroup{
 		Offsets:  make(map[string]ConsumerPartitionOffsetMetric),
 		Metadata: make(map[string]kafka.ConsumerGroupMetadata),
@@ -99,6 +103,7 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 		groups:     groups,
 		partitions: partitions,
 		topics:     topics,
+		options:    opts,
 	}
 }
 
@@ -106,6 +111,20 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 func (module *MemoryStorage) Start() {
 	go module.consumerOffsetWorker()
 	go module.clusterWorker()
+}
+
+func (module *MemoryStorage) removeExpiredOffsets() {
+	module.groups.OffsetsLock.Lock()
+	defer module.groups.OffsetsLock.Unlock()
+
+	for key, offset := range module.groups.Offsets {
+		offsetExpiry := time.Now().Add(-module.options.OffsetRetention)
+		if offset.Timestamp.Before(offsetExpiry) {
+			// Offset message is older than 1 week ago (or whatever the offset retention is set to)
+			return
+		}
+		delete(module.groups.Offsets, key)
+	}
 }
 
 func (module *MemoryStorage) consumerOffsetWorker() {

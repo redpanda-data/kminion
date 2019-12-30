@@ -3,6 +3,7 @@ package kafka
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,7 @@ func TestDecodeConsumerPartitionOffsetV3(t *testing.T) {
 		Topic:     "orders",
 		Partition: 0,
 		Offset:    16534,
-		Timestamp: 1558998332950,
+		Timestamp: time.Unix(0, 1558998332950),
 	}
 
 	offset, err := newConsumerPartitionOffset(key, value, logger)

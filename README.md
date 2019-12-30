@@ -46,6 +46,7 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | EXPORTER_IGNORE_SYSTEM_TOPICS | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true |
 | METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
 | KAFKA_BROKERS | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default) |
+| KAFKA_OFFSET_RETENTION | After this time Kafka Minion will delete stale offsets, this must match your Brokers' `offsets.retention.minutes` which equals to a defailt of 7 days for Kafka v2.0.0+ | 168h |
 | KAFKA_CONSUMER_OFFSETS_TOPIC_NAME | Topic name of topic where kafka commits the consumer offsets | \_\_consumer_offsets |
 | KAFKA_SASL_ENABLED | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported) | false |
 | KAFKA_SASL_USE_HANDSHAKE | Whether or not to send the Kafka SASL handshake first | true |

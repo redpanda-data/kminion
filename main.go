@@ -41,7 +41,7 @@ func main() {
 	clusterCh := make(chan *kafka.StorageRequest, 200)
 
 	// Create storage module
-	cache := storage.NewMemoryStorage(consumerOffsetsCh, clusterCh)
+	cache := storage.NewMemoryStorage(opts, consumerOffsetsCh, clusterCh)
 	cache.Start()
 
 	// Create cluster module

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google-cloud-tools/kafka-minion/storage"
 )
@@ -13,49 +14,49 @@ func TestGetVersionedConsumerGroups(t *testing.T) {
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1156,
-		Timestamp: 1552723003465,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 	offsets["sample-group-2"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "sample-group-2",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1000,
-		Timestamp: 1552723003465,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 	offsets["sample-group-3"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "sample-group-3",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
-		Timestamp: 1552723003475,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 	offsets["another-group-v1"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "another-group-v1",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
-		Timestamp: 1552723003485,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 	offsets["another-group-v3"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "another-group-v3",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    1200,
-		Timestamp: 1552723003489,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 	offsets["console-consumer-40098"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "console-consumer-40098",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    936,
-		Timestamp: 1552723003485,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 	offsets["nongroupedconsumer"] = storage.ConsumerPartitionOffsetMetric{
 		Group:     "nongroupedconsumer",
 		Topic:     "important-topic",
 		Partition: 0,
 		Offset:    936,
-		Timestamp: 1552723003485,
+		Timestamp: time.Unix(0, 1552723003465),
 	}
 
 	tables := []struct {

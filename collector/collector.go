@@ -244,7 +244,7 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 		ch <- prometheus.MustNewConstMetric(
 			groupPartitionLastCommitDesc,
 			prometheus.GaugeValue,
-			float64(offset.Timestamp),
+			float64(offset.Timestamp.Unix()),
 			offset.Group,
 			group.BaseName,
 			strconv.FormatBool(group.IsLatest),
