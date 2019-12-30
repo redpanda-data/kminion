@@ -14,6 +14,7 @@ var (
 	groupPartitionOffsetDesc      *prometheus.Desc
 	groupPartitionCommitCountDesc *prometheus.Desc
 	groupPartitionLastCommitDesc  *prometheus.Desc
+	groupPartitionExpiresAtDesc   *prometheus.Desc
 	groupPartitionLagDesc         *prometheus.Desc
 	groupTopicLagDesc             *prometheus.Desc
 
@@ -66,6 +67,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 	groupPartitionLastCommitDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "last_commit"),
 		"Timestamp when consumer group last committed an offset for a partition",
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+	)
+	groupPartitionExpiresAtDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "expires_at"),
+		"Timestamp when this offset will expire if there won't be further commits",
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
 	)
 	groupPartitionLagDesc = prometheus.NewDesc(
@@ -245,6 +251,20 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			groupPartitionLastCommitDesc,
 			prometheus.GaugeValue,
 			float64(offset.Timestamp.Unix()),
+			offset.Group,
+			group.BaseName,
+			strconv.FormatBool(group.IsLatest),
+			strconv.Itoa(int(group.Version)),
+			offset.Topic,
+			strconv.Itoa(int(offset.Partition)),
+		)
+
+		// Offset commit expiry
+		offsetExpiry := offset.Timestamp.Add(-e.opts.OffsetRetention)
+		ch <- prometheus.MustNewConstMetric(
+			groupPartitionExpiresAtDesc,
+			prometheus.GaugeValue,
+			float64(offsetExpiry.Unix()),
 			offset.Group,
 			group.BaseName,
 			strconv.FormatBool(group.IsLatest),

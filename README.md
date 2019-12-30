@@ -95,6 +95,7 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}` | Current offset of a given group on a given partition. |
 | `kafka_minion_group_topic_partition_commit_count{group, group_base_name, group_is_latest, group_version, topic, partition}` | Number of commited offset entries by a consumer group for a given partition. Helpful to determine the commit rate to possibly tune the consumer performance. |
 | `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}` | Timestamp of last consumer group commit on a given partition |
+| `kafka_minion_group_topic_partition_expires_at{group, group_base_name, group_is_latest, group_version, topic, partition}` | Timestamp when this offset will expire if there won't be further commits |
 
 #### Topic / Partition metrics
 
