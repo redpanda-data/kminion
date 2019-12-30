@@ -46,6 +46,7 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | EXPORTER_IGNORE_SYSTEM_TOPICS | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true |
 | METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
 | KAFKA_BROKERS | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default) |
+| KAFKA_VERSION | Kafka cluster version. V1.0.0+ is required to collect log dir sizes. Set this to `0.11.0.2` if your cluster version is below v1.0.0 | 1.0.0 |
 | KAFKA_OFFSET_RETENTION | After this time Kafka Minion will delete stale offsets, this must match your Brokers' `offsets.retention.minutes` which equals to a defailt of 7 days for Kafka v2.0.0+ | 168h |
 | KAFKA_CONSUMER_OFFSETS_TOPIC_NAME | Topic name of topic where kafka commits the consumer offsets | \_\_consumer_offsets |
 | KAFKA_SASL_ENABLED | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported) | false |
@@ -106,6 +107,13 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_topic_partition_low_water_mark{topic, partition}` | Oldest known commited offset for this partition. This metric is being updated periodically and thus the actual high water mark may be ahead of this one. |
 | `kafka_minion_topic_partition_message_count{topic, partition}` | Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic. |
 | `kafka_minion_topic_subscribed_groups_count{topic}` | Number of consumer groups which have at least one consumer group offset for any of the topic's partitions |
+| `kafka_minion_topic_log_dir_size{topic}` | Size in bytes which is used for the topic's log dirs storage |
+
+#### Broker metrics
+
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_broker_log_dir_size{broker_id}` | Size in bytes which is used for the broker's log dirs storage |
 
 #### Internal metrics
 

@@ -114,8 +114,6 @@ func (module *Cluster) IsHealthy() bool {
 func (module *Cluster) mainLoop() {
 
 	go func() {
-		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
-		module.refreshAndSendTopicMetadata()
 		offsetRefresh := time.NewTicker(time.Second * 5)
 		for range offsetRefresh.C {
 			module.refreshAndSendTopicMetadata()
@@ -123,13 +121,68 @@ func (module *Cluster) mainLoop() {
 	}()
 
 	go func() {
-		// Initially trigger offset refresh once manually to ensure up to date data before the first ticker fires
-		module.refreshAndSendTopicConfig()
+		// Error can't happen here because we ensured that this works when creating the kafka client
+		version, _ := sarama.ParseKafkaVersion(module.options.KafkaVersion)
+		collectLogDirs := version.IsAtLeast(sarama.V1_0_0_0)
+
 		topicConfigRefresh := time.NewTicker(time.Second * 60)
 		for range topicConfigRefresh.C {
 			module.refreshAndSendTopicConfig()
+			if collectLogDirs {
+				module.describeLogDirs()
+			}
 		}
 	}()
+}
+
+func (module *Cluster) describeLogDirs() {
+	// 1. Fetch Log Dirs from all brokers
+	type response struct {
+		BrokerID int32
+		Res      *sarama.DescribeLogDirsResponse
+		Err      error
+	}
+
+	brokers := module.client.Brokers()
+	req := &sarama.DescribeLogDirsRequest{}
+	resCh := make(chan response, len(brokers))
+
+	for _, broker := range brokers {
+		go func(b *sarama.Broker) {
+			res, err := b.DescribeLogDirs(req)
+			resCh <- response{
+				BrokerID: b.ID(),
+				Res:      res,
+				Err:      err,
+			}
+		}(broker)
+	}
+
+	// 2. Put log dir responses into a structured map as they arrive
+	result := make(map[int32]*sarama.DescribeLogDirsResponse)
+	for i := 0; i < len(brokers); i++ {
+		r := <-resCh
+		if r.Err != nil {
+			module.logger.WithFields(log.Fields{"error": r.Err}).Error("failed to describe log dirs")
+			return
+		}
+
+		result[r.BrokerID] = r.Res
+	}
+
+	sizeByBroker, err := logDirSizeByBroker(result)
+	if err != nil {
+		module.logger.WithFields(log.Fields{"error": err}).Error("failed to describe log dirs")
+		return
+	}
+	module.storageCh <- newAddSizeByBrokerRequest(sizeByBroker)
+
+	sizeByTopic, err := logDirSizeByTopic(result)
+	if err != nil {
+		module.logger.WithFields(log.Fields{"error": err}).Error("failed to describe log dirs")
+		return
+	}
+	module.storageCh <- newAddSizeByTopicRequest(sizeByTopic)
 }
 
 // deleteTopicIfNeeded checks a current map of available topics against a previously fetched
@@ -437,4 +490,46 @@ func (module *Cluster) isTopicAllowed(topicName string) bool {
 	}
 
 	return true
+}
+
+// LogDirSizeByBroker returns a map where the BrokerID is the key and the summed bytes of all log dirs of
+// the respective broker is the value.
+func logDirSizeByBroker(responses map[int32]*sarama.DescribeLogDirsResponse) (map[int32]int64, error) {
+	sizeByBroker := make(map[int32]int64)
+	for brokerID, response := range responses {
+		for _, dir := range response.LogDirs {
+			if dir.ErrorCode != sarama.ErrNoError {
+				return nil, fmt.Errorf("log dir request has failed with error code '%v' - %s", dir.ErrorCode, dir.ErrorCode.Error())
+			}
+
+			for _, topic := range dir.Topics {
+				for _, partition := range topic.Partitions {
+					sizeByBroker[brokerID] += partition.Size
+				}
+			}
+		}
+	}
+
+	return sizeByBroker, nil
+}
+
+// LogDirSizeByTopic returns a map where the Topicname is the key and the summed bytes of all log dirs of
+// the respective topic is the value.
+func logDirSizeByTopic(responses map[int32]*sarama.DescribeLogDirsResponse) (map[string]int64, error) {
+	sizeByTopic := make(map[string]int64)
+	for _, response := range responses {
+		for _, dir := range response.LogDirs {
+			if dir.ErrorCode != sarama.ErrNoError {
+				return nil, fmt.Errorf("log dir request has failed with error code '%v' - %s", dir.ErrorCode, dir.ErrorCode.Error())
+			}
+
+			for _, topic := range dir.Topics {
+				for _, partition := range topic.Partitions {
+					sizeByTopic[topic.Topic] += partition.Size
+				}
+			}
+		}
+	}
+
+	return sizeByTopic, nil
 }

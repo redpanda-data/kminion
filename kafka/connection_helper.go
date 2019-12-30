@@ -18,7 +18,11 @@ import (
 func saramaClientConfig(opts *options.Options) *sarama.Config {
 	clientConfig := sarama.NewConfig()
 	clientConfig.ClientID = "kafka-lag-collector-1"
-	clientConfig.Version = sarama.V0_11_0_2
+	version, err := sarama.ParseKafkaVersion(opts.KafkaVersion)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Panic("failed to parse kafka version")
+	}
+	clientConfig.Version = version
 
 	// SASL
 	if opts.SASLEnabled {
@@ -78,7 +82,7 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 	} else {
 		//PLAIN TEXT mode
 	}
-	err := clientConfig.Validate()
+	err = clientConfig.Validate()
 	if err != nil {
 		log.Panicf("Error validating kafka client config. %s", err)
 	}

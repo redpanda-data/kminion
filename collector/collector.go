@@ -21,11 +21,15 @@ var (
 	// Topic metrics
 	partitionCountDesc        *prometheus.Desc
 	subscribedGroupsCountDesc *prometheus.Desc
+	topicLogDirSizeDesc       *prometheus.Desc
 
 	// Partition metrics
 	partitionLowWaterMarkDesc  *prometheus.Desc
 	partitionHighWaterMarkDesc *prometheus.Desc
 	partitionMessageCountDesc  *prometheus.Desc
+
+	// Broker metrics
+	brokerLogDirSizeDesc *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics on each /metrics invocation, see:
@@ -96,6 +100,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		"Number of consumer groups which have at least one consumer group offset for any of the topics partitions",
 		[]string{"topic"}, prometheus.Labels{},
 	)
+	topicLogDirSizeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "log_dir_size"),
+		"Size in bytes which is used for the topic's log dirs storage",
+		[]string{"topic"}, prometheus.Labels{},
+	)
 
 	// Partition metrics
 	partitionHighWaterMarkDesc = prometheus.NewDesc(
@@ -112,6 +121,13 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "message_count"),
 		"Number of messages for a given topic. Calculated by subtracting high water mark by low water mark.",
 		[]string{"topic", "partition"}, prometheus.Labels{},
+	)
+
+	// Broker metrics
+	brokerLogDirSizeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "broker", "log_dir_size"),
+		"Size in bytes which is used for the broker's log dirs storage",
+		[]string{"broker_id"}, prometheus.Labels{},
 	)
 
 	// General metrics
@@ -143,7 +159,7 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
 
 	if e.storage.IsConsumed() == false {
-		log.Info("Offets topic has not yet been consumed until the end")
+		log.Info("Offsets topic has not yet been consumed until the end")
 		return
 	}
 
@@ -361,6 +377,26 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			prometheus.GaugeValue,
 			float64(subscribedGroups),
 			topicName,
+		)
+	}
+
+	sizeByTopic := e.storage.SizeByTopic()
+	for topicName, size := range sizeByTopic {
+		ch <- prometheus.MustNewConstMetric(
+			topicLogDirSizeDesc,
+			prometheus.GaugeValue,
+			float64(size),
+			topicName,
+		)
+	}
+
+	sizeByBroker := e.storage.SizeByBroker()
+	for brokerID, size := range sizeByBroker {
+		ch <- prometheus.MustNewConstMetric(
+			brokerLogDirSizeDesc,
+			prometheus.GaugeValue,
+			float64(size),
+			strconv.Itoa(int(brokerID)),
 		)
 	}
 }

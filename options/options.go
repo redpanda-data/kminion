@@ -35,6 +35,7 @@ type Options struct {
 	// TLSPassphrase - Passphrase to decrypt the TLS Key
 	// SASLMechanism - Default to empty : set to SCRAM-SHA-256 or SCRAM-SHA-512 for scram usage
 	KafkaBrokers             []string      `envconfig:"KAFKA_BROKERS" required:"true"`
+	KafkaVersion             string        `envconfig:"KAFKA_VERSION" default:"1.0.0"`
 	OffsetRetention          time.Duration `envconfig:"KAFKA_OFFSET_RETENTION" default:"168h"` // 7d default
 	ConsumerOffsetsTopicName string        `envconfig:"KAFKA_CONSUMER_OFFSETS_TOPIC_NAME" default:"__consumer_offsets"`
 	SASLEnabled              bool          `envconfig:"KAFKA_SASL_ENABLED" default:"false"`

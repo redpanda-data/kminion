@@ -21,6 +21,12 @@ const (
 	// StorageAddTopicConfiguration is the request type to add configuration entries for a topic
 	StorageAddTopicConfiguration
 
+	// StorageAddSizeByTopic is the request type to add aggregated partition sizes grouped by topic
+	StorageAddSizeByTopic
+
+	// StorageAddSizeByBroker is the request type to add aggregated partition sizes grouped by broker
+	StorageAddSizeByBroker
+
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
 	StorageDeleteConsumerGroup
 
@@ -50,6 +56,8 @@ type StorageRequest struct {
 	TopicName          string
 	PartitionID        int32
 	PartitionCount     int
+	SizeByTopic        map[string]int64
+	SizeByBroker       map[int32]int64
 }
 
 func newAddPartitionLowWaterMarkRequest(lowWaterMark *PartitionWaterMark) *StorageRequest {
@@ -121,5 +129,19 @@ func newDeleteTopicRequest(topic string) *StorageRequest {
 	return &StorageRequest{
 		RequestType: StorageDeleteTopic,
 		TopicName:   topic,
+	}
+}
+
+func newAddSizeByTopicRequest(sizeByTopic map[string]int64) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageAddSizeByTopic,
+		SizeByTopic: sizeByTopic,
+	}
+}
+
+func newAddSizeByBrokerRequest(sizeByBroker map[int32]int64) *StorageRequest {
+	return &StorageRequest{
+		RequestType:  StorageAddSizeByBroker,
+		SizeByBroker: sizeByBroker,
 	}
 }

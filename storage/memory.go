@@ -27,7 +27,14 @@ type MemoryStorage struct {
 	groups     *consumerGroup
 	partitions *partition
 	topics     *topic
+	logDirSize *logDirSize
 	options    *options.Options
+}
+
+type logDirSize struct {
+	Lock         sync.RWMutex
+	SizeByBroker map[int32]int64
+	SizeByTopic  map[string]int64
 }
 
 // consumerStatus holds information about the partition consumers consuming the __consumer_offsets topic
@@ -91,6 +98,11 @@ func NewMemoryStorage(opts *options.Options, consumerOffsetCh <-chan *kafka.Stor
 		Configs: make(map[string]kafka.TopicConfiguration),
 	}
 
+	logDirSizes := &logDirSize{
+		SizeByBroker: make(map[int32]int64),
+		SizeByTopic:  make(map[string]int64),
+	}
+
 	return &MemoryStorage{
 		logger: log.WithFields(log.Fields{
 			"module": "storage",
@@ -103,6 +115,7 @@ func NewMemoryStorage(opts *options.Options, consumerOffsetCh <-chan *kafka.Stor
 		groups:     groups,
 		partitions: partitions,
 		topics:     topics,
+		logDirSize: logDirSizes,
 		options:    opts,
 	}
 }
@@ -162,6 +175,10 @@ func (module *MemoryStorage) clusterWorker() {
 			module.storeTopicConfig(request.TopicConfig)
 		case kafka.StorageDeleteTopic:
 			module.deleteTopic(request.TopicName)
+		case kafka.StorageAddSizeByBroker:
+			module.storeSizeByBroker(request.SizeByBroker)
+		case kafka.StorageAddSizeByTopic:
+			module.storeSizeByTopic(request.SizeByTopic)
 
 		default:
 			log.WithFields(log.Fields{
@@ -171,6 +188,20 @@ func (module *MemoryStorage) clusterWorker() {
 		}
 	}
 	log.Panic("Partition Offset storage channel closed")
+}
+
+func (module *MemoryStorage) storeSizeByBroker(sizeByBroker map[int32]int64) {
+	module.logDirSize.Lock.Lock()
+	defer module.logDirSize.Lock.Unlock()
+
+	module.logDirSize.SizeByBroker = sizeByBroker
+}
+
+func (module *MemoryStorage) storeSizeByTopic(sizeByTopic map[string]int64) {
+	module.logDirSize.Lock.Lock()
+	defer module.logDirSize.Lock.Unlock()
+
+	module.logDirSize.SizeByTopic = sizeByTopic
 }
 
 func (module *MemoryStorage) deleteTopic(topicName string) {
@@ -341,6 +372,32 @@ func (module *MemoryStorage) PartitionLowWaterMarks() map[string]PartitionWaterM
 		for partition, partitionData := range value {
 			mapCopy[key][partition] = partitionData
 		}
+	}
+
+	return mapCopy
+}
+
+// SizeByTopic returns a copy of the topic sizes map
+func (module *MemoryStorage) SizeByTopic() map[string]int64 {
+	module.logDirSize.Lock.RLock()
+	defer module.logDirSize.Lock.RUnlock()
+
+	mapCopy := make(map[string]int64)
+	for key, value := range module.logDirSize.SizeByTopic {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
+}
+
+// SizeByBroker returns a copy of the broker sizes map
+func (module *MemoryStorage) SizeByBroker() map[int32]int64 {
+	module.logDirSize.Lock.RLock()
+	defer module.logDirSize.Lock.RUnlock()
+
+	mapCopy := make(map[int32]int64)
+	for key, value := range module.logDirSize.SizeByBroker {
+		mapCopy[key] = value
 	}
 
 	return mapCopy
