@@ -7,36 +7,36 @@ type StorageRequestType int
 
 const (
 	// StorageAddPartitionHighWaterMark is the request type to add a partition's high water mark
-	StorageAddPartitionHighWaterMark StorageRequestType = 0
+	StorageAddPartitionHighWaterMark StorageRequestType = iota + 1
 
 	// StorageAddPartitionLowWaterMark is the request type to add a partition's low water mark
-	StorageAddPartitionLowWaterMark StorageRequestType = 1
+	StorageAddPartitionLowWaterMark
 
 	// StorageAddConsumerOffset is the request type to add a consumer's offset commit
-	StorageAddConsumerOffset StorageRequestType = 2
+	StorageAddConsumerOffset
 
 	// StorageAddGroupMetadata is the request type to add a group member's partition assignment
-	StorageAddGroupMetadata StorageRequestType = 3
+	StorageAddGroupMetadata
 
 	// StorageAddTopicConfiguration is the request type to add configuration entries for a topic
-	StorageAddTopicConfiguration StorageRequestType = 4
+	StorageAddTopicConfiguration
 
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
-	StorageDeleteConsumerGroup StorageRequestType = 5
+	StorageDeleteConsumerGroup
 
 	// StorageRegisterOffsetPartitions is the request type to make the storage module aware that the offset consumer
 	// first has to fully consume a specific number of partitions before it should expose any metrics
-	StorageRegisterOffsetPartitions StorageRequestType = 6
+	StorageRegisterOffsetPartitions
 
 	// StorageMarkOffsetPartitionReady is the request type to mark a partition consumer of the consumer offsets topic
 	// as ready (=caught up partition lag)
-	StorageMarkOffsetPartitionReady StorageRequestType = 7
+	StorageMarkOffsetPartitionReady
 
 	// StorageDeleteGroupMetadata is the request type to delete a group member's partition assignment
-	StorageDeleteGroupMetadata StorageRequestType = 8
+	StorageDeleteGroupMetadata
 
 	// StorageDeleteTopic is the request type to delete all topic information
-	StorageDeleteTopic StorageRequestType = 9
+	StorageDeleteTopic
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
