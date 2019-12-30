@@ -89,7 +89,7 @@ func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *
 		return nil, err
 	}
 	entry.Offset = decodedValue.Offset
-	entry.Timestamp = time.Unix(0, decodedValue.Timestamp)
+	entry.Timestamp = time.Unix(decodedValue.Timestamp/1000, 0)
 
 	return &entry, nil
 }
