@@ -2,6 +2,7 @@ package collector
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/google-cloud-tools/kafka-minion/storage"
@@ -266,7 +267,7 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 		ch <- prometheus.MustNewConstMetric(
 			groupPartitionLastCommitDesc,
 			prometheus.GaugeValue,
-			float64(offset.Timestamp.Unix()),
+			float64(offset.Timestamp.UnixNano()/int64(time.Millisecond)),
 			offset.Group,
 			group.BaseName,
 			strconv.FormatBool(group.IsLatest),
