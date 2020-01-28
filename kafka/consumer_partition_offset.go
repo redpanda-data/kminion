@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -15,7 +16,7 @@ type ConsumerPartitionOffset struct {
 	Topic     string
 	Partition int32
 	Offset    int64
-	Timestamp int64
+	Timestamp time.Time
 }
 
 type offsetValue struct {
@@ -88,7 +89,7 @@ func newConsumerPartitionOffset(key *bytes.Buffer, value *bytes.Buffer, logger *
 		return nil, err
 	}
 	entry.Offset = decodedValue.Offset
-	entry.Timestamp = decodedValue.Timestamp
+	entry.Timestamp = time.Unix(decodedValue.Timestamp/1000, 0)
 
 	return &entry, nil
 }

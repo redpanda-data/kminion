@@ -2,10 +2,13 @@ package storage
 
 import (
 	"fmt"
-	"github.com/google-cloud-tools/kafka-minion/kafka"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"sync"
+	"time"
+
+	"github.com/google-cloud-tools/kafka-minion/kafka"
+	"github.com/google-cloud-tools/kafka-minion/options"
+	log "github.com/sirupsen/logrus"
 )
 
 // PartitionWaterMarks represents a map of PartitionWaterMarks grouped by PartitionID
@@ -25,6 +28,14 @@ type MemoryStorage struct {
 	partitions  *partition
 	topics      *topic
 	brokerCount *brokerCount
+	logDirSize  *logDirSize
+	options     *options.Options
+}
+
+type logDirSize struct {
+	Lock         sync.RWMutex
+	SizeByBroker map[int32]int64
+	SizeByTopic  map[string]int64
 }
 
 // consumerStatus holds information about the partition consumers consuming the __consumer_offsets topic
@@ -71,12 +82,12 @@ type ConsumerPartitionOffsetMetric struct {
 	Topic            string
 	Partition        int32
 	Offset           int64
-	Timestamp        int64
+	Timestamp        time.Time
 	TotalCommitCount float64
 }
 
 // NewMemoryStorage creates a new storage and preinitializes the required maps which store the PartitionOffset information
-func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <-chan *kafka.StorageRequest) *MemoryStorage {
+func NewMemoryStorage(opts *options.Options, consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <-chan *kafka.StorageRequest) *MemoryStorage {
 	groups := &consumerGroup{
 		Offsets:  make(map[string]ConsumerPartitionOffsetMetric),
 		Metadata: make(map[string]kafka.ConsumerGroupMetadata),
@@ -99,6 +110,11 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 
 	brokerCount := &brokerCount{
 		BrokerCount: 0,
+  }
+  
+	logDirSizes := &logDirSize{
+		SizeByBroker: make(map[int32]int64),
+		SizeByTopic:  make(map[string]int64),
 	}
 
 	return &MemoryStorage{
@@ -114,6 +130,8 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 		partitions:  partitions,
 		topics:      topics,
 		brokerCount: brokerCount,
+		logDirSize:  logDirSizes,
+		options:     opts,
 	}
 }
 
@@ -121,6 +139,20 @@ func NewMemoryStorage(consumerOffsetCh <-chan *kafka.StorageRequest, clusterCh <
 func (module *MemoryStorage) Start() {
 	go module.consumerOffsetWorker()
 	go module.clusterWorker()
+}
+
+func (module *MemoryStorage) removeExpiredOffsets() {
+	module.groups.OffsetsLock.Lock()
+	defer module.groups.OffsetsLock.Unlock()
+
+	for key, offset := range module.groups.Offsets {
+		offsetExpiry := time.Now().Add(-module.options.OffsetRetention)
+		if offset.Timestamp.Before(offsetExpiry) {
+			// Offset message is older than 1 week ago (or whatever the offset retention is set to)
+			return
+		}
+		delete(module.groups.Offsets, key)
+	}
 }
 
 func (module *MemoryStorage) consumerOffsetWorker() {
@@ -162,6 +194,10 @@ func (module *MemoryStorage) clusterWorker() {
 			module.storeReplicationStatus(request.TopicName, request.PartitionID, request.ReplicationStatus)
 		case kafka.StorageBrokerCount:
 			module.storeBrokerCount(request.BrokerCount)
+		case kafka.StorageAddSizeByBroker:
+			module.storeSizeByBroker(request.SizeByBroker)
+		case kafka.StorageAddSizeByTopic:
+			module.storeSizeByTopic(request.SizeByTopic)
 
 		default:
 			log.WithFields(log.Fields{
@@ -171,6 +207,20 @@ func (module *MemoryStorage) clusterWorker() {
 		}
 	}
 	log.Panic("Partition Offset storage channel closed")
+}
+
+func (module *MemoryStorage) storeSizeByBroker(sizeByBroker map[int32]int64) {
+	module.logDirSize.Lock.Lock()
+	defer module.logDirSize.Lock.Unlock()
+
+	module.logDirSize.SizeByBroker = sizeByBroker
+}
+
+func (module *MemoryStorage) storeSizeByTopic(sizeByTopic map[string]int64) {
+	module.logDirSize.Lock.Lock()
+	defer module.logDirSize.Lock.Unlock()
+
+	module.logDirSize.SizeByTopic = sizeByTopic
 }
 
 func (module *MemoryStorage) deleteTopic(topicName string) {
@@ -388,6 +438,19 @@ func (module *MemoryStorage) ReplicationStatus() map[string][]bool {
 		for partitionID, status := range partitions {
 			mapCopy[topicName][partitionID] = status
 		}
+  }
+
+	return mapCopy
+}
+
+// SizeByTopic returns a copy of the topic sizes map
+func (module *MemoryStorage) SizeByTopic() map[string]int64 {
+	module.logDirSize.Lock.RLock()
+	defer module.logDirSize.Lock.RUnlock()
+
+	mapCopy := make(map[string]int64)
+	for key, value := range module.logDirSize.SizeByTopic {
+		mapCopy[key] = value
 	}
 
 	return mapCopy
@@ -398,6 +461,19 @@ func (module *MemoryStorage) BrokerCount() int {
 	defer module.brokerCount.BrokerCountLock.Unlock()
 
 	return module.brokerCount.BrokerCount
+}
+
+// SizeByBroker returns a copy of the broker sizes map
+func (module *MemoryStorage) SizeByBroker() map[int32]int64 {
+	module.logDirSize.Lock.RLock()
+	defer module.logDirSize.Lock.RUnlock()
+
+	mapCopy := make(map[int32]int64)
+	for key, value := range module.logDirSize.SizeByBroker {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
 }
 
 // IsConsumed indicates whether the consumer offsets topic lag has been caught up and therefore

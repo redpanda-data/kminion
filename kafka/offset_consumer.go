@@ -261,6 +261,12 @@ func (module *OffsetConsumer) processOffsetCommit(key *bytes.Buffer, value *byte
 		}).Debug("topic is not allowed")
 		return
 	}
+
+	offsetExpiry := time.Now().Add(-module.options.OffsetRetention)
+	if offset.Timestamp.Before(offsetExpiry) {
+		// Offset message is older than 1 week ago (or whatever the offset retention is set to)
+		return
+	}
 	module.storageChannel <- newAddConsumerOffsetRequest(offset)
 }
 

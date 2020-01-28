@@ -46,6 +46,8 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | EXPORTER_IGNORE_SYSTEM_TOPICS | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true |
 | METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
 | KAFKA_BROKERS | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default) |
+| KAFKA_VERSION | Kafka cluster version. V1.0.0+ is required to collect log dir sizes. Set this to `0.11.0.2` if your cluster version is below v1.0.0 | 1.0.0 |
+| KAFKA_OFFSET_RETENTION | After this time Kafka Minion will delete stale offsets, this must match your Brokers' `offsets.retention.minutes` which equals to a defailt of 7 days for Kafka v2.0.0+ | 168h |
 | KAFKA_CONSUMER_OFFSETS_TOPIC_NAME | Topic name of topic where kafka commits the consumer offsets | \_\_consumer_offsets |
 | KAFKA_SASL_ENABLED | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported) | false |
 | KAFKA_SASL_USE_HANDSHAKE | Whether or not to send the Kafka SASL handshake first | true |
@@ -60,6 +62,7 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | OFFSETS_UPDATE_INTERVAL | Update interval for the consumer offsets in seconds | 5 |
 | METADATA_UPDATE_INTERVAL | Update interval for the consumer offsets in seconds | 60 |
 | BROKER_UPDATE_INTERVAL | Update interval for the consumer offsets in seconds | 30 |
+| KAFKA_SASL_MECHANISM | Set to SCRAM-SHA-256 or SCRAM-SHA-512 for scram usage | (No default) |
 
 ### Grafana Dashboard
 
@@ -102,6 +105,7 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_group_topic_partition_offset{group, group_base_name, group_is_latest, group_version, topic, partition}` | Current offset of a given group on a given partition. |
 | `kafka_minion_group_topic_partition_commit_count{group, group_base_name, group_is_latest, group_version, topic, partition}` | Number of commited offset entries by a consumer group for a given partition. Helpful to determine the commit rate to possibly tune the consumer performance. |
 | `kafka_minion_group_topic_partition_last_commit{group, group_base_name, group_is_latest, group_version, topic, partition}` | Timestamp of last consumer group commit on a given partition |
+| `kafka_minion_group_topic_partition_expires_at{group, group_base_name, group_is_latest, group_version, topic, partition}` | Timestamp when this offset will expire if there won't be further commits |
 
 #### Topic / Partition metrics
 
@@ -113,6 +117,13 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_topic_partition_message_count{topic, partition}` | Number of messages for a given partition. Calculated by subtracting high water mark by low water mark. Thus this metric is likely to be invalid for compacting topics, but it still can be helpful to get an idea about the number of messages in that topic. |
 | `kafka_minion_topic_partition_under_replicated{topic, partition}` | Whether the partition's replicas are available - either the number of in-sync replicas is less than the number of replicas, or the cluster reports an error "9" (ErrReplicaNotAvailable) for the partition. |
 | `kafka_minion_topic_subscribed_groups_count{topic}` | Number of consumer groups which have at least one consumer group offset for any of the topic's partitions |
+| `kafka_minion_topic_log_dir_size{topic}` | Size in bytes which is used for the topic's log dirs storage |
+
+#### Broker metrics
+
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_broker_log_dir_size{broker_id}` | Size in bytes which is used for the broker's log dirs storage |
 
 #### Internal metrics
 
@@ -124,6 +135,12 @@ Below metrics have a variety of different labels, explained in this section:
 | `kafka_minion_internal_offset_consumer_group_metadata_tombstones_read{version}` | Number of tombstone messages of all group metadata messages |
 | `kafka_minion_internal_kafka_messages_in_success{topic}` | Number of successfully received kafka messages |
 | `kafka_minion_internal_kafka_messages_in_failed{topic}` | Number of errors while consuming kafka messages |
+
+#### General metrics
+
+| Metric | Description |
+| --- | --- |
+| `kafka_minion_build_info{version}` | Build version exposed as label. The value for this metric is always set to `1` |
 
 ## How does it work
 

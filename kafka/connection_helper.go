@@ -19,8 +19,12 @@ import (
 func saramaClientConfig(opts *options.Options) *sarama.Config {
 	clientConfig := sarama.NewConfig()
 	clientConfig.ClientID = "kafka-lag-collector-1"
-	clientConfig.Version = sarama.V0_11_0_2
 	clientConfig.Metadata.RefreshFrequency = 1 * time.Minute
+	version, err := sarama.ParseKafkaVersion(opts.KafkaVersion)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Panic("failed to parse kafka version")
+	}
+	clientConfig.Version = version
 
 	// SASL
 	if opts.SASLEnabled {
@@ -69,7 +73,18 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 		}
 	}
 
-	err := clientConfig.Validate()
+	if opts.SASLMechanism == "SCRAM-SHA-512" {
+		log.Debug("Sarama client config has been set for scram 512")
+		clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &xdgSCRAMClient{HashGeneratorFcn: scramSha512} }
+		clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(sarama.SASLTypeSCRAMSHA512)
+	} else if opts.SASLMechanism == "SCRAM-SHA-256" {
+		log.Debug("Sarama client config has been set for scram256")
+		clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &xdgSCRAMClient{HashGeneratorFcn: scramSha256} }
+		clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(sarama.SASLTypeSCRAMSHA256)
+	} else {
+		//PLAIN TEXT mode
+	}
+	err = clientConfig.Validate()
 	if err != nil {
 		log.Panicf("Error validating kafka client config. %s", err)
 	}

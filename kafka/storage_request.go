@@ -7,42 +7,48 @@ type StorageRequestType int
 
 const (
 	// StorageAddPartitionHighWaterMark is the request type to add a partition's high water mark
-	StorageAddPartitionHighWaterMark StorageRequestType = 0
+	StorageAddPartitionHighWaterMark StorageRequestType = iota + 1
 
 	// StorageAddPartitionLowWaterMark is the request type to add a partition's low water mark
-	StorageAddPartitionLowWaterMark StorageRequestType = 1
+	StorageAddPartitionLowWaterMark
 
 	// StorageAddConsumerOffset is the request type to add a consumer's offset commit
-	StorageAddConsumerOffset StorageRequestType = 2
+	StorageAddConsumerOffset
 
 	// StorageAddGroupMetadata is the request type to add a group member's partition assignment
-	StorageAddGroupMetadata StorageRequestType = 3
+	StorageAddGroupMetadata
 
 	// StorageAddTopicConfiguration is the request type to add configuration entries for a topic
-	StorageAddTopicConfiguration StorageRequestType = 4
+	StorageAddTopicConfiguration
+
+	// StorageAddSizeByTopic is the request type to add aggregated partition sizes grouped by topic
+	StorageAddSizeByTopic
+
+	// StorageAddSizeByBroker is the request type to add aggregated partition sizes grouped by broker
+	StorageAddSizeByBroker
 
 	// StorageDeleteConsumerGroup is the request type to remove an offset commit for a topic:group:partition combination
-	StorageDeleteConsumerGroup StorageRequestType = 5
+	StorageDeleteConsumerGroup
 
 	// StorageRegisterOffsetPartitions is the request type to make the storage module aware that the offset consumer
 	// first has to fully consume a specific number of partitions before it should expose any metrics
-	StorageRegisterOffsetPartitions StorageRequestType = 6
+	StorageRegisterOffsetPartitions
 
 	// StorageMarkOffsetPartitionReady is the request type to mark a partition consumer of the consumer offsets topic
 	// as ready (=caught up partition lag)
-	StorageMarkOffsetPartitionReady StorageRequestType = 7
+	StorageMarkOffsetPartitionReady
 
 	// StorageDeleteGroupMetadata is the request type to delete a group member's partition assignment
-	StorageDeleteGroupMetadata StorageRequestType = 8
+	StorageDeleteGroupMetadata
 
 	// StorageDeleteTopic is the request type to delete all topic information
-	StorageDeleteTopic StorageRequestType = 9
+	StorageDeleteTopic
 
 	// StorageReplicationStatus is the request type to store the current replication status
-	StorageReplicationStatus StorageRequestType = 10
+	StorageReplicationStatus
 
 	// StorageBrokerCount is the request type to store the current number of connected brokers
-	StorageBrokerCount StorageRequestType = 11
+	StorageBrokerCount
 )
 
 // StorageRequest is an entity to send messages / requests to the storage module.
@@ -58,6 +64,8 @@ type StorageRequest struct {
 	PartitionCount     int
 	BrokerCount        int
 	ReplicationStatus  bool
+	SizeByTopic        map[string]int64
+	SizeByBroker       map[int32]int64
 }
 
 func newAddPartitionLowWaterMarkRequest(lowWaterMark *PartitionWaterMark) *StorageRequest {
@@ -145,5 +153,17 @@ func newBrokerCountRequest(number int) *StorageRequest {
 	return &StorageRequest{
 		RequestType: StorageBrokerCount,
 		BrokerCount: number,
+
+func newAddSizeByTopicRequest(sizeByTopic map[string]int64) *StorageRequest {
+	return &StorageRequest{
+		RequestType: StorageAddSizeByTopic,
+		SizeByTopic: sizeByTopic,
+	}
+}
+
+func newAddSizeByBrokerRequest(sizeByBroker map[int32]int64) *StorageRequest {
+	return &StorageRequest{
+		RequestType:  StorageAddSizeByBroker,
+		SizeByBroker: sizeByBroker,
 	}
 }

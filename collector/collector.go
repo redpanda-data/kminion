@@ -2,6 +2,7 @@ package collector
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/google-cloud-tools/kafka-minion/options"
 	"github.com/google-cloud-tools/kafka-minion/storage"
@@ -10,25 +11,28 @@ import (
 )
 
 var (
-	// Broker metrics
-	brokerCountDesc *prometheus.Desc
-
 	// Consumer group metrics
 	groupPartitionOffsetDesc      *prometheus.Desc
 	groupPartitionCommitCountDesc *prometheus.Desc
 	groupPartitionLastCommitDesc  *prometheus.Desc
+	groupPartitionExpiresAtDesc   *prometheus.Desc
 	groupPartitionLagDesc         *prometheus.Desc
 	groupTopicLagDesc             *prometheus.Desc
 
 	// Topic metrics
 	partitionCountDesc        *prometheus.Desc
 	subscribedGroupsCountDesc *prometheus.Desc
+	topicLogDirSizeDesc       *prometheus.Desc
 
 	// Partition metrics
 	partitionLowWaterMarkDesc  *prometheus.Desc
 	partitionHighWaterMarkDesc *prometheus.Desc
 	partitionMessageCountDesc  *prometheus.Desc
 	partitionIsUnderReplicated *prometheus.Desc
+
+  // Broker metrics
+	brokerCountDesc *prometheus.Desc
+  brokerLogDirSizeDesc *prometheus.Desc
 )
 
 // Collector collects and provides all Kafka metrics on each /metrics invocation, see:
@@ -56,13 +60,6 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		"module": "collector",
 	})
 
-	// Broker metrics
-	brokerCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(opts.MetricsPrefix, "broker", "count"),
-		"Number of currently connected brokers",
-		nil, prometheus.Labels{},
-	)
-
 	// Consumer group metrics
 	groupPartitionOffsetDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "offset"),
@@ -77,6 +74,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 	groupPartitionLastCommitDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "last_commit"),
 		"Timestamp when consumer group last committed an offset for a partition",
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+	)
+	groupPartitionExpiresAtDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "expires_at"),
+		"Timestamp when this offset will expire if there won't be further commits",
 		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
 	)
 	groupPartitionLagDesc = prometheus.NewDesc(
@@ -99,6 +101,11 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 	subscribedGroupsCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "subscribed_groups_count"),
 		"Number of consumer groups which have at least one consumer group offset for any of the topics partitions",
+		[]string{"topic"}, prometheus.Labels{},
+	)
+	topicLogDirSizeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "log_dir_size"),
+		"Size in bytes which is used for the topic's log dirs storage",
 		[]string{"topic"}, prometheus.Labels{},
 	)
 
@@ -124,6 +131,30 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		[]string{"topic", "partition"}, prometheus.Labels{},
 	)
 
+  // Broker metrics
+	brokerCountDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "broker", "count"),
+		"Number of currently connected brokers",
+		nil, prometheus.Labels{},
+	)
+	brokerLogDirSizeDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(opts.MetricsPrefix, "broker", "log_dir_size"),
+		"Size in bytes which is used for the broker's log dirs storage",
+		[]string{"broker_id"}, prometheus.Labels{},
+	)
+
+	// General metrics
+	buildInfo := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: opts.MetricsPrefix,
+		Name:      "build_info",
+		Help:      "Build Info about Kafka Minion",
+		ConstLabels: prometheus.Labels{
+			"version": opts.Version,
+		},
+	})
+	buildInfo.Set(1)
+	prometheus.MustRegister(buildInfo)
+
 	return &Collector{
 		opts,
 		storage,
@@ -148,7 +179,7 @@ func (e *Collector) Collect(ch chan<- prometheus.Metric) {
 	log.Debug("Collector's collect has been invoked")
 
 	if e.storage.IsConsumed() == false {
-		log.Info("Offets topic has not yet been consumed until the end")
+		log.Info("Offsets topic has not yet been consumed until the end")
 		return
 	}
 
@@ -275,7 +306,21 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 		ch <- prometheus.MustNewConstMetric(
 			groupPartitionLastCommitDesc,
 			prometheus.GaugeValue,
-			float64(offset.Timestamp),
+			float64(offset.Timestamp.UnixNano()/int64(time.Millisecond)),
+			offset.Group,
+			group.BaseName,
+			strconv.FormatBool(group.IsLatest),
+			strconv.Itoa(int(group.Version)),
+			offset.Topic,
+			strconv.Itoa(int(offset.Partition)),
+		)
+
+		// Offset commit expiry
+		offsetExpiry := offset.Timestamp.Add(-e.opts.OffsetRetention)
+		ch <- prometheus.MustNewConstMetric(
+			groupPartitionExpiresAtDesc,
+			prometheus.GaugeValue,
+			float64(offsetExpiry.Unix()),
 			offset.Group,
 			group.BaseName,
 			strconv.FormatBool(group.IsLatest),
@@ -372,6 +417,26 @@ func (e *Collector) collectConsumerOffsets(ch chan<- prometheus.Metric, offsets 
 			prometheus.GaugeValue,
 			float64(subscribedGroups),
 			topicName,
+		)
+	}
+
+	sizeByTopic := e.storage.SizeByTopic()
+	for topicName, size := range sizeByTopic {
+		ch <- prometheus.MustNewConstMetric(
+			topicLogDirSizeDesc,
+			prometheus.GaugeValue,
+			float64(size),
+			topicName,
+		)
+	}
+
+	sizeByBroker := e.storage.SizeByBroker()
+	for brokerID, size := range sizeByBroker {
+		ch <- prometheus.MustNewConstMetric(
+			brokerLogDirSizeDesc,
+			prometheus.GaugeValue,
+			float64(size),
+			strconv.Itoa(int(brokerID)),
 		)
 	}
 }
