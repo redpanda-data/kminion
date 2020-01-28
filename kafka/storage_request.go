@@ -153,6 +153,8 @@ func newBrokerCountRequest(number int) *StorageRequest {
 	return &StorageRequest{
 		RequestType: StorageBrokerCount,
 		BrokerCount: number,
+	}
+}
 
 func newAddSizeByTopicRequest(sizeByTopic map[string]int64) *StorageRequest {
 	return &StorageRequest{
