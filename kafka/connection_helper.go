@@ -24,49 +24,42 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 	}
 	clientConfig.Version = version
 
-	// SASL
+	// Setup SASL
 	if opts.SASLEnabled {
 		clientConfig.Net.SASL.Enable = true
 		clientConfig.Net.SASL.Handshake = opts.UseSASLHandshake
-
-		if opts.SASLUsername != "" {
-			clientConfig.Net.SASL.User = opts.SASLUsername
-		}
-		if opts.SASLPassword != "" {
-			clientConfig.Net.SASL.Password = opts.SASLPassword
-		}
+		clientConfig.Net.SASL.User = opts.SASLUsername
+		clientConfig.Net.SASL.Password = opts.SASLPassword
 	}
 
 	// Setup TLS
 	if opts.TLSEnabled {
-		// Ensure that Cert and Key can be read
-		canReadCertAndKey, err := canReadCertAndKey(opts.TLSCertFilePath, opts.TLSKeyFilePath)
-		if err != nil {
-			log.Panic(err)
-		}
-
 		clientConfig.Net.TLS.Enable = true
-		clientConfig.Net.TLS.Config = &tls.Config{
-			RootCAs:            x509.NewCertPool(),
-			InsecureSkipVerify: opts.TLSInsecureSkipTLSVerify,
-		}
+		clientConfig.Net.TLS.Config.InsecureSkipVerify = opts.TLSInsecureSkipTLSVerify
 
-		// Load CA file
 		if opts.TLSCAFilePath != "" {
-			if ca, err := ioutil.ReadFile(opts.TLSCAFilePath); err == nil {
-				clientConfig.Net.TLS.Config.RootCAs.AppendCertsFromPEM(ca)
-			} else {
-				log.Panic(err)
+			if opts.TLSCAFilePath != "" {
+				ca, err := ioutil.ReadFile(opts.TLSCAFilePath)
+				if err != nil {
+					log.WithFields(log.Fields{"error": err}).Panic("failed to load ca file")
+				}
+				caCertPool := x509.NewCertPool()
+				caCertPool.AppendCertsFromPEM(ca)
+				clientConfig.Net.TLS.Config.RootCAs = caCertPool
 			}
-		}
 
-		// Load Cert file, if necessary it will be decrypted with a passphrase too
-		if canReadCertAndKey {
-			cert, err := getCert(opts)
-			if err == nil {
-				clientConfig.Net.TLS.Config.Certificates = cert
-			} else {
-				log.Panic(err)
+			// Load TLS / Key files
+			if opts.TLSCertFilePath != "" && opts.TLSKeyFilePath != "" {
+				_, err := canReadCertAndKey(opts.TLSCertFilePath, opts.TLSKeyFilePath)
+				if err != nil {
+					log.Panic(err)
+				}
+
+				certs, err := getCert(opts)
+				if err != nil {
+					log.Panic(err)
+				}
+				clientConfig.Net.TLS.Config.Certificates = certs
 			}
 		}
 	}
