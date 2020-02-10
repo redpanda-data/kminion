@@ -43,7 +43,7 @@ type Options struct {
 	// Kerberos Settings
 	// SASLGSSAPIAuthType - Auth type (either "USER_AUTH" or "KEYTAB_AUTH")
 	SASLGSSAPIAuthType           string `envconfig:"KAFKA_SASL_GSSAPI_AUTH_TYPE"`
-	SASLGSSAPIKeyTabPath         string `envconfig:"KAFKA_SASL_GSSAPI_KEY_TAB"`
+	SASLGSSAPIKeyTabPath         string `envconfig:"KAFKA_SASL_GSSAPI_KEY_TAB_PATH"`
 	SASLGSSAPIKerberosConfigPath string `envconfig:"KAFKA_SASL_GSSAPI_KERBEROS_CONFIG_PATH"`
 	SASLGSSAPIServiceName        string `envconfig:"KAFKA_SASL_GSSAPI_SERVICE_NAME"`
 	SASLGSSAPIUsername           string `envconfig:"KAFKA_SASL_GSSAPI_USERNAME"`

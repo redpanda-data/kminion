@@ -50,16 +50,23 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | KAFKA_OFFSET_RETENTION | After this time Kafka Minion will delete stale offsets, this must match your Brokers' `offsets.retention.minutes` which equals to a defailt of 7 days for Kafka v2.0.0+ | 168h |
 | KAFKA_CONSUMER_OFFSETS_TOPIC_NAME | Topic name of topic where kafka commits the consumer offsets | \_\_consumer_offsets |
 | KAFKA_SASL_ENABLED | Bool to enable/disable SASL authentication (only SASL_PLAINTEXT is supported) | false |
+| KAFKA_SASL_MECHANISM | Set to SCRAM-SHA-256 or SCRAM-SHA-512 for scram usage | (No default) |
 | KAFKA_SASL_USE_HANDSHAKE | Whether or not to send the Kafka SASL handshake first | true |
 | KAFKA_SASL_USERNAME | SASL Username | (No default) |
 | KAFKA_SASL_PASSWORD | SASL Password | (No default) |
+| KAFKA_SASL_GSSAPI_AUTH_TYPE | Auth type (either "USER_AUTH" or "KEYTAB_AUTH") | (No default) |
+| KAFKA_SASL_GSSAPI_KEY_TAB_PATH | Filepath to key table file | (No default) |
+| KAFKA_SASL_GSSAPI_KERBEROS_CONFIG_PATH | Path to Kerberos config file | (No default) |
+| KAFKA_SASL_GSSAPI_SERVICE_NAME | Kerberos service name | (No default) |
+| KAFKA_SASL_GSSAPI_USERNAME | Kerberos username | (No default) |
+| KAFKA_SASL_GSSAPI_PASSWORD | Kerberos password | (No default) |
+| KAFKA_SASL_GSSAPI_REALM | Kerberos realm | (No default) |
 | KAFKA_TLS_ENABLED | Whether or not to use TLS when connecting to the broker | false |
 | KAFKA_TLS_CA_FILE_PATH | Path to the TLS CA file | (No default) |
 | KAFKA_TLS_KEY_FILE_PATH | Path to the TLS key file | (No default) |
 | KAFKA_TLS_CERT_FILE_PATH | Path to the TLS cert file | (No default) |
 | KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true |
 | KAFKA_TLS_PASSPHRASE | Passphrase to decrypt the TLS Key | (No default) |
-| KAFKA_SASL_MECHANISM | Set to SCRAM-SHA-256 or SCRAM-SHA-512 for scram usage | (No default) |
 
 ### Grafana Dashboard
 
