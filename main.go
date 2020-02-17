@@ -1,6 +1,12 @@
 package main
 
 import (
+	"net"
+	"net/http"
+	"os"
+	"strconv"
+
+	"github.com/Shopify/sarama"
 	"github.com/google-cloud-tools/kafka-minion/collector"
 	"github.com/google-cloud-tools/kafka-minion/kafka"
 	"github.com/google-cloud-tools/kafka-minion/options"
@@ -9,10 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"net/http"
-	"os"
-	"strconv"
 )
 
 func main() {
@@ -34,6 +36,9 @@ func main() {
 		log.Panicf("Loglevel could not be parsed. See logrus documentation for valid log level inputs. Given input was '%v'", opts.LogLevel)
 	}
 	log.SetLevel(level)
+	if level == log.DebugLevel {
+		sarama.Logger = log.StandardLogger().WithField("source", "sarama")
+	}
 
 	log.Infof("Starting kafka minion version%v", opts.Version)
 	// Create cross package shared dependencies
