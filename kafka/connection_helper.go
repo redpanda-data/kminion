@@ -24,14 +24,6 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 	}
 	clientConfig.Version = version
 
-	// Setup SASL
-	if opts.SASLEnabled {
-		clientConfig.Net.SASL.Enable = true
-		clientConfig.Net.SASL.Handshake = opts.UseSASLHandshake
-		clientConfig.Net.SASL.User = opts.SASLUsername
-		clientConfig.Net.SASL.Password = opts.SASLPassword
-	}
-
 	// Setup TLS
 	if opts.TLSEnabled {
 		clientConfig.Net.TLS.Enable = true
@@ -64,16 +56,36 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 		}
 	}
 
-	if opts.SASLMechanism == "SCRAM-SHA-512" {
-		log.Debug("Sarama client config has been set for scram 512")
-		clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &xdgSCRAMClient{HashGeneratorFcn: scramSha512} }
-		clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(sarama.SASLTypeSCRAMSHA512)
-	} else if opts.SASLMechanism == "SCRAM-SHA-256" {
-		log.Debug("Sarama client config has been set for scram256")
-		clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &xdgSCRAMClient{HashGeneratorFcn: scramSha256} }
-		clientConfig.Net.SASL.Mechanism = sarama.SASLMechanism(sarama.SASLTypeSCRAMSHA256)
-	} else {
-		//PLAIN TEXT mode
+	// Setup SASL
+	clientConfig.Net.SASL.Mechanism = sarama.SASLTypePlaintext // Default
+	if opts.SASLEnabled {
+		clientConfig.Net.SASL.Enable = true
+		clientConfig.Net.SASL.Handshake = opts.UseSASLHandshake
+		clientConfig.Net.SASL.User = opts.SASLUsername
+		clientConfig.Net.SASL.Password = opts.SASLPassword
+
+		switch opts.SASLMechanism {
+		case sarama.SASLTypeSCRAMSHA256:
+			clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &xdgSCRAMClient{HashGeneratorFcn: scramSha256} }
+			clientConfig.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
+		case sarama.SASLTypeSCRAMSHA512:
+			clientConfig.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &xdgSCRAMClient{HashGeneratorFcn: scramSha512} }
+			clientConfig.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA512
+		case sarama.SASLTypeGSSAPI:
+			clientConfig.Net.SASL.Mechanism = sarama.SASLTypeGSSAPI
+			switch opts.SASLGSSAPIAuthType {
+			case "USER_AUTH:":
+				clientConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_USER_AUTH
+			case "KEYTAB_AUTH":
+				clientConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_KEYTAB_AUTH
+				clientConfig.Net.SASL.GSSAPI.KeyTabPath = opts.SASLGSSAPIKeyTabPath
+			}
+			clientConfig.Net.SASL.GSSAPI.KerberosConfigPath = opts.SASLGSSAPIKerberosConfigPath
+			clientConfig.Net.SASL.GSSAPI.ServiceName = opts.SASLGSSAPIServiceName
+			clientConfig.Net.SASL.GSSAPI.Username = opts.SASLGSSAPIUsername
+			clientConfig.Net.SASL.GSSAPI.Password = opts.SASLGSSAPIPassword
+			clientConfig.Net.SASL.GSSAPI.Realm = opts.SASLGSSAPIRealm
+		}
 	}
 	err = clientConfig.Validate()
 	if err != nil {
