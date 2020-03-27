@@ -27,7 +27,9 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 	// Setup TLS
 	if opts.TLSEnabled {
 		clientConfig.Net.TLS.Enable = true
-		clientConfig.Net.TLS.Config.InsecureSkipVerify = opts.TLSInsecureSkipTLSVerify
+		clientConfig.Net.TLS.Config = &tls.Config{
+			InsecureSkipVerify: opts.TLSInsecureSkipTLSVerify,
+		}
 
 		if opts.TLSCAFilePath != "" {
 			if opts.TLSCAFilePath != "" {
