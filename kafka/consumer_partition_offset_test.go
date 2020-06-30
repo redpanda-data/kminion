@@ -21,7 +21,7 @@ func TestDecodeConsumerPartitionOffsetV3(t *testing.T) {
 		Topic:     "orders",
 		Partition: 0,
 		Offset:    16534,
-		Timestamp: time.Unix(1558998332, 0),
+		Timestamp: time.Unix(0, 1558998332950*1e6),
 	}
 
 	offset, err := newConsumerPartitionOffset(key, value, logger)
