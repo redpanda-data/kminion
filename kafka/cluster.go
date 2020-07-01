@@ -149,25 +149,7 @@ func (module *Cluster) describeLogDirs() {
 
 	for _, broker := range brokers {
 		go func(b *sarama.Broker) {
-			connected, err := b.Connected()
-			if err != nil {
-				resCh <- response{
-					BrokerID: b.ID(),
-					Res:      nil,
-					Err:      err,
-				}
-			}
-			if !connected {
-				err = b.Open(module.client.Config())
-				if err != nil {
-					resCh <- response{
-						BrokerID: b.ID(),
-						Res:      nil,
-						Err:      err,
-					}
-				}
-			}
-
+			_ = b.Open(module.client.Config())
 			res, err := b.DescribeLogDirs(req)
 			resCh <- response{
 				BrokerID: b.ID(),
