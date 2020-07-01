@@ -149,6 +149,8 @@ func (module *Cluster) describeLogDirs() {
 
 	for _, broker := range brokers {
 		go func(b *sarama.Broker) {
+			// try to open the connection with broker if not already established
+			// ignoring the error as the only possible one at this stage is AlreadyConnected
 			_ = b.Open(module.client.Config())
 			res, err := b.DescribeLogDirs(req)
 			resCh <- response{
