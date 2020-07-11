@@ -12,5 +12,5 @@ FROM alpine:3.11
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /go/bin/kafka-minion /go/bin/kafka-minion
 
-ENV VERSION 1.0.0
+ENV VERSION 1.0.1
 ENTRYPOINT ["/go/bin/kafka-minion"]
