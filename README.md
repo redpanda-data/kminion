@@ -44,6 +44,7 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | LOG_LEVEL | Log granularity (debug, info, warn, error, fatal, panic) | info |
 | VERSION | Application version (env variable is set in Dockerfile) | (from Dockerfile) |
 | EXPORTER_IGNORE_SYSTEM_TOPICS | Don't expose metrics about system topics (any topic names which are "\_\_" or "\_confluent" prefixed) | true |
+| EXPORTER_TOPIC_FILTER   | Expose metrics for only topics that match this filter.  This is a valid regex  | .*  |
 | METRICS_PREFIX | A prefix for all exported prometheus metrics | kafka_minion |
 | KAFKA_BROKERS | Array of broker addresses, delimited by comma (e. g. "kafka-1:9092, kafka-2:9092") | (No default) |
 | KAFKA_VERSION | Kafka cluster version. V1.0.0+ is required to collect log dir sizes. Set this to `0.11.0.2` if your cluster version is below v1.0.0 | 1.0.0 |
