@@ -62,73 +62,73 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 	groupPartitionOffsetDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "offset"),
 		"Newest committed offset of a consumer group for a partition",
-		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, opts.ConstLabels,
 	)
 	groupPartitionCommitCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "commit_count"),
 		"Number of commits of a consumer group for a partition",
-		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, opts.ConstLabels,
 	)
 	groupPartitionLastCommitDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "last_commit"),
 		"Timestamp when consumer group last committed an offset for a partition",
-		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, opts.ConstLabels,
 	)
 	groupPartitionExpiresAtDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "expires_at"),
 		"Timestamp when this offset will expire if there won't be further commits",
-		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, opts.ConstLabels,
 	)
 	groupPartitionLagDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic_partition", "lag"),
 		"Number of messages the consumer group is behind for a partition",
-		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, prometheus.Labels{},
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic", "partition"}, opts.ConstLabels,
 	)
 	groupTopicLagDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "group_topic", "lag"),
 		"Number of messages the consumer group is behind for a topic",
-		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic"}, prometheus.Labels{},
+		[]string{"group", "group_base_name", "group_is_latest", "group_version", "topic"}, opts.ConstLabels,
 	)
 
 	// Topic metrics
 	partitionCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "partition_count"),
 		"Partition count for a given topic along with cleanup policy as label",
-		[]string{"topic", "cleanup_policy"}, prometheus.Labels{},
+		[]string{"topic", "cleanup_policy"}, opts.ConstLabels,
 	)
 	subscribedGroupsCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "subscribed_groups_count"),
 		"Number of consumer groups which have at least one consumer group offset for any of the topics partitions",
-		[]string{"topic"}, prometheus.Labels{},
+		[]string{"topic"}, opts.ConstLabels,
 	)
 	topicLogDirSizeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic", "log_dir_size"),
 		"Size in bytes which is used for the topic's log dirs storage",
-		[]string{"topic"}, prometheus.Labels{},
+		[]string{"topic"}, opts.ConstLabels,
 	)
 
 	// Partition metrics
 	partitionHighWaterMarkDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "high_water_mark"),
 		"Highest known committed offset for this partition",
-		[]string{"topic", "partition"}, prometheus.Labels{},
+		[]string{"topic", "partition"}, opts.ConstLabels,
 	)
 	partitionLowWaterMarkDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "low_water_mark"),
 		"Oldest known committed offset for this partition",
-		[]string{"topic", "partition"}, prometheus.Labels{},
+		[]string{"topic", "partition"}, opts.ConstLabels,
 	)
 	partitionMessageCountDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "topic_partition", "message_count"),
 		"Number of messages for a given topic. Calculated by subtracting high water mark by low water mark.",
-		[]string{"topic", "partition"}, prometheus.Labels{},
+		[]string{"topic", "partition"}, opts.ConstLabels,
 	)
 
 	// Broker metrics
 	brokerLogDirSizeDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(opts.MetricsPrefix, "broker", "log_dir_size"),
 		"Size in bytes which is used for the broker's log dirs storage",
-		[]string{"broker_id"}, prometheus.Labels{},
+		[]string{"broker_id"}, opts.ConstLabels,
 	)
 
 	// General metrics

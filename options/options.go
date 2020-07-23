@@ -66,6 +66,9 @@ type Options struct {
 	TLSInsecureSkipTLSVerify bool   `envconfig:"KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY" default:"true"`
 	TLSPassphrase            string `envconfig:"KAFKA_TLS_PASSPHRASE"`
 
+	// Prometheus constant labels which are added to all metrics
+	ConstLabels map[string]string `envconfig:"PROMETHEUS_CONST_LABELS" default:""`
+
 	// Prometheus exporter
 	// MetricsPrefix - A prefix for all exported prometheus metrics
 	MetricsPrefix string `envconfig:"METRICS_PREFIX" default:"kafka_minion"`
