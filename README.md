@@ -68,6 +68,7 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 | KAFKA_TLS_CERT_FILE_PATH | Path to the TLS cert file | (No default) |
 | KAFKA_TLS_INSECURE_SKIP_TLS_VERIFY | If true, TLS accepts any certificate presented by the server and any host name in that certificate. | true |
 | KAFKA_TLS_PASSPHRASE | Passphrase to decrypt the TLS Key | (No default) |
+| PROMETHEUS_CONST_LABELS | Prometheus [Constant Labels](https://pkg.go.dev/github.com/prometheus/client_golang/prometheus?tab=doc#example-GaugeFunc-ConstLabels) which are added to all metrics. Take a comma-separated string of key-value pairs e.g. "environment:integration,name:cluster-1" | "" |
 
 ### Grafana Dashboard
 
