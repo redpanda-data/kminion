@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"regexp"
 
 	"github.com/Shopify/sarama"
 	"github.com/google-cloud-tools/kafka-minion/options"
@@ -23,6 +24,7 @@ type Cluster struct {
 	logger      *log.Entry
 	options     *options.Options
 	topicByName map[string]*sarama.TopicMetadata
+	topicFilter *regexp.Regexp
 }
 
 // PartitionWaterMark contains either the first or last known committed offset (water mark) for a partition
@@ -88,12 +90,20 @@ func NewCluster(opts *options.Options, storageCh chan<- *StorageRequest) *Cluste
 	}
 	connectionLogger.Info("successfully connected to kafka cluster")
 
+	filter, err := regexp.Compile(opts.TopicFilter)
+	if err != nil {
+		connectionLogger.WithFields(log.Fields{
+			"reason": err,
+		}).Panicf("failed to compile topic filter regex")
+	}
+
 	return &Cluster{
-		storageCh: storageCh,
-		client:    client,
-		admin:     admin,
-		logger:    logger,
-		options:   opts,
+		storageCh:   storageCh,
+		client:      client,
+		admin:       admin,
+		logger:      logger,
+		options:     opts,
+		topicFilter: filter,
 	}
 }
 
@@ -173,14 +183,14 @@ func (module *Cluster) describeLogDirs() {
 		result[r.BrokerID] = r.Res
 	}
 
-	sizeByBroker, err := logDirSizeByBroker(result)
+	sizeByBroker, err := module.logDirSizeByBroker(result)
 	if err != nil {
 		module.logger.WithFields(log.Fields{"error": err}).Error("failed to describe log dirs")
 		return
 	}
 	module.storageCh <- newAddSizeByBrokerRequest(sizeByBroker)
 
-	sizeByTopic, err := logDirSizeByTopic(result)
+	sizeByTopic, err := module.logDirSizeByTopic(result)
 	if err != nil {
 		module.logger.WithFields(log.Fields{"error": err}).Error("failed to describe log dirs")
 		return
@@ -229,6 +239,9 @@ func (module *Cluster) refreshAndSendTopicConfig() {
 	var describeConfigsResources []*sarama.ConfigResource
 	topicByName := make(map[string]*sarama.TopicMetadata)
 	for _, topic := range metadata.Topics {
+		if !module.isTopicAllowed(topic.Name) && topic.Name != module.options.ConsumerOffsetsTopicName {
+			continue
+		}
 		topicByName[topic.Name] = topic
 		topicResource := &sarama.ConfigResource{
 			Type:        sarama.TopicResource,
@@ -316,6 +329,9 @@ func (module *Cluster) topicPartitions() (map[string][]int32, error) {
 
 	partitionIDsByTopicName := make(map[string][]int32)
 	for _, topicName := range topicNames {
+		if !module.isTopicAllowed(topicName) && topicName != module.options.ConsumerOffsetsTopicName {
+			continue
+		}
 		// Partitions() response is served from cached metadata if available. So there's usually no need to launch go routines for that
 		partitionIDs, err := module.client.Partitions(topicName)
 		if err != nil {
@@ -344,6 +360,9 @@ func (module *Cluster) generateOffsetRequests(partitionIDsByTopicName map[string
 
 	// Generate an OffsetRequest for each topic:partition and bucket it to the leader broker
 	for topic, partitionIDs := range partitionIDsByTopicName {
+		if !module.isTopicAllowed(topic) && topic != module.options.ConsumerOffsetsTopicName {
+			continue
+		}
 		for _, partitionID := range partitionIDs {
 			broker, err := module.client.Leader(topic, partitionID)
 			if err != nil {
@@ -492,12 +511,12 @@ func (module *Cluster) isTopicAllowed(topicName string) bool {
 		}
 	}
 
-	return true
+	return module.topicFilter.MatchString(topicName)
 }
 
 // LogDirSizeByBroker returns a map where the BrokerID is the key and the summed bytes of all log dirs of
 // the respective broker is the value.
-func logDirSizeByBroker(responses map[int32]*sarama.DescribeLogDirsResponse) (map[int32]int64, error) {
+func (module *Cluster) logDirSizeByBroker(responses map[int32]*sarama.DescribeLogDirsResponse) (map[int32]int64, error) {
 	sizeByBroker := make(map[int32]int64)
 	for brokerID, response := range responses {
 		for _, dir := range response.LogDirs {
@@ -506,6 +525,9 @@ func logDirSizeByBroker(responses map[int32]*sarama.DescribeLogDirsResponse) (ma
 			}
 
 			for _, topic := range dir.Topics {
+				if !module.isTopicAllowed(topic.Topic) && topic.Topic != module.options.ConsumerOffsetsTopicName {
+					continue
+				}
 				for _, partition := range topic.Partitions {
 					sizeByBroker[brokerID] += partition.Size
 				}
@@ -518,7 +540,7 @@ func logDirSizeByBroker(responses map[int32]*sarama.DescribeLogDirsResponse) (ma
 
 // LogDirSizeByTopic returns a map where the Topicname is the key and the summed bytes of all log dirs of
 // the respective topic is the value.
-func logDirSizeByTopic(responses map[int32]*sarama.DescribeLogDirsResponse) (map[string]int64, error) {
+func (module *Cluster) logDirSizeByTopic(responses map[int32]*sarama.DescribeLogDirsResponse) (map[string]int64, error) {
 	sizeByTopic := make(map[string]int64)
 	for _, response := range responses {
 		for _, dir := range response.LogDirs {
@@ -527,6 +549,9 @@ func logDirSizeByTopic(responses map[int32]*sarama.DescribeLogDirsResponse) (map
 			}
 
 			for _, topic := range dir.Topics {
+				if !module.isTopicAllowed(topic.Topic) && topic.Topic != module.options.ConsumerOffsetsTopicName {
+					continue
+				}
 				for _, partition := range topic.Partitions {
 					sizeByTopic[topic.Topic] += partition.Size
 				}

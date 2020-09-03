@@ -7,6 +7,7 @@ import (
 	"github.com/google-cloud-tools/kafka-minion/options"
 	log "github.com/sirupsen/logrus"
 	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ type OffsetConsumer struct {
 	client           sarama.Client
 	offsetsTopicName string
 	options          *options.Options
+	topicFilter      *regexp.Regexp
 }
 
 // NewOffsetConsumer creates a consumer which process all messages in the __consumer_offsets topic
@@ -61,6 +63,7 @@ func NewOffsetConsumer(opts *options.Options, storageChannel chan<- *StorageRequ
 		client:           client,
 		offsetsTopicName: opts.ConsumerOffsetsTopicName,
 		options:          opts,
+		topicFilter:      regexp.MustCompile(opts.TopicFilter),
 	}
 }
 
@@ -277,7 +280,7 @@ func (module *OffsetConsumer) isTopicAllowed(topicName string) bool {
 		}
 	}
 
-	return true
+	return module.topicFilter.MatchString(topicName)
 }
 
 // processGroupMetadata decodes all group metadata messages and sends them to the storage module
