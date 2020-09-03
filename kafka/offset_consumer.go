@@ -7,10 +7,10 @@ import (
 	"github.com/google-cloud-tools/kafka-minion/options"
 	log "github.com/sirupsen/logrus"
 	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
-	"regexp"
 )
 
 type consumerStatus struct {
@@ -63,7 +63,7 @@ func NewOffsetConsumer(opts *options.Options, storageChannel chan<- *StorageRequ
 		client:           client,
 		offsetsTopicName: opts.ConsumerOffsetsTopicName,
 		options:          opts,
-		topicFilter: regexp.MustCompile(opts.TopicFilter),
+		topicFilter:      regexp.MustCompile(opts.TopicFilter),
 	}
 }
 

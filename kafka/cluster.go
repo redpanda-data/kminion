@@ -90,13 +90,20 @@ func NewCluster(opts *options.Options, storageCh chan<- *StorageRequest) *Cluste
 	}
 	connectionLogger.Info("successfully connected to kafka cluster")
 
+	filter, err := regexp.Compile(opts.TopicFilter)
+	if err != nil {
+		connectionLogger.WithFields(log.Fields{
+			"reason": err,
+		}).Panicf("failed to compile topic filter regex")
+	}
+
 	return &Cluster{
 		storageCh:   storageCh,
 		client:      client,
 		admin:       admin,
 		logger:      logger,
 		options:     opts,
-		topicFilter: regexp.MustCompile(opts.TopicFilter),
+		topicFilter: filter,
 	}
 }
 
