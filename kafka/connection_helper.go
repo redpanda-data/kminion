@@ -76,7 +76,7 @@ func saramaClientConfig(opts *options.Options) *sarama.Config {
 		case sarama.SASLTypeGSSAPI:
 			clientConfig.Net.SASL.Mechanism = sarama.SASLTypeGSSAPI
 			switch opts.SASLGSSAPIAuthType {
-			case "USER_AUTH:":
+			case "USER_AUTH":
 				clientConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_USER_AUTH
 			case "KEYTAB_AUTH":
 				clientConfig.Net.SASL.GSSAPI.AuthType = sarama.KRB5_KEYTAB_AUTH
