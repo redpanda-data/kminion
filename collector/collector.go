@@ -131,14 +131,18 @@ func NewCollector(opts *options.Options, storage *storage.MemoryStorage) *Collec
 		[]string{"broker_id"}, opts.ConstLabels,
 	)
 
+	buildInfoLabels := make(map[string]string)
+	for k, v := range opts.ConstLabels {
+		buildInfoLabels[k] = v
+	}
+	buildInfoLabels["version"] = opts.Version
+
 	// General metrics
 	buildInfo := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: opts.MetricsPrefix,
-		Name:      "build_info",
-		Help:      "Build Info about Kafka Minion",
-		ConstLabels: prometheus.Labels{
-			"version": opts.Version,
-		},
+		Namespace:   opts.MetricsPrefix,
+		Name:        "build_info",
+		Help:        "Build Info about Kafka Minion",
+		ConstLabels: buildInfoLabels,
 	})
 	buildInfo.Set(1)
 	prometheus.MustRegister(buildInfo)
