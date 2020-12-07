@@ -15,7 +15,7 @@ Kafka minion is a prometheus exporter for Apache Kafka (v0.11.0.2+), created to 
 
 ## Features
 
-- [x] Supports Kafka 0.11.0.2 - 2.2.x (last updated 16th Jun 2019)
+- [x] Supports Kafka 0.11.0.2 - 2.6.x (last updated  6th Dec 2020)
 - [x] Fetches consumer group information directly from `__consumer_offsets` topic instead of querying single brokers for consumer group lags to ensure robustness in case of broker failures or leader elections
 - [x] Kafka SASL/SSL support
 - [x] Provides per consumergroup:topic lag metrics (removes a topic's metrics if a single partition metric in that topic couldn't be fetched)
@@ -72,8 +72,8 @@ Kubernetes users may want to use the Helm chart to deploy Kafka Minion: https://
 ### Grafana Dashboard
 
 You can import our suggested Grafana dashboards and modify them as you wish:
- - https://grafana.com/dashboards/10083 (Kafka Minion Dashboard ID 10083)
- - https://grafana.com/dashboards/10466 (Kafka Minion OPS Dashbaord ID 10466)
+- https://grafana.com/dashboards/10083 (Kafka Minion Dashboard ID 10083)
+- https://grafana.com/dashboards/10466 (Kafka Minion OPS Dashbaord ID 10466)
 
 ## Exposed metrics
 
@@ -154,7 +154,7 @@ At a high level Kafka Minion fetches data from two different sources (see below)
 
 ### Why did you create yet another kafka lag exporter?
 
-1. As of writing the exporter there is no publicly available prometheus exporter (to my knowledge) which is lightweight, robust and supports Kafka v0.11 - v2.1+
+1. As of writing the exporter there is no publicly available prometheus exporter (to my knowledge) which is lightweight, robust and supports Kafka v0.11 - v2.6+
 
 2. We are primarily interested in per consumergroup:topic lags. Some exporters export either only group lags of all topics altogether or they export only per partition metrics. While you can obviously aggregate those partition metrics in Grafana as well, this adds unnecessary complexity in Grafana dashboards. This exporter offers metrics on partition and topic granularity.
 
