@@ -1,17 +1,17 @@
-module github.com/google-cloud-tools/kafka-minion
-
-require (
-	github.com/Shopify/sarama v1.27.0
-	github.com/golang/snappy v0.0.2 // indirect
-	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/klauspost/compress v1.11.0 // indirect
-	github.com/prometheus/client_golang v1.7.1
-	github.com/sirupsen/logrus v1.6.0
-	github.com/stretchr/testify v1.6.1
-	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
-	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
-	golang.org/x/net v0.0.0-20200925080053-05aa5d4ee321 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
-)
+module github.com/cloudhut/kminion/v2
 
 go 1.15
+
+require (
+	github.com/jcmturner/gokrb5/v8 v8.4.2
+	github.com/knadh/koanf v0.15.0
+	github.com/mitchellh/mapstructure v1.2.2
+	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
+	github.com/prometheus/client_golang v1.9.0
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.7.1
+	github.com/twmb/franz-go v0.6.3
+	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/zap v1.16.0
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+)

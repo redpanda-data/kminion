@@ -14,3 +14,5 @@ zk-single-kafka-single
 zk-multiple-kafka-multiple
 .vscode
 .idea
+
+config
