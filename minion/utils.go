@@ -6,6 +6,24 @@ import (
 	"strings"
 )
 
+func (s *Service) IsTopicAllowed(topicName string) bool {
+	isAllowed := false
+	for _, regex := range s.AllowedGroupIDsExpr {
+		if regex.MatchString(topicName) {
+			isAllowed = true
+			break
+		}
+	}
+
+	for _, regex := range s.IgnoredGroupIDsExpr {
+		if regex.MatchString(topicName) {
+			isAllowed = false
+			break
+		}
+	}
+	return isAllowed
+}
+
 func compileRegex(expr string) (*regexp.Regexp, error) {
 	if strings.HasPrefix(expr, "/") && strings.HasSuffix(expr, "/") {
 		substr := expr[1 : len(expr)-1]

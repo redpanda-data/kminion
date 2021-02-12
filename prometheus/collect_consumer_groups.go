@@ -31,7 +31,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			e.consumerGroupStable,
+			e.consumerGroupInfo,
 			prometheus.GaugeValue,
 			float64(val),
 			group.Group,

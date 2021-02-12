@@ -3,6 +3,7 @@ module github.com/cloudhut/kminion/v2
 go 1.15
 
 require (
+	github.com/google/uuid v1.2.0
 	github.com/jcmturner/gokrb5/v8 v8.4.2
 	github.com/knadh/koanf v0.15.0
 	github.com/mitchellh/mapstructure v1.2.2

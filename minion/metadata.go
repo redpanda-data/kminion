@@ -8,7 +8,8 @@ import (
 )
 
 func (s *Service) GetMetadataCached(ctx context.Context) (*kmsg.MetadataResponse, error) {
-	key := "metadata"
+	reqId := ctx.Value("requestId").(string)
+	key := "metadata-" + reqId
 
 	if cachedRes, exists := s.getCachedItem(key); exists {
 		return cachedRes.(*kmsg.MetadataResponse), nil
@@ -20,7 +21,7 @@ func (s *Service) GetMetadataCached(ctx context.Context) (*kmsg.MetadataResponse
 			return nil, err
 		}
 
-		s.setCachedItem(key, metadata, 2*time.Second)
+		s.setCachedItem(key, metadata, 120*time.Second)
 
 		return metadata, nil
 	})

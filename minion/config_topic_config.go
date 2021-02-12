@@ -2,7 +2,16 @@ package minion
 
 import "fmt"
 
+const (
+	TopicGranularityTopic     string = "topic"
+	TopicGranularityPartition string = "partition"
+)
+
 type TopicConfig struct {
+	// Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
+	// you aren't interested in per partition metrics you could choose "topic".
+	Granularity string `koanf:"granularity"`
+
 	// AllowedTopics are regex strings of topic names whose topic metrics that shall be exported.
 	AllowedTopics []string `koanf:"allowedTopics"`
 
@@ -13,6 +22,12 @@ type TopicConfig struct {
 
 // Validate if provided TopicConfig is valid.
 func (c *TopicConfig) Validate() error {
+	switch c.Granularity {
+	case TopicGranularityPartition, TopicGranularityTopic:
+	default:
+		return fmt.Errorf("given granularity '%v' is invalid", c.Granularity)
+	}
+
 	// Check whether each provided string is valid regex
 	for _, topic := range c.AllowedTopics {
 		_, err := compileRegex(topic)
@@ -33,5 +48,6 @@ func (c *TopicConfig) Validate() error {
 
 // SetDefaults for topic config
 func (c *TopicConfig) SetDefaults() {
+	c.Granularity = TopicGranularityPartition
 	c.AllowedTopics = []string{"/.*/"}
 }

@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 )
 
@@ -27,11 +28,28 @@ func main() {
 	}
 	logger.Info("started kminion, starting setup")
 
+	// Setup context that cancels when the application receives an interrupt signal
+	ctx, cancel := context.WithCancel(context.Background())
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	defer func() {
+		signal.Stop(c)
+		cancel()
+	}()
+	go func() {
+		select {
+		case <-c:
+			logger.Info("received a signal, going to shut down KMinion")
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger)
 	if err != nil {
 		logger.Fatal("failed to setup kafka service", zap.Error(err))
 	}
-	connectCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	err = kafkaSvc.TestConnection(connectCtx)
 	if err != nil {
@@ -43,7 +61,7 @@ func main() {
 		logger.Fatal("failed to setup minion service", zap.Error(err))
 	}
 	// TODO: Use context that cancels upon sigkill/sigterm
-	err = minionSvc.Start(context.Background())
+	err = minionSvc.Start(ctx)
 	if err != nil {
 		logger.Fatal("failed to start minion service", zap.Error(err))
 	}

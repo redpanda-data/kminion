@@ -3,6 +3,7 @@ package prometheus
 import (
 	"context"
 	"github.com/cloudhut/kminion/v2/minion"
+	uuid2 "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"os"
@@ -26,7 +27,14 @@ type Exporter struct {
 	brokerLogDirSize *prometheus.Desc
 	topicLogDirSize  *prometheus.Desc
 
-	consumerGroupStable *prometheus.Desc
+	topicHighWaterMarkSum  *prometheus.Desc
+	partitionHighWaterMark *prometheus.Desc
+	topicLowWaterMarkSum   *prometheus.Desc
+	partitionLowWaterMark  *prometheus.Desc
+
+	consumerGroupInfo              *prometheus.Desc
+	consumerGroupTopicPartitionLag *prometheus.Desc
+	consumerGroupTopicLag          *prometheus.Desc
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
@@ -76,12 +84,54 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"topic_name"},
 		nil,
 	)
-	e.consumerGroupStable = prometheus.NewDesc(
+	e.partitionLowWaterMark = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_low_water_mark"),
+		"Partition Low Water Mark",
+		[]string{"topic_name", "partition_id"},
+		nil,
+	)
+	e.topicLowWaterMarkSum = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_low_water_mark_sum"),
+		"Sum of all the topic's partition low water marks",
+		[]string{"topic_name"},
+		nil,
+	)
+	e.partitionHighWaterMark = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_high_water_mark"),
+		"Partition High Water Mark",
+		[]string{"topic_name", "partition_id"},
+		nil,
+	)
+	e.topicHighWaterMarkSum = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_high_water_mark_sum"),
+		"Sum of all the topic's partition high water marks",
+		[]string{"topic_name"},
+		nil,
+	)
+
+	// Consumer Group Metrics
+	// Group Info
+	e.consumerGroupInfo = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_info"),
 		"Consumer Group info metrics. It will report 1 if the group is in the stable state, otherwise 0.",
 		[]string{"group_id", "member_count", "protocol", "protocol_type", "state"},
 		nil,
 	)
+	// Partition Lag
+	e.consumerGroupTopicPartitionLag = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_partition_lag"),
+		"The number of messages a consumer group is lagging behind the latest offset of a partition",
+		[]string{"group_id", "topic_name", "partition_id"},
+		nil,
+	)
+	// Topic Lag (sum of all partition lags)
+	e.consumerGroupTopicLag = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_lag"),
+		"The number of messages a consumer group is lagging behind across all partitions in a topic",
+		[]string{"group_id", "topic_name"},
+		nil,
+	)
+
 }
 
 // Describe implements the prometheus.Collector interface. It sends the
@@ -95,13 +145,18 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
+
+	uuid := uuid2.New()
+	ctx = context.WithValue(ctx, "requestId", uuid.String())
 
 	ok := e.collectClusterInfo(ctx, ch)
 	ok = e.collectBrokerInfo(ctx, ch) && ok
 	ok = e.collectLogDirs(ctx, ch) && ok
 	ok = e.collectConsumerGroups(ctx, ch) && ok
+	ok = e.collectTopicPartitionOffsets(ctx, ch) && ok
+	ok = e.collectConsumerGroupLags(ctx, ch) && ok
 
 	if ok {
 		ch <- prometheus.MustNewConstMetric(e.exporterUp, prometheus.GaugeValue, 1.0)
