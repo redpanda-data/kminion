@@ -9,6 +9,7 @@ import (
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
+	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
 	"os"
 	"strings"
@@ -42,6 +43,8 @@ func (c *Config) Validate() error {
 
 func newConfig(logger *zap.Logger) (Config, error) {
 	k := koanf.New(".")
+	var cfg Config
+	cfg.SetDefaults()
 
 	// 1. Check if a config filepath is set via flags. If there is one we'll try to load the file using a YAML Parser
 	envKey := "CONFIG_FILEPATH"
@@ -54,16 +57,31 @@ func newConfig(logger *zap.Logger) (Config, error) {
 			return Config{}, fmt.Errorf("failed to parse YAML config: %w", err)
 		}
 	}
+	// We could unmarshal the loaded koanf input after loading both providers, however we want to unmarshal the YAML
+	// config with `ErrorUnused` set to true, but unmarshal environment variables with `ErrorUnused` set to false (default).
+	// Rationale: Orchestrators like Kubernetes inject unrelated environment variables, which we still want to allow.
+	err := k.UnmarshalWithConf("", &cfg, koanf.UnmarshalConf{
+		Tag:       "",
+		FlatPaths: false,
+		DecoderConfig: &mapstructure.DecoderConfig{
+			DecodeHook: mapstructure.ComposeDecodeHookFunc(
+				mapstructure.StringToTimeDurationHookFunc()),
+			Metadata:         nil,
+			Result:           &cfg,
+			WeaklyTypedInput: true,
+			ErrorUnused:      true,
+		},
+	})
+	if err != nil {
+		return Config{}, err
+	}
 
-	err := k.Load(env.Provider("", ".", func(s string) string {
+	err = k.Load(env.Provider("", ".", func(s string) string {
 		return strings.Replace(strings.ToLower(s), "_", ".", -1)
 	}), nil)
 	if err != nil {
 		return Config{}, err
 	}
-
-	var cfg Config
-	cfg.SetDefaults()
 
 	err = k.Unmarshal("", &cfg)
 	if err != nil {
