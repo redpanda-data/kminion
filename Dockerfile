@@ -23,6 +23,6 @@ COPY --from=builder /app/bin/kminion /app/kminion
 
 # Embed env vars in final image as well (so the backend can read them)
 ARG KMINION_VERSION
-ENV KMINION_VERSION ${KMINION_VERSION}
+ENV VERSION ${KMINION_VERSION}
 
 ENTRYPOINT ["/app/kminion"]
