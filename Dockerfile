@@ -1,16 +1,28 @@
-# build image
+############################################################
+# Build image
+############################################################
 FROM golang:1.15-alpine as builder
 RUN apk update && apk add --no-cache git ca-certificates && update-ca-certificates
 
 WORKDIR /app
+
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuffix cgo -o /go/bin/kafka-minion
+RUN CGO_ENABLED=0 go build -o ./bin/kminion
 
-# executable image
+############################################################
+# Runtime Image
+############################################################
 FROM alpine:3
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /go/bin/kafka-minion /go/bin/kafka-minion
+COPY --from=builder /app/bin/kminion /app/kminion
 
-ENV VERSION 1.0.2
-ENTRYPOINT ["/go/bin/kafka-minion"]
+# Embed env vars in final image as well (so the backend can read them)
+ARG KMINION_VERSION
+ENV KMINION_VERSION ${KMINION_VERSION}
+
+ENTRYPOINT ["/app/kminion"]
