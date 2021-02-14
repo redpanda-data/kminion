@@ -21,17 +21,21 @@ type Exporter struct {
 	failedCollectsCounter *prometheus.CounterVec
 
 	// Kafka metrics
+	// General
 	clusterInfo *prometheus.Desc
 	brokerInfo  *prometheus.Desc
 
+	// Log Dir Sizes
 	brokerLogDirSize *prometheus.Desc
 	topicLogDirSize  *prometheus.Desc
 
+	// Topic / Partition
 	topicHighWaterMarkSum  *prometheus.Desc
 	partitionHighWaterMark *prometheus.Desc
 	topicLowWaterMarkSum   *prometheus.Desc
 	partitionLowWaterMark  *prometheus.Desc
 
+	// Consumer Groups
 	consumerGroupInfo              *prometheus.Desc
 	consumerGroupTopicPartitionLag *prometheus.Desc
 	consumerGroupTopicLag          *prometheus.Desc
@@ -60,18 +64,22 @@ func (e *Exporter) InitializeMetrics() {
 	prometheus.MustRegister(e.failedCollectsCounter)
 
 	// Kafka metrics
+	// Cluster info
 	e.clusterInfo = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "cluster_info"),
 		"Kafka cluster information",
 		[]string{"cluster_version", "broker_count", "controller_id", "cluster_id"},
 		nil,
 	)
+	// Broker Info
 	e.brokerInfo = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "broker_info"),
 		"Kafka broker information",
 		[]string{"broker_id", "address", "port", "rack_id", "is_controller"},
 		nil,
 	)
+
+	// LogDir sizes
 	e.brokerLogDirSize = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "broker_log_dir_size_total_bytes"),
 		"The summed size in bytes of all log dirs for a given broker",
@@ -84,24 +92,30 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"topic_name"},
 		nil,
 	)
+
+	// Topic / Partition metrics
+	// Partition Low Water Mark
 	e.partitionLowWaterMark = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_low_water_mark"),
 		"Partition Low Water Mark",
 		[]string{"topic_name", "partition_id"},
 		nil,
 	)
+	// Topic Low Water Mark Sum
 	e.topicLowWaterMarkSum = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_low_water_mark_sum"),
 		"Sum of all the topic's partition low water marks",
 		[]string{"topic_name"},
 		nil,
 	)
+	// Partition High Water Mark
 	e.partitionHighWaterMark = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_high_water_mark"),
 		"Partition High Water Mark",
 		[]string{"topic_name", "partition_id"},
 		nil,
 	)
+	// Topic Low Water Mark Sum
 	e.topicHighWaterMarkSum = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_high_water_mark_sum"),
 		"Sum of all the topic's partition high water marks",
@@ -148,6 +162,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
 
+	// Attach a unique id which will be used for caching (and and it's invalidation) of the kafka requests
 	uuid := uuid2.New()
 	ctx = context.WithValue(ctx, "requestId", uuid.String())
 

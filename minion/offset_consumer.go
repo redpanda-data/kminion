@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/twmb/franz-go/pkg/kbin"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
+	"time"
 )
 
 // startConsumingOffsets consumes the __consumer_offsets topic and forwards the kafka messages to their respective
@@ -17,25 +19,132 @@ func (s *Service) startConsumingOffsets(ctx context.Context) {
 	client.AssignPartitions(topic)
 
 	s.logger.Info("starting to consume messages from offsets topic")
-	// TODO: Add select case for context cancellation to propagate signals / stopping the exporter
+	go s.checkIfConsumerLagIsCaughtUp(ctx)
+
 	for {
-		fetches := client.PollFetches(ctx)
-		errors := fetches.Errors()
-		for _, err := range errors {
-			// Log all errors and continue afterwards as we might get errors and still have some fetch results
-			s.logger.Error("failed to fetch records from kafka",
-				zap.String("topic", err.Topic),
-				zap.Int32("partition", err.Partition),
-				zap.Error(err.Err))
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			fetches := client.PollFetches(ctx)
+			errors := fetches.Errors()
+			for _, err := range errors {
+				// Log all errors and continue afterwards as we might get errors and still have some fetch results
+				s.logger.Error("failed to fetch records from kafka",
+					zap.String("topic", err.Topic),
+					zap.Int32("partition", err.Partition),
+					zap.Error(err.Err))
+			}
+
+			iter := fetches.RecordIter()
+			for !iter.Done() {
+				record := iter.Next()
+				s.storage.markRecordConsumed(record)
+
+				err := s.decodeOffsetRecord(record)
+				if err != nil {
+					s.logger.Warn("failed to decode offset record", zap.Error(err))
+				}
+			}
+		}
+	}
+}
+
+// checkIfConsumerLagIsCaughtUp fetches the newest partition offsets for all partitions in the __consumer_offsets
+// topic and compares these against the last consumed messages from our offset consumer. If the consumed offsets are
+// higher than the partition offsets this means we caught up the initial lag and can mark our storage as ready. A ready
+// store will start to expose consumer group offsets.
+func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
+	for {
+		time.Sleep(12 * time.Second)
+		s.logger.Debug("checking if lag in consumer offsets topic is caught up")
+
+		// 1. Get topic high watermarks for __consumer_offsets topic
+		req := kmsg.NewMetadataRequest()
+		topic := kmsg.NewMetadataRequestTopic()
+		topicName := "__consumer_offsets"
+		topic.Topic = &topicName
+		req.Topics = []kmsg.MetadataRequestTopic{topic}
+
+		res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+		if err != nil {
+			s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because metadata request failed",
+				zap.Error(err))
+			continue
 		}
 
-		iter := fetches.RecordIter()
-		for !iter.Done() {
-			record := iter.Next()
-			err := s.decodeOffsetRecord(record)
-			if err != nil {
-				s.logger.Warn("failed to decode offset record", zap.Error(err))
+		// 2. Request high watermarks for consumer offset partitions
+		topicReqs := make([]kmsg.ListOffsetsRequestTopic, len(res.Topics))
+		for i, topic := range res.Topics {
+			req := kmsg.NewListOffsetsRequestTopic()
+			req.Topic = topic.Topic
+
+			partitionReqs := make([]kmsg.ListOffsetsRequestTopicPartition, len(topic.Partitions))
+			for j, partition := range topic.Partitions {
+				partitionReqs[j] = kmsg.NewListOffsetsRequestTopicPartition()
+				partitionReqs[j].Partition = partition.Partition
+				partitionReqs[j].Timestamp = -1 // Newest
 			}
+			req.Partitions = partitionReqs
+
+			topicReqs[i] = req
+		}
+		offsetReq := kmsg.NewListOffsetsRequest()
+		offsetReq.Topics = topicReqs
+		highMarksRes, err := offsetReq.RequestWith(ctx, s.kafkaSvc.Client)
+		if err != nil {
+			s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because high watermark request failed",
+				zap.Error(err))
+			continue
+		}
+		if len(highMarksRes.Topics) != 1 {
+			s.logger.Error("expected exactly one topic response for high water mark request")
+			continue
+		}
+
+		// 3. Check if high watermarks have been consumed. To avoid a race condition here we will wait some time before
+		// comparing, so that the consumer has enough time to pass the new high watermarks we just fetched.
+		time.Sleep(3 * time.Second)
+		consumedOffsets := s.storage.getConsumedOffsets()
+		topicRes := highMarksRes.Topics[0]
+		isReady := true
+		partitionsLagging := 0
+		totalLag := int64(0)
+		for _, partition := range topicRes.Partitions {
+			err := kerr.ErrorForCode(partition.ErrorCode)
+			if err != nil {
+				s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because high "+
+					"watermark request failed, with an inner error",
+					zap.Error(err))
+			}
+
+			highWaterMark := partition.Offset - 1
+			consumedOffset := consumedOffsets[partition.Partition]
+			partitionLag := highWaterMark - consumedOffset
+			if partitionLag < 0 {
+				partitionLag = 0
+			}
+
+			if partitionLag > 0 {
+				partitionsLagging++
+				totalLag += partitionLag
+				s.logger.Debug("consumer_offsets topic lag has not been caught up yet",
+					zap.Int32("partition_id", partition.Partition),
+					zap.Int64("high_water_mark", highWaterMark),
+					zap.Int64("consumed_offset", consumedOffset),
+					zap.Int64("partition_lag", partitionLag))
+				isReady = false
+				continue
+			}
+		}
+		if isReady {
+			s.logger.Info("successfully consumed all consumer offsets. consumer group lags will be exported from now on")
+			s.storage.setReadyState(true)
+			return
+		} else {
+			s.logger.Info("catching up the message lag on consumer offsets",
+				zap.Int("lagging_partitions", partitionsLagging),
+				zap.Int64("total_lag", totalLag))
 		}
 	}
 }
@@ -117,7 +226,8 @@ func (s *Service) decodeOffsetCommit(record *kgo.Record) error {
 	}
 
 	if record.Value == nil {
-		// Tombstone
+		// Tombstone - The group offset is expired or no longer valid (e.g. because the topic has been deleted)
+		s.storage.deleteOffsetCommit(offsetCommitKey)
 		return nil
 	}
 

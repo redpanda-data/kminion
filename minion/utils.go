@@ -6,16 +6,34 @@ import (
 	"strings"
 )
 
-func (s *Service) IsTopicAllowed(topicName string) bool {
+func (s *Service) IsGroupAllowed(groupName string) bool {
 	isAllowed := false
 	for _, regex := range s.AllowedGroupIDsExpr {
-		if regex.MatchString(topicName) {
+		if regex.MatchString(groupName) {
 			isAllowed = true
 			break
 		}
 	}
 
 	for _, regex := range s.IgnoredGroupIDsExpr {
+		if regex.MatchString(groupName) {
+			isAllowed = false
+			break
+		}
+	}
+	return isAllowed
+}
+
+func (s *Service) IsTopicAllowed(topicName string) bool {
+	isAllowed := false
+	for _, regex := range s.AllowedTopicsExpr {
+		if regex.MatchString(topicName) {
+			isAllowed = true
+			break
+		}
+	}
+
+	for _, regex := range s.IgnoredTopicsExpr {
 		if regex.MatchString(topicName) {
 			isAllowed = false
 			break

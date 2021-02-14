@@ -24,6 +24,8 @@ type Service struct {
 
 	AllowedGroupIDsExpr []*regexp.Regexp
 	IgnoredGroupIDsExpr []*regexp.Regexp
+	AllowedTopicsExpr   []*regexp.Regexp
+	IgnoredTopicsExpr   []*regexp.Regexp
 
 	kafkaSvc *kafka.Service
 	storage  *Storage
@@ -38,6 +40,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Servi
 	// Compile regexes. We can ignore the errors because valid compilation has been validated already
 	allowedGroupIDsExpr, _ := compileRegexes(cfg.ConsumerGroups.AllowedGroupIDs)
 	ignoredGroupIDsExpr, _ := compileRegexes(cfg.ConsumerGroups.IgnoredGroupIDs)
+	allowedTopicsExpr, _ := compileRegexes(cfg.Topics.AllowedTopics)
+	ignoredTopicsExpr, _ := compileRegexes(cfg.Topics.IgnoredTopics)
 
 	return &Service{
 		Cfg:    cfg,
@@ -49,6 +53,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Servi
 
 		AllowedGroupIDsExpr: allowedGroupIDsExpr,
 		IgnoredGroupIDsExpr: ignoredGroupIDsExpr,
+		AllowedTopicsExpr:   allowedTopicsExpr,
+		IgnoredTopicsExpr:   ignoredTopicsExpr,
 
 		kafkaSvc: kafkaSvc,
 		storage:  storage,

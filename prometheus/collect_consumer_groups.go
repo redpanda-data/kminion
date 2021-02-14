@@ -19,6 +19,9 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 	}
 
 	for _, group := range groups.Groups {
+		if !e.minionSvc.IsGroupAllowed(group.Group) {
+			continue
+		}
 		err := kerr.ErrorForCode(group.ErrorCode)
 		if err != nil {
 			e.logger.Warn("consumer group could not be described", zap.Error(err))

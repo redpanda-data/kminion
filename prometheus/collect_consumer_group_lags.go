@@ -19,7 +19,8 @@ type waterMark struct {
 }
 
 func (e *Exporter) collectConsumerGroupLags(ctx context.Context, ch chan<- prometheus.Metric) bool {
-	// Low Watermarks
+	// Low Watermarks (at the moment they are not needed at all, they could be used to calculate the lag on partitions
+	// that don't have any active offsets)
 	lowWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -2)
 	if err != nil {
 		e.logger.Error("failed to fetch low water marks", zap.Error(err))
@@ -31,17 +32,148 @@ func (e *Exporter) collectConsumerGroupLags(ctx context.Context, ch chan<- prome
 		e.logger.Error("failed to fetch low water marks", zap.Error(err))
 		return false
 	}
-
 	waterMarksByTopic := e.waterMarksByTopic(lowWaterMarks, highWaterMarks)
+
 	// We have two different options to get consumer group offsets - either via the AdminAPI or by consuming the
 	// __consumer_offsets topic.
-
 	if e.minionSvc.Cfg.ConsumerGroups.ScrapeMode == minion.ConsumerGroupScrapeModeAdminAPI {
-		e.collectConsumerGroupLagsAdminAPI(ctx, ch, waterMarksByTopic)
-		return true
+		return e.collectConsumerGroupLagsAdminAPI(ctx, ch, waterMarksByTopic)
+	} else {
+		return e.collectConsumerGroupLagsOffsetTopic(ctx, ch, waterMarksByTopic)
 	}
+}
 
-	return false
+func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch chan<- prometheus.Metric, marks map[string]map[int32]waterMark) bool {
+	offsets := e.minionSvc.ListAllConsumerGroupOffsetsInternal()
+	for groupName, group := range offsets {
+		if !e.minionSvc.IsGroupAllowed(groupName) {
+			continue
+		}
+
+		for topicName, topic := range group {
+			topicLag := float64(0)
+			for partitionID, partition := range topic {
+				childLogger := e.logger.With(
+					zap.String("consumer_group", groupName),
+					zap.String("topic_name", topicName),
+					zap.Int32("partition_id", partitionID),
+					zap.Int64("group_offset", partition.Offset))
+
+				topicMark, exists := marks[topicName]
+				if !exists {
+					childLogger.Warn("consumer group has committed offsets on a topic we don't have watermarks for")
+					break // We can stop trying to find any other offsets for that topic so let's quit this loop
+				}
+				partitionMark, exists := topicMark[partitionID]
+				if !exists {
+					childLogger.Warn("consumer group has committed offsets on a partition we don't have watermarks for")
+					continue
+				}
+				lag := float64(partitionMark.HighWaterMark - partition.Offset)
+				// Lag might be negative because we fetch group offsets after we get partition offsets. It's kinda a
+				// race condition. Negative lags obviously do not make sense so use at least 0 as lag.
+				lag = math.Max(0, lag)
+				topicLag += lag
+
+				if e.minionSvc.Cfg.ConsumerGroups.Granularity == minion.ConsumerGroupGranularityTopic {
+					continue
+				}
+				ch <- prometheus.MustNewConstMetric(
+					e.consumerGroupTopicPartitionLag,
+					prometheus.GaugeValue,
+					lag,
+					groupName,
+					topicName,
+					strconv.Itoa(int(partitionID)),
+				)
+			}
+			ch <- prometheus.MustNewConstMetric(
+				e.consumerGroupTopicLag,
+				prometheus.GaugeValue,
+				topicLag,
+				groupName,
+				topicName,
+			)
+		}
+	}
+	return true
+}
+
+func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan<- prometheus.Metric, marks map[string]map[int32]waterMark) bool {
+	isOk := true
+
+	groupOffsets, err := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
+	for groupName, offsetRes := range groupOffsets {
+		if !e.minionSvc.IsGroupAllowed(groupName) {
+			continue
+		}
+
+		err = kerr.ErrorForCode(offsetRes.ErrorCode)
+		if err != nil {
+			e.logger.Warn("failed to get offsets from consumer group, inner kafka error",
+				zap.String("consumer_group", groupName),
+				zap.Error(err))
+			isOk = false
+			continue
+		}
+		for _, topic := range offsetRes.Topics {
+			topicLag := float64(0)
+			for _, partition := range topic.Partitions {
+				err := kerr.ErrorForCode(partition.ErrorCode)
+				if err != nil {
+					e.logger.Warn("failed to get consumer group offsets for a partition, inner kafka error",
+						zap.String("consumer_group", groupName),
+						zap.Error(err))
+					isOk = false
+					continue
+				}
+
+				childLogger := e.logger.With(
+					zap.String("consumer_group", groupName),
+					zap.String("topic_name", topic.Topic),
+					zap.Int32("partition_id", partition.Partition),
+					zap.Int64("group_offset", partition.Offset))
+				topicMark, exists := marks[topic.Topic]
+				if !exists {
+					childLogger.Warn("consumer group has committed offsets on a topic we don't have watermarks for")
+					isOk = false
+					break // We can stop trying to find any other offsets for that topic so let's quit this loop
+				}
+				partitionMark, exists := topicMark[partition.Partition]
+				if !exists {
+					childLogger.Warn("consumer group has committed offsets on a partition we don't have watermarks for")
+					isOk = false
+					continue
+				}
+				lag := float64(partitionMark.HighWaterMark - partition.Offset)
+				// Lag might be negative because we fetch group offsets after we get partition offsets. It's kinda a
+				// race condition. Negative lags obviously do not make sense so use at least 0 as lag.
+				lag = math.Max(0, lag)
+				topicLag += lag
+
+				if e.minionSvc.Cfg.ConsumerGroups.Granularity == minion.ConsumerGroupGranularityTopic {
+					continue
+				}
+				ch <- prometheus.MustNewConstMetric(
+					e.consumerGroupTopicPartitionLag,
+					prometheus.GaugeValue,
+					lag,
+					groupName,
+					topic.Topic,
+					strconv.Itoa(int(partition.Partition)),
+				)
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				e.consumerGroupTopicLag,
+				prometheus.GaugeValue,
+				topicLag,
+				groupName,
+				topic.Topic,
+			)
+		}
+	}
+	return isOk
 }
 
 func (e *Exporter) waterMarksByTopic(lowMarks *kmsg.ListOffsetsResponse, highMarks *kmsg.ListOffsetsResponse) map[string]map[int32]waterMark {
@@ -103,70 +235,4 @@ func (e *Exporter) waterMarksByTopic(lowMarks *kmsg.ListOffsetsResponse, highMar
 	}
 
 	return waterMarks
-}
-
-func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan<- prometheus.Metric, marks map[string]map[int32]waterMark) {
-	groupOffsets, err := e.minionSvc.ListAllConsumerGroupOffsets(ctx)
-	for groupName, offsetRes := range groupOffsets {
-		err = kerr.ErrorForCode(offsetRes.ErrorCode)
-		if err != nil {
-			e.logger.Warn("failed to get offsets from consumer group, inner kafka error",
-				zap.String("consumer_group", groupName),
-				zap.Error(err))
-			continue
-		}
-		for _, topic := range offsetRes.Topics {
-			topicLag := float64(0)
-			for _, partition := range topic.Partitions {
-				err := kerr.ErrorForCode(partition.ErrorCode)
-				if err != nil {
-					e.logger.Warn("failed to get consumer group offsets for a partition, inner kafka error",
-						zap.String("consumer_group", groupName),
-						zap.Error(err))
-					continue
-				}
-
-				childLogger := e.logger.With(
-					zap.String("consumer_group", groupName),
-					zap.String("topic_name", topic.Topic),
-					zap.Int32("partition_id", partition.Partition),
-					zap.Int64("group_offset", partition.Offset))
-				topicMark, exists := marks[topic.Topic]
-				if !exists {
-					childLogger.Warn("consumer group has committed offsets on a topic we don't have watermarks for")
-					break // We can stop trying to find any other offsets for that topic so let's quit this loop
-				}
-				partitionMark, exists := topicMark[partition.Partition]
-				if !exists {
-					childLogger.Warn("consumer group has committed offsets on a partition we don't have watermarks for")
-					continue
-				}
-				lag := float64(partitionMark.HighWaterMark - partition.Offset)
-				// Lag might be negative because we fetch group offsets after we get partition offsets. It's kinda a
-				// race condition. Negative lags obviously do not make sense so use at least 0 as lag.
-				lag = math.Max(0, lag)
-				topicLag += lag
-
-				if e.minionSvc.Cfg.ConsumerGroups.Granularity == minion.ConsumerGroupGranularityTopic {
-					continue
-				}
-				ch <- prometheus.MustNewConstMetric(
-					e.consumerGroupTopicPartitionLag,
-					prometheus.GaugeValue,
-					lag,
-					groupName,
-					topic.Topic,
-					strconv.Itoa(int(partition.Partition)),
-				)
-			}
-
-			ch <- prometheus.MustNewConstMetric(
-				e.consumerGroupTopicLag,
-				prometheus.GaugeValue,
-				topicLag,
-				groupName,
-				topic.Topic,
-			)
-		}
-	}
 }

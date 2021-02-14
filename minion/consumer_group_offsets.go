@@ -9,17 +9,24 @@ import (
 	"sync"
 )
 
-// listConsumerGroupOffsets returns the committed group offsets for a single group
-func (s *Service) listConsumerGroupOffsets(ctx context.Context, group string) (*kmsg.OffsetFetchResponse, error) {
-	req := kmsg.NewOffsetFetchRequest()
-	req.Group = group
-	req.Topics = nil
-	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+// ListAllConsumerGroupOffsetsInternal returns a map from the in memory storage. The map value is the offset commit
+// value and is grouped by group id, topic, partition id as keys of the nested maps.
+func (s *Service) ListAllConsumerGroupOffsetsInternal() map[string]map[string]map[int32]kmsg.OffsetCommitValue {
+	return s.storage.getGroupOffsets()
+}
+
+// ListAllConsumerGroupOffsetsAdminAPI return all consumer group offsets using Kafka's Admin API.
+func (s *Service) ListAllConsumerGroupOffsetsAdminAPI(ctx context.Context) (map[string]*kmsg.OffsetFetchResponse, error) {
+	groupsRes, err := s.listConsumerGroups(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request group offsets for group '%v': %w", group, err)
+		return nil, fmt.Errorf("failed to list groupsRes: %w", err)
+	}
+	groupIDs := make([]string, len(groupsRes.Groups))
+	for i, group := range groupsRes.Groups {
+		groupIDs[i] = group.Group
 	}
 
-	return res, nil
+	return s.listConsumerGroupOffsetsBulk(ctx, groupIDs)
 }
 
 // listConsumerGroupOffsetsBulk returns a map which has the Consumer group name as key
@@ -57,15 +64,15 @@ func (s *Service) listConsumerGroupOffsetsBulk(ctx context.Context, groups []str
 	return res, nil
 }
 
-func (s *Service) ListAllConsumerGroupOffsets(ctx context.Context) (map[string]*kmsg.OffsetFetchResponse, error) {
-	groupsRes, err := s.listConsumerGroups(ctx)
+// listConsumerGroupOffsets returns the committed group offsets for a single group
+func (s *Service) listConsumerGroupOffsets(ctx context.Context, group string) (*kmsg.OffsetFetchResponse, error) {
+	req := kmsg.NewOffsetFetchRequest()
+	req.Group = group
+	req.Topics = nil
+	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list groupsRes: %w", err)
-	}
-	groupIDs := make([]string, len(groupsRes.Groups))
-	for i, group := range groupsRes.Groups {
-		groupIDs[i] = group.Group
+		return nil, fmt.Errorf("failed to request group offsets for group '%v': %w", group, err)
 	}
 
-	return s.listConsumerGroupOffsetsBulk(ctx, groupIDs)
+	return res, nil
 }

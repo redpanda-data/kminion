@@ -13,7 +13,7 @@ func (e *Exporter) collectLogDirs(ctx context.Context, ch chan<- prometheus.Metr
 	if !e.minionSvc.Cfg.LogDirs.Enabled {
 		return true
 	}
-	hasErrors := false
+	isOk := true
 
 	sizeByBroker := make(map[kgo.BrokerMetadata]int64)
 	sizeByTopicName := make(map[string]int64)
@@ -25,7 +25,7 @@ func (e *Exporter) collectLogDirs(ctx context.Context, ch chan<- prometheus.Metr
 
 		if logDirRes.Err != nil {
 			childLogger.Error("failed to describe a broker's log dirs", zap.Error(logDirRes.Err))
-			hasErrors = true
+			isOk = false
 			continue
 		}
 
@@ -35,7 +35,7 @@ func (e *Exporter) collectLogDirs(ctx context.Context, ch chan<- prometheus.Metr
 				childLogger.Error("failed to describe a broker's log dir",
 					zap.String("log_dir", dir.Dir),
 					zap.Error(err))
-				hasErrors = true
+				isOk = false
 				continue
 			}
 			for _, topic := range dir.Topics {
@@ -68,8 +68,8 @@ func (e *Exporter) collectLogDirs(ctx context.Context, ch chan<- prometheus.Metr
 
 	// If one of the log dir responses returned an error we can not reliably report the topic log dirs, as there might
 	// be additional data on the brokers that failed to respond.
-	if hasErrors {
-		return true
+	if !isOk {
+		return false
 	}
 
 	// Report the total log dir size per topic
@@ -82,5 +82,5 @@ func (e *Exporter) collectLogDirs(ctx context.Context, ch chan<- prometheus.Metr
 		)
 	}
 
-	return hasErrors
+	return isOk
 }

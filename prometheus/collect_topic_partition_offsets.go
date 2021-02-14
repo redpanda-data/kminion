@@ -10,7 +10,7 @@ import (
 )
 
 func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- prometheus.Metric) bool {
-	hasErrors := false
+	isOk := true
 
 	// Low Watermarks
 	lowWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -1)
@@ -34,7 +34,7 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
 				e.logger.Error("failed to fetch partition low water mark", zap.Error(err))
-				hasErrors = true
+				isOk = false
 				continue
 			}
 			waterMarkSum += partition.Offset
@@ -67,7 +67,7 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
 				e.logger.Error("failed to fetch partition high water mark", zap.Error(err))
-				hasErrors = true
+				isOk = true
 				continue
 			}
 			waterMarkSum += partition.Offset
@@ -91,5 +91,5 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 		)
 	}
 
-	return hasErrors
+	return isOk
 }
