@@ -16,6 +16,8 @@ import (
 )
 
 type Config struct {
+	Version string `koanf:"version"`
+
 	Kafka    kafka.Config      `koanf:"kafka"`
 	Minion   minion.Config     `koanf:"minion"`
 	Exporter prometheus.Config `koanf:"exporter"`
