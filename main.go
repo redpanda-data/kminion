@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 )
 
@@ -87,7 +88,7 @@ func main() {
 	)
 
 	// Start HTTP server
-	address := net.JoinHostPort("", "8080")
+	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
 	logger.Info("listening on address", zap.String("listen_address", address))
 	if err := http.ListenAndServe(address, nil); err != nil {
 		logger.Error("error starting HTTP server", zap.Error(err))

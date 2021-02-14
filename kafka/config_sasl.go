@@ -15,10 +15,10 @@ type SASLConfig struct {
 	Enabled   bool   `koanf:"enabled"`
 	Username  string `koanf:"username"`
 	Password  string `koanf:"password"`
-	Mechanism string
+	Mechanism string `koanf:"mechanism"`
 
 	// SASL Mechanisms that require more configuration than username & password
-	GSSAPI SASLGSSAPIConfig
+	GSSAPI SASLGSSAPIConfig `koanf:"gssapi"`
 }
 
 // SetDefaults for SASL Config

@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	ConsumerGroupScrapeModeOffsetsTopic string = "offsetsTopics"
+	ConsumerGroupScrapeModeOffsetsTopic string = "offsetsTopic"
 	ConsumerGroupScrapeModeAdminAPI     string = "adminApi"
 
 	ConsumerGroupGranularityTopic     string = "topic"
