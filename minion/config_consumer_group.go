@@ -35,7 +35,7 @@ type ConsumerGroupConfig struct {
 
 func (c *ConsumerGroupConfig) SetDefaults() {
 	c.Enabled = true
-	c.ScrapeMode = ConsumerGroupScrapeModeOffsetsTopic
+	c.ScrapeMode = ConsumerGroupScrapeModeAdminAPI
 	c.Granularity = ConsumerGroupGranularityPartition
 	c.AllowedGroupIDs = []string{"/.*/"}
 }
