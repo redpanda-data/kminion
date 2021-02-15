@@ -53,7 +53,7 @@ func (e *Exporter) InitializeMetrics() {
 		prometheus.BuildFQName(e.cfg.Namespace, "exporter", "up"),
 		"Build info about this Prometheus Exporter. Gauge value is 0 if one or more scrapes have failed.",
 		nil,
-		map[string]string{"version": os.Getenv("EXPORTER_VERSION")},
+		map[string]string{"version": os.Getenv("VERSION")},
 	)
 	// OffsetConsumer records consumed
 	e.offsetConsumerRecordsConsumed = prometheus.NewDesc(
