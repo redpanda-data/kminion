@@ -67,6 +67,7 @@ func newConfig(logger *zap.Logger) (Config, error) {
 			return Config{}, fmt.Errorf("failed to parse YAML config: %w", err)
 		}
 	}
+
 	// We could unmarshal the loaded koanf input after loading both providers, however we want to unmarshal the YAML
 	// config with `ErrorUnused` set to true, but unmarshal environment variables with `ErrorUnused` set to false (default).
 	// Rationale: Orchestrators like Kubernetes inject unrelated environment variables, which we still want to allow.
@@ -86,8 +87,16 @@ func newConfig(logger *zap.Logger) (Config, error) {
 		return Config{}, err
 	}
 
-	err = k.Load(env.Provider("", ".", func(s string) string {
-		return strings.Replace(strings.ToLower(s), "_", ".", -1)
+	err = k.Load(env.ProviderWithValue("", ".", func(s string, v string) (string, interface{}) {
+		// key := strings.Replace(strings.ToLower(s), "_", ".", -1)
+		key := strings.Replace(strings.ToLower(s), "_", ".", -1)
+		// Check to exist if we have a configuration option already and see if it's a slice
+		switch k.Get(key).(type) {
+		case []interface{}, []string:
+			// Convert our environment variable to a slice by splitting on space
+			return key, strings.Split(v, ",")
+		}
+		return key, v // Otherwise return the new key with the unaltered value
 	}), nil)
 	if err != nil {
 		return Config{}, err
