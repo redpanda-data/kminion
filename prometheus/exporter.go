@@ -39,6 +39,7 @@ type Exporter struct {
 	consumerGroupInfo              *prometheus.Desc
 	consumerGroupTopicPartitionLag *prometheus.Desc
 	consumerGroupTopicLag          *prometheus.Desc
+	offsetCommits                  *prometheus.Desc
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
@@ -135,14 +136,21 @@ func (e *Exporter) InitializeMetrics() {
 	e.consumerGroupTopicPartitionLag = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_partition_lag"),
 		"The number of messages a consumer group is lagging behind the latest offset of a partition",
-		[]string{"group_id", "topic_name", "partition_id"},
+		[]string{"group_id", "topic_name", "partition_id", "expires_at"},
 		nil,
 	)
 	// Topic Lag (sum of all partition lags)
 	e.consumerGroupTopicLag = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_lag"),
 		"The number of messages a consumer group is lagging behind across all partitions in a topic",
-		[]string{"group_id", "topic_name"},
+		[]string{"group_id", "topic_name", "expires_at"},
+		nil,
+	)
+	// Offset commits by group id
+	e.offsetCommits = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_offset_commits_total"),
+		"The number of offsets committed by a group",
+		[]string{"group_id"},
 		nil,
 	)
 

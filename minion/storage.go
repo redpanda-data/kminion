@@ -8,6 +8,7 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"strconv"
+	"time"
 )
 
 // Storage stores the current state of all consumer group information that has been consumed using the offset consumer.
@@ -23,10 +24,16 @@ type Storage struct {
 	isReadyBool *atomic.Bool
 }
 
-// offsetCommit is used as value for the offsetCommit map
-type offsetCommit struct {
-	kmsg.OffsetCommitKey
-	kmsg.OffsetCommitValue
+// OffsetCommit is used as value for the OffsetCommit map
+type OffsetCommit struct {
+	Key   kmsg.OffsetCommitKey
+	Value kmsg.OffsetCommitValue
+
+	// CommitCount is the number of offset commits for this group-topic-partition combination
+	CommitCount int
+
+	// ExpireTimestamp is a timestamp that indicates when this offset commit will expire on the Kafka cluster
+	ExpireTimestamp time.Time
 }
 
 func newStorage(logger *zap.Logger) (*Storage, error) {
@@ -59,9 +66,20 @@ func (s *Storage) addOffsetCommit(key kmsg.OffsetCommitKey, value kmsg.OffsetCom
 	// reads (Prometheus scraping the endpoint). Hence we can group everything by group or topic on the read path as
 	// needed instead of writing it into nested maps like a map[GroupID]map[Topic]map[Partition]
 	uniqueKey := encodeOffsetCommitKey(key)
-	commit := offsetCommit{
-		OffsetCommitKey:   key,
-		OffsetCommitValue: value,
+
+	commitCount := 0
+	commitInterface, exists := s.offsetCommits.Get(uniqueKey)
+	if exists {
+		offsetCommit := commitInterface.(OffsetCommit)
+		commitCount = offsetCommit.CommitCount
+	}
+
+	timeDay := 24 * time.Hour
+	commit := OffsetCommit{
+		Key:             key,
+		Value:           value,
+		CommitCount:     commitCount + 1,
+		ExpireTimestamp: time.Unix(0, value.CommitTimestamp*int64(time.Millisecond)).Add(7 * timeDay),
 	}
 	s.offsetCommits.Set(uniqueKey, commit)
 }
@@ -78,9 +96,9 @@ func (s *Storage) getConsumedOffsets() map[int32]int64 {
 	return offsetsByPartition
 }
 
-func (s *Storage) getGroupOffsets() map[string]map[string]map[int32]kmsg.OffsetCommitValue {
+func (s *Storage) getGroupOffsets() map[string]map[string]map[int32]OffsetCommit {
 	// Offsets by group, topic, partition
-	offsetsByGroup := make(map[string]map[string]map[int32]kmsg.OffsetCommitValue)
+	offsetsByGroup := make(map[string]map[string]map[int32]OffsetCommit)
 
 	if !s.isReady() {
 		s.logger.Info("Tried to fetch consumer group offsets, but haven't consumed the whole topic yet")
@@ -89,17 +107,17 @@ func (s *Storage) getGroupOffsets() map[string]map[string]map[int32]kmsg.OffsetC
 
 	offsets := s.offsetCommits.Items()
 	for _, offset := range offsets {
-		val := offset.(offsetCommit)
+		val := offset.(OffsetCommit)
 
 		// Initialize inner maps as necessary
-		if _, exists := offsetsByGroup[val.Group]; !exists {
-			offsetsByGroup[val.Group] = make(map[string]map[int32]kmsg.OffsetCommitValue)
+		if _, exists := offsetsByGroup[val.Key.Group]; !exists {
+			offsetsByGroup[val.Key.Group] = make(map[string]map[int32]OffsetCommit)
 		}
-		if _, exists := offsetsByGroup[val.Group][val.Topic]; !exists {
-			offsetsByGroup[val.Group][val.Topic] = make(map[int32]kmsg.OffsetCommitValue)
+		if _, exists := offsetsByGroup[val.Key.Group][val.Key.Topic]; !exists {
+			offsetsByGroup[val.Key.Group][val.Key.Topic] = make(map[int32]OffsetCommit)
 		}
 
-		offsetsByGroup[val.Group][val.Topic][val.Partition] = val.OffsetCommitValue
+		offsetsByGroup[val.Key.Group][val.Key.Topic][val.Key.Partition] = val
 	}
 
 	return offsetsByGroup
