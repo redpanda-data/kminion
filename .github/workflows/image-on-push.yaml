@@ -23,7 +23,7 @@ jobs:
           tag-sha: true # add git short SHA as Docker tag
           tag-match-latest: true
 
-      - name: Login to DockerHub
+      - name: Login to Quay
         uses: docker/login-action@v1
         with:
           registry: quay.io
@@ -35,3 +35,5 @@ jobs:
         with:
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
+          build-args: |
+            KMINION_VERSION=$GITHUB_SHA
