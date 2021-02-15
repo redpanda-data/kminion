@@ -88,3 +88,7 @@ exporter:
   port: 8080
   # Path to serve the Prometheus metrics
   path: "/metrics"
+
+logger:
+  # Level is a logging priority. Higher levels are more important. Valid values are: debug, info, warn, error, fatal, panic
+  level: info
