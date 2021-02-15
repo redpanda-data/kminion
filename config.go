@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/cloudhut/kminion/v2/logging"
 	"github.com/cloudhut/kminion/v2/minion"
 	"github.com/cloudhut/kminion/v2/prometheus"
 	"github.com/knadh/koanf"
@@ -21,12 +22,14 @@ type Config struct {
 	Kafka    kafka.Config      `koanf:"kafka"`
 	Minion   minion.Config     `koanf:"minion"`
 	Exporter prometheus.Config `koanf:"exporter"`
+	Logger   logging.Config    `koanf:"logger"`
 }
 
 func (c *Config) SetDefaults() {
 	c.Kafka.SetDefaults()
 	c.Minion.SetDefaults()
 	c.Exporter.SetDefaults()
+	c.Logger.SetDefaults()
 }
 
 func (c *Config) Validate() error {
@@ -38,6 +41,11 @@ func (c *Config) Validate() error {
 	err = c.Minion.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate minion config: %w", err)
+	}
+
+	err = c.Logger.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate logger config: %w", err)
 	}
 
 	return nil

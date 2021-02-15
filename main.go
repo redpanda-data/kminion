@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/cloudhut/kminion/v2/logging"
 	"github.com/cloudhut/kminion/v2/minion"
 	"github.com/cloudhut/kminion/v2/prometheus"
 	promclient "github.com/prometheus/client_golang/prometheus"
@@ -18,15 +19,21 @@ import (
 )
 
 func main() {
-	logger, err := zap.NewProduction()
+	startupLogger, err := zap.NewProduction()
 	if err != nil {
 		panic(fmt.Errorf("failed to create startup logger: %w", err))
 	}
 
-	cfg, err := newConfig(logger)
+	cfg, err := newConfig(startupLogger)
 	if err != nil {
-		logger.Fatal("failed to parse config", zap.Error(err))
+		startupLogger.Fatal("failed to parse config", zap.Error(err))
 	}
+
+	logger := logging.NewLogger(cfg.Logger, cfg.Exporter.Namespace)
+	if err != nil {
+		startupLogger.Fatal("failed to create new logger", zap.Error(err))
+	}
+
 	logger.Info("started kminion", zap.String("version", cfg.Version))
 
 	// Setup context that cancels when the application receives an interrupt signal
