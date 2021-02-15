@@ -36,4 +36,4 @@ jobs:
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
           build-args: |
-            KMINION_VERSION=${{ env.GITHUB_SHA }}
+            KMINION_VERSION=${{ github.sha }}
