@@ -18,9 +18,6 @@ KMinion.
 - **Configurable targets:** You can configure what topics or groups you'd like to export using regex expressions
 - **Multiple config parsers:** It's possible to configure KMinion using YAML, Environment variables or a mix of both
 
-TODO: Add more internal metrics (logger, number of records consumed, ...), add metric for offset commits by group id,
-github workflow for releases and builds, helm chart
-
 ## Getting started
 
 ### Docker image
