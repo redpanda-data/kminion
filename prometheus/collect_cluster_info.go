@@ -11,14 +11,12 @@ func (e *Exporter) collectClusterInfo(ctx context.Context, ch chan<- prometheus.
 	version, err := e.minionSvc.GetClusterVersion(ctx)
 	if err != nil {
 		e.logger.Error("failed to get kafka cluster version", zap.Error(err))
-		e.failedCollectsCounter.WithLabelValues("cluster-info").Inc()
 		return false
 	}
 
 	metadata, err := e.minionSvc.GetMetadataCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to get kafka metadata", zap.Error(err))
-		e.failedCollectsCounter.WithLabelValues("kafka-cluster-info").Inc()
 		return false
 	}
 	brokerCount := len(metadata.Brokers)

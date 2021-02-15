@@ -17,8 +17,8 @@ type Exporter struct {
 	minionSvc *minion.Service
 
 	// Exporter metrics
-	exporterUp            *prometheus.Desc
-	failedCollectsCounter *prometheus.CounterVec
+	exporterUp                    *prometheus.Desc
+	offsetConsumerRecordsConsumed *prometheus.Desc
 
 	// Kafka metrics
 	// General
@@ -47,22 +47,21 @@ func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Ex
 }
 
 func (e *Exporter) InitializeMetrics() {
+	// Exporter / internal metrics
+	// Exporter up
 	e.exporterUp = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "exporter", "up"),
 		"Build info about this Prometheus Exporter. Gauge value is 0 if one or more scrapes have failed.",
 		nil,
 		map[string]string{"version": os.Getenv("EXPORTER_VERSION")},
 	)
-	e.failedCollectsCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: e.cfg.Namespace,
-			Subsystem: "kafka",
-			Name:      "failed_collects_total",
-			Help:      "Number of collects that have failed",
-		},
-		[]string{"type"},
+	// OffsetConsumer records consumed
+	e.offsetConsumerRecordsConsumed = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "exporter", "offset_consumer_records_consumed_total"),
+		"The number of offset records that have been consumed by the internal offset consumer",
+		[]string{},
+		nil,
 	)
-	prometheus.MustRegister(e.failedCollectsCounter)
 
 	// Kafka metrics
 	// Cluster info
@@ -175,6 +174,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ctx = context.WithValue(ctx, "requestId", uuid.String())
 
 	ok := e.collectClusterInfo(ctx, ch)
+	ok = e.collectExporterMetrics(ctx, ch) && ok
 	ok = e.collectBrokerInfo(ctx, ch) && ok
 	ok = e.collectLogDirs(ctx, ch) && ok
 	ok = e.collectConsumerGroups(ctx, ch) && ok

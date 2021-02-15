@@ -241,3 +241,7 @@ func (s *Service) decodeOffsetCommit(record *kgo.Record) error {
 
 	return nil
 }
+
+func (s *Service) GetNumberOfOffsetRecordsConsumed() float64 {
+	return s.storage.getNumberOfConsumedRecords()
+}

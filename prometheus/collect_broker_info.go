@@ -11,7 +11,6 @@ func (e *Exporter) collectBrokerInfo(ctx context.Context, ch chan<- prometheus.M
 	metadata, err := e.minionSvc.GetMetadataCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to get kafka metadata", zap.Error(err))
-		e.failedCollectsCounter.WithLabelValues("broker-info").Inc()
 		return false
 	}
 

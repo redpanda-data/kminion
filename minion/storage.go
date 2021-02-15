@@ -22,6 +22,9 @@ type Storage struct {
 	progressTracker cmap.ConcurrentMap
 
 	isReadyBool *atomic.Bool
+
+	// Number of consumed records (used for a Prometheus metric)
+	consumedRecords *atomic.Float64
 }
 
 // OffsetCommit is used as value for the OffsetCommit map
@@ -42,6 +45,7 @@ func newStorage(logger *zap.Logger) (*Storage, error) {
 		offsetCommits:   cmap.New(),
 		progressTracker: cmap.New(),
 		isReadyBool:     atomic.NewBool(false),
+		consumedRecords: atomic.NewFloat64(0),
 	}, nil
 }
 
@@ -59,6 +63,7 @@ func (s *Storage) setReadyState(isReady bool) {
 func (s *Storage) markRecordConsumed(rec *kgo.Record) {
 	key := fmt.Sprintf("%v", rec.Partition)
 	s.progressTracker.Set(key, rec.Offset)
+	s.consumedRecords.Add(1)
 }
 
 func (s *Storage) addOffsetCommit(key kmsg.OffsetCommitKey, value kmsg.OffsetCommitValue) {
@@ -94,6 +99,10 @@ func (s *Storage) getConsumedOffsets() map[int32]int64 {
 	}
 
 	return offsetsByPartition
+}
+
+func (s *Storage) getNumberOfConsumedRecords() float64 {
+	return s.consumedRecords.Load()
 }
 
 func (s *Storage) getGroupOffsets() map[string]map[string]map[int32]OffsetCommit {
