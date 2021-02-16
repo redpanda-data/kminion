@@ -22,11 +22,16 @@ KMinion.
 
 ### Docker image
 
-TODO
+All images will be built on each push to master or for every new release. You can find an overview of all available tags
+in our [quay.io repository](https://quay.io/repository/cloudhut/kminion?tab=tags).
+
+```shell
+docker pull quay.io/cloudhut/kminion:master
+```
 
 ### Helm chart
 
-TODO
+A Helm chart will be maintained as part of this repository under [/charts](/charts).
 
 ### Configuration
 
