@@ -1,0 +1,190 @@
+# Default values for kminion.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: quay.io/repository/cloudhut/kminion
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+# fsGroup: 2000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# limits:
+#   cpu: 100m
+#   memory: 128Mi
+# requests:
+#   cpu: 100m
+#   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+deployment:
+  volumes:
+    # Mount files from Kubernetes secrets into the container
+    secrets: []
+    # - secretName: vault-tls
+    #   mountPath: /vault/tls
+
+  # If you want to provide specifc config settings like sensitive Kafka credentials via environment variables you can
+  # do so by making them available here. See the kminion reference config to figure out the expected variable names.
+  env:
+    # Configure environment variables which you want to make available
+    values: []
+    # - name: KAFKA_SASL_MECHANISM
+    #   value: PLAIN
+
+    # Configure environment variables which you want to make available from a config map
+    configMapKeyRefs: []
+    # - name: KAFKA_SASL_USERNAME
+    #   configMapName: kafka-user-team-xy
+    #   key: username
+
+    # Configure environment variables which you want to make available from a secret
+    secretKeyRefs: []
+    # - name: KAFKA_SASL_PASSWORD
+    #   secretName: kafka-credentials-team-xy
+    #   key: password
+
+kminion:
+  # KMinion can be configured using environment variables and/or a YAML config. The yaml contents under config will
+  # end up in a YAML file which will be mounted into the kminion container.
+  # See reference config: https://github.com/cloudhut/kminion/blob/master/docs/reference-config.yaml
+  config: {}
+#    kafka:
+#      brokers: [ ]
+#      clientId: "kminion"
+#      rackId: ""
+#      tls:
+#        enabled: false
+#        caFilepath: ""
+#        certFilepath: ""
+#        keyFilepath: ""
+#        passphrase: ""
+#        insecureSkipTlsVerify: false
+#      sasl:
+#        # Whether or not SASL authentication will be used for authentication
+#        enabled: false
+#        # Username to use for PLAIN or SCRAM mechanism
+#        username: ""
+#        # Password to use for PLAIN or SCRAM mechanism
+#        password: ""
+#        # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
+#        mechanism: "PLAIN"
+#        # GSSAPI / Kerberos config properties
+#        gssapi:
+#          authType: ""
+#          keyTabPath: ""
+#          kerberosConfigPath: ""
+#          serviceName: ""
+#          username: ""
+#          password: ""
+#          realm: ""
+#
+#    minion:
+#      consumerGroups:
+#        # Enabled specifies whether consumer groups shall be scraped and exported or not.
+#        enabled: true
+#        # Mode specifies whether we export consumer group offsets using the Admin API or by consuming the internal
+#        # __consumer_offsets topic. Both modes have their advantages and disadvantages.
+#        scrapeMode: adminApi # Valid values: adminApi, offsetsTopic
+#        # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
+#        # you aren't interested in per partition lags you could choose "topic" where all partition lags will be summed
+#        # and only topic lags will be exported.
+#        granularity: partitions
+#        # AllowedGroups are regex strings of group ids that shall be exported
+#        # You can specify allowed groups by providing literals like "my-consumergroup-name" or by providing regex expressions
+#        # like "/internal-.*/".
+#        allowedGroups: [ ]
+#        # IgnoredGroups are regex strings of group ids that shall be ignored/skipped when exporting metrics. Ignored groups
+#        # take precedence over allowed groups.
+#        ignoredGroups: [ ]
+#      topics:
+#        # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
+#        # you aren't interested in per partition metrics you could choose "topic".
+#        granularity: partition
+#        # AllowedTopics are regex strings of topic names whose topic metrics that shall be exported.
+#        # You can specify allowed topics by providing literals like "my-topic-name" or by providing regex expressions
+#        # like "/internal-.*/".
+#        allowedTopics: [ ]
+#
+#        # IgnoredTopics are regex strings of topic names that shall be ignored/skipped when exporting metrics. Ignored topics
+#        # take precedence over allowed topics.
+#        ignoredTopics: [ ]
+#      logDirs:
+#        # Enabled specifies whether log dirs shall be scraped and exported or not. This should be disabled for clusters prior
+#        # to version 1.0.0 as describing log dirs was not supported back then.
+#        enabled: true
+#
+#    exporter:
+#      # Namespace is the prefix for all exported Prometheus metrics
+#      namespace: "kminion"
+#      # Host that shall be used to bind the HTTP server on
+#      host: ""
+#      # Port that shall be used to bind the HTTP server on
+#      port: 8080
+#      # Path to serve the Prometheus metrics
+#      path: "/metrics"
+#
+#    logger:
+#      # Level is a logging priority. Higher levels are more important. Valid values are: debug, info, warn, error, fatal, panic
+#      level: info
