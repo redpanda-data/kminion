@@ -5,3 +5,11 @@ users to deploy KMinion the way they want to. Therefore it's very flexible at th
 you might run into runtime errors for a misconfiguration.
 
 All available input is documented inside of the [values.yaml](./values.yaml) file.
+
+## Installing the Helm chart
+
+```shell
+helm repo add kminion https://raw.githubusercontent.com/cloudhut/kminion/master/charts/archives
+helm repo update
+helm install -f values.yaml --name=kminion kminion/kminion
+```
