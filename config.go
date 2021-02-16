@@ -91,12 +91,13 @@ func newConfig(logger *zap.Logger) (Config, error) {
 		// key := strings.Replace(strings.ToLower(s), "_", ".", -1)
 		key := strings.Replace(strings.ToLower(s), "_", ".", -1)
 		// Check to exist if we have a configuration option already and see if it's a slice
-		switch k.Get(key).(type) {
-		case []interface{}, []string:
-			// Convert our environment variable to a slice by splitting on space
+		// If there is a comma in the value, split the value into a slice by the comma.
+		if strings.Contains(v, ",") {
 			return key, strings.Split(v, ",")
 		}
-		return key, v // Otherwise return the new key with the unaltered value
+
+		// Otherwise return the new key with the unaltered value
+		return key, v
 	}), nil)
 	if err != nil {
 		return Config{}, err
