@@ -1,0 +1,5 @@
+release:
+  name_template: "{{.Tag}}"
+
+changelog:
+  skip: false
