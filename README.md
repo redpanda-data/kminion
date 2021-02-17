@@ -1,6 +1,6 @@
 # Prometheus Exporter for Apache Kafka - KMinion
 
-KMinion (previously known as Kafka Minion) is a feature rich and flexible Prometheus Exporter to monitor your Apache
+KMinion (previously known as Kafka Minion) is a feature-rich and flexible Prometheus Exporter to monitor your Apache
 Kafka cluster. All valuable information that are accessible via the Kafka protocol are supposed to be accessible using
 KMinion.
 
