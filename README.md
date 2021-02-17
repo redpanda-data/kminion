@@ -4,7 +4,7 @@ KMinion (previously known as Kafka Minion) is a feature-rich and flexible Promet
 Kafka cluster. All valuable information that are accessible via the Kafka protocol are supposed to be accessible using
 KMinion.
 
-## Features
+## 🚀 Features
 
 - **Kafka versions:** Supports all Kafka versions v0.11+
 - **Supported SASL mechanisms:** plain, scram-sha-256/512, gssapi/kerberos
@@ -20,7 +20,7 @@ KMinion.
 
 ## Getting started
 
-### Docker image
+### 🐳 Docker image
 
 All images will be built on each push to master or for every new release. You can find an overview of all available tags
 in our [quay.io repository](https://quay.io/repository/cloudhut/kminion?tab=tags).
@@ -29,17 +29,17 @@ in our [quay.io repository](https://quay.io/repository/cloudhut/kminion?tab=tags
 docker pull quay.io/cloudhut/kminion:master
 ```
 
-### Helm chart
+### ☸ Helm chart
 
 A Helm chart will be maintained as part of this repository under [/charts](/charts).
 
-### Configuration
+### 🔧 Configuration
 
 All options in KMinion can be configured via YAML or environment variables. Configuring some options via YAML and some
 via environment variables is also possible. Environment variables take precedence in this case. You can find the
 reference config with additional documentation in [/docs/reference-config.yaml](/docs/reference-config.yaml).
 
-### Testing locally
+### ⚡ Testing locally
 
 This repo contains a docker-compose file that you can run on your machine. It will spin up a Kafka & ZooKeeper cluster
 and starts KMinion on port 8080 which is exposed to your host machine:
