@@ -39,6 +39,10 @@ All options in KMinion can be configured via YAML or environment variables. Conf
 via environment variables is also possible. Environment variables take precedence in this case. You can find the
 reference config with additional documentation in [/docs/reference-config.yaml](/docs/reference-config.yaml).
 
+### 📊 Grafana Dashboards
+
+V2 Dashboards are work in progress.
+
 ### ⚡ Testing locally
 
 This repo contains a docker-compose file that you can run on your machine. It will spin up a Kafka & ZooKeeper cluster
@@ -49,3 +53,11 @@ and starts KMinion on port 8080 which is exposed to your host machine:
 # 2. Browse to the repo's root directory and run:
 docker-compose up
 ```
+
+## Chat with us
+
+We use Discord to communicate. If you are looking for more interactive discussions or support, you are invited to join our Discord server: https://discord.gg/KQj7P6v
+
+## License
+
+KMinion is distributed under the [MIT License](https://github.com/cloudhut/kminion/blob/master/LICENSE).
