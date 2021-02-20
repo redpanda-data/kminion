@@ -103,7 +103,7 @@ deployment:
     secretKeyRefs: []
     # - name: KAFKA_SASL_PASSWORD
     #   secretName: kafka-credentials-team-xy
-    #   key: password
+    #   secretKey: password
 
 kminion:
   # KMinion can be configured using environment variables and/or a YAML config. The yaml contents under config will
