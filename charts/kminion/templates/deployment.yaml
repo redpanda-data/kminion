@@ -69,7 +69,7 @@ spec:
             {{- end}}
           volumeMounts:
             - name: config
-              mountpath: /etc/kminion
+              mountPath: /etc/kminion
             {{- range .Values.deployment.volumes.secrets}}
             - name: {{.secretName}}
               mountPath: {{.mountPath}}
