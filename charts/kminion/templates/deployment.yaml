@@ -28,6 +28,9 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8}}
       volumes:
+        - name: config
+          configMap:
+            name: {{include "kminion.fullname" .}}
         {{- range .Values.deployment.volumes.secrets}}
         - name: {{.secretName}}
           secret:
@@ -44,6 +47,8 @@ spec:
               containerPort: 80
               protocol: TCP
           env:
+            - name: CONFIG_FILEPATH
+              value: /etc/kminion/config.yaml
             {{- range .Values.deployment.env.values}}
             - name: {{.name}}
               value: {{.value | quote}}
@@ -63,6 +68,8 @@ spec:
                   key: {{.configMapKey}}
             {{- end}}
           volumeMounts:
+            - name: config
+              mountpath: /etc/kminion
             {{- range .Values.deployment.volumes.secrets}}
             - name: {{.secretName}}
               mountPath: {{.mountPath}}
