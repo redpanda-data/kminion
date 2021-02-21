@@ -1,0 +1,18 @@
+{{- if .Values.prometheus.monitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{include "kminion.fullname" .}}
+  labels:
+    {{- include "kminion.labels" . | nindent 4}}
+    {{- if .Values.additionalLabels}}
+    {{toYaml .Values.additionalLabels | nindent 4}}
+    {{- end}}
+spec:
+  selector:
+    matchLabels:
+      {{- include "kminion.labels" . | nindent 4}}
+  endpoints:
+    - port: metrics
+      honorLabels: {{ .Values.prometheus.monitor.honorLabels }}
+{{- end }}

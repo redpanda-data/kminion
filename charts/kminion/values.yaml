@@ -38,7 +38,7 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8080 # This port is also used as exposed container port
 
 ingress:
   enabled: false
@@ -77,6 +77,16 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+customLabels: {}
+#  prometheus.io/scrape: "true"
+#  prometheus.io/port: "8080"
+#  prometheus.io/path: "/metrics"
+
+serviceMonitor:
+  create: false
+  additionalLabels: {}
+  honorLabels: false
 
 deployment:
   volumes:
