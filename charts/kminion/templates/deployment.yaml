@@ -4,6 +4,9 @@ metadata:
   name: {{include "kminion.fullname" .}}
   labels:
     {{- include "kminion.labels" . | nindent 4}}
+    {{- if .Values.customLabels}}
+    {{toYaml .Values.customLabels | nindent 4}}
+    {{- end}}
 spec:
   {{- if not .Values.autoscaling.enabled}}
   replicas: {{.Values.replicaCount}}
@@ -19,6 +22,9 @@ spec:
       {{- end}}
       labels:
         {{- include "kminion.selectorLabels" . | nindent 8}}
+        {{- if .Values.customLabels}}
+        {{toYaml .Values.customLabels | nindent 8}}
+        {{- end}}
     spec:
       {{- with .Values.imagePullSecrets}}
       imagePullSecrets:
@@ -43,8 +49,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{.Values.image.pullPolicy}}
           ports:
-            - name: http
-              containerPort: 80
+            - name: metrics
+              containerPort: {{.Values.service.port}}
               protocol: TCP
           env:
             - name: CONFIG_FILEPATH
