@@ -13,13 +13,13 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 	isOk := true
 
 	// Low Watermarks
-	lowWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -1)
+	lowWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -2)
 	if err != nil {
 		e.logger.Error("failed to fetch low water marks", zap.Error(err))
 		return false
 	}
 	// High Watermarks
-	highWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -2)
+	highWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -1)
 	if err != nil {
 		e.logger.Error("failed to fetch low water marks", zap.Error(err))
 		return false
