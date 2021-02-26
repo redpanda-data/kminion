@@ -30,6 +30,7 @@ type Exporter struct {
 	topicLogDirSize  *prometheus.Desc
 
 	// Topic / Partition
+	topicInfo              *prometheus.Desc
 	topicHighWaterMarkSum  *prometheus.Desc
 	partitionHighWaterMark *prometheus.Desc
 	topicLowWaterMarkSum   *prometheus.Desc
@@ -94,6 +95,13 @@ func (e *Exporter) InitializeMetrics() {
 	)
 
 	// Topic / Partition metrics
+	// Topic info
+	e.topicInfo = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_info"),
+		"Info labels for a given topic",
+		[]string{"topic_name", "partition_count", "replication_factor", "cleanup_policy"},
+		nil,
+	)
 	// Partition Low Water Mark
 	e.partitionLowWaterMark = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_low_water_mark"),
@@ -180,6 +188,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ok = e.collectConsumerGroups(ctx, ch) && ok
 	ok = e.collectTopicPartitionOffsets(ctx, ch) && ok
 	ok = e.collectConsumerGroupLags(ctx, ch) && ok
+	ok = e.collectTopicInfo(ctx, ch) && ok
 
 	if ok {
 		ch <- prometheus.MustNewConstMetric(e.exporterUp, prometheus.GaugeValue, 1.0)
