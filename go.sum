@@ -368,6 +368,8 @@ github.com/twmb/franz-go v0.6.9-0.20210222191556-f7c64a831329 h1:V6NPBTk03kL/CMr
 github.com/twmb/franz-go v0.6.9-0.20210222191556-f7c64a831329/go.mod h1:Ghd7UKXqxRgImB5IdZBu9CiGzhuWXndIzyN8yoHTgi8=
 github.com/twmb/franz-go v0.6.9-0.20210222230159-0cdc2b67f6de h1:WBiNMmooeOpLQpZOJSxJUnmwj9Ag9tVHu3Ya0DWpFdk=
 github.com/twmb/franz-go v0.6.9-0.20210222230159-0cdc2b67f6de/go.mod h1:Ghd7UKXqxRgImB5IdZBu9CiGzhuWXndIzyN8yoHTgi8=
+github.com/twmb/franz-go v0.6.9 h1:+NkDiaOzaO7HLiOOn7oiY98NqPGxNhNQsOwKGg9pRDw=
+github.com/twmb/franz-go v0.6.9/go.mod h1:Ghd7UKXqxRgImB5IdZBu9CiGzhuWXndIzyN8yoHTgi8=
 github.com/twmb/go-rbtree v1.0.0 h1:KxN7dXJ8XaZ4cvmHV1qqXTshxX3EBvX/toG5+UR49Mg=
 github.com/twmb/go-rbtree v1.0.0/go.mod h1:UlIAI8gu3KRPkXSobZnmJfVwCJgEhD/liWzT5ppzIyc=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=

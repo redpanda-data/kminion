@@ -12,10 +12,11 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
 	github.com/pelletier/go-toml v1.8.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
-	github.com/twmb/franz-go v0.6.9-0.20210222230159-0cdc2b67f6de
+	github.com/twmb/franz-go v0.6.9
 	go.uber.org/atomic v1.7.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
