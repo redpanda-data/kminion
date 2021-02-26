@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 	"math"
 	"strconv"
-	"time"
 )
 
 type waterMark struct {
@@ -54,7 +53,6 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 
 		for topicName, topic := range group {
 			topicLag := float64(0)
-			topicExpiry := time.Unix(0, 0)
 			for partitionID, partition := range topic {
 				childLogger := e.logger.With(
 					zap.String("consumer_group", groupName),
@@ -81,11 +79,6 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 				// Offset commit count for this consumer group
 				offsetCommits += partition.CommitCount
 
-				// Topic Expiry
-				if topicExpiry.Before(partition.ExpireTimestamp) {
-					topicExpiry = partition.ExpireTimestamp
-				}
-
 				if e.minionSvc.Cfg.ConsumerGroups.Granularity == minion.ConsumerGroupGranularityTopic {
 					continue
 				}
@@ -96,7 +89,6 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 					groupName,
 					topicName,
 					strconv.Itoa(int(partitionID)),
-					partition.ExpireTimestamp.Format(time.RFC3339),
 				)
 			}
 			ch <- prometheus.MustNewConstMetric(
@@ -105,7 +97,6 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 				topicLag,
 				groupName,
 				topicName,
-				topicExpiry.Format(time.RFC3339),
 			)
 		}
 
@@ -181,7 +172,6 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 					groupName,
 					topic.Topic,
 					strconv.Itoa(int(partition.Partition)),
-					"unknown", // The Admin API doesn't expose when offsets will expire
 				)
 			}
 
@@ -191,7 +181,6 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 				topicLag,
 				groupName,
 				topic.Topic,
-				"unknown",
 			)
 		}
 	}

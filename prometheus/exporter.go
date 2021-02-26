@@ -143,14 +143,14 @@ func (e *Exporter) InitializeMetrics() {
 	e.consumerGroupTopicPartitionLag = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_partition_lag"),
 		"The number of messages a consumer group is lagging behind the latest offset of a partition",
-		[]string{"group_id", "topic_name", "partition_id", "expires_at"},
+		[]string{"group_id", "topic_name", "partition_id"},
 		nil,
 	)
 	// Topic Lag (sum of all partition lags)
 	e.consumerGroupTopicLag = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_lag"),
 		"The number of messages a consumer group is lagging behind across all partitions in a topic",
-		[]string{"group_id", "topic_name", "expires_at"},
+		[]string{"group_id", "topic_name"},
 		nil,
 	)
 	// Offset commits by group id
