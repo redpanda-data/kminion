@@ -53,6 +53,7 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 
 		for topicName, topic := range group {
 			topicLag := float64(0)
+			topicOffsetSum := float64(0)
 			for partitionID, partition := range topic {
 				childLogger := e.logger.With(
 					zap.String("consumer_group", groupName),
@@ -75,6 +76,7 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 				// race condition. Negative lags obviously do not make sense so use at least 0 as lag.
 				lag = math.Max(0, lag)
 				topicLag += lag
+				topicOffsetSum += float64(partition.Value.Offset)
 
 				// Offset commit count for this consumer group
 				offsetCommits += partition.CommitCount
@@ -95,6 +97,13 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 				e.consumerGroupTopicLag,
 				prometheus.GaugeValue,
 				topicLag,
+				groupName,
+				topicName,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				e.consumerGroupTopicOffsetSum,
+				prometheus.GaugeValue,
+				topicOffsetSum,
 				groupName,
 				topicName,
 			)
@@ -129,6 +138,7 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 		}
 		for _, topic := range offsetRes.Topics {
 			topicLag := float64(0)
+			topicOffsetSum := float64(0)
 			for _, partition := range topic.Partitions {
 				err := kerr.ErrorForCode(partition.ErrorCode)
 				if err != nil {
@@ -161,6 +171,7 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 				// race condition. Negative lags obviously do not make sense so use at least 0 as lag.
 				lag = math.Max(0, lag)
 				topicLag += lag
+				topicOffsetSum += float64(partition.Offset)
 
 				if e.minionSvc.Cfg.ConsumerGroups.Granularity == minion.ConsumerGroupGranularityTopic {
 					continue
@@ -179,6 +190,13 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 				e.consumerGroupTopicLag,
 				prometheus.GaugeValue,
 				topicLag,
+				groupName,
+				topic.Topic,
+			)
+			ch <- prometheus.MustNewConstMetric(
+				e.consumerGroupTopicOffsetSum,
+				prometheus.GaugeValue,
+				topicOffsetSum,
 				groupName,
 				topic.Topic,
 			)

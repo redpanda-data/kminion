@@ -38,6 +38,7 @@ type Exporter struct {
 
 	// Consumer Groups
 	consumerGroupInfo              *prometheus.Desc
+	consumerGroupTopicOffsetSum    *prometheus.Desc
 	consumerGroupTopicPartitionLag *prometheus.Desc
 	consumerGroupTopicLag          *prometheus.Desc
 	offsetCommits                  *prometheus.Desc
@@ -137,6 +138,13 @@ func (e *Exporter) InitializeMetrics() {
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_info"),
 		"Consumer Group info metrics. It will report 1 if the group is in the stable state, otherwise 0.",
 		[]string{"group_id", "member_count", "protocol", "protocol_type", "state"},
+		nil,
+	)
+	// Topic / Partition Offset Sum (useful for calculating the consumed messages / sec on a topic)
+	e.consumerGroupTopicOffsetSum = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_offset_sum"),
+		"The sum of all committed group offsets across all partitions in a topic",
+		[]string{"group_id", "topic_name"},
 		nil,
 	)
 	// Partition Lag
