@@ -18,6 +18,8 @@ KMinion.
 - **Configurable targets:** You can configure what topics or groups you'd like to export using regex expressions
 - **Multiple config parsers:** It's possible to configure KMinion using YAML, Environment variables or a mix of both
 
+You can find a list of all exported metrics here: [/docs/metrics.md](/docs/metrics.md)
+
 ## Getting started
 
 ### 🐳 Docker image
@@ -56,7 +58,8 @@ docker-compose up
 
 ## Chat with us
 
-We use Discord to communicate. If you are looking for more interactive discussions or support, you are invited to join our Discord server: https://discord.gg/KQj7P6v
+We use Discord to communicate. If you are looking for more interactive discussions or support, you are invited to join
+our Discord server: https://discord.gg/KQj7P6v
 
 ## License
 
