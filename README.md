@@ -43,7 +43,13 @@ reference config with additional documentation in [/docs/reference-config.yaml](
 
 ### 📊 Grafana Dashboards
 
-V2 Dashboards are work in progress.
+I uploaded three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config.
+
+<p float="left">
+  <img src="/docs/screenshots/kminion-cluster.png" width="250" />
+  <img src="/docs/screenshots/kminion-groups.png" width="250" /> 
+  <img src="/docs/screenshots/kminion-topics.png" width="250" />
+</p>
 
 ### ⚡ Testing locally
 
