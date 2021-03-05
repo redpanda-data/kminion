@@ -45,6 +45,12 @@ reference config with additional documentation in [/docs/reference-config.yaml](
 
 I uploaded three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config.
 
+Cluster Dashboard: https://grafana.com/grafana/dashboards/14012
+
+Consumer Group Dashboard: https://grafana.com/grafana/dashboards/14014
+
+Topic Dashboard: https://grafana.com/grafana/dashboards/14013
+
 <p float="left">
   <img src="/docs/screenshots/kminion-cluster.png" width="250" />
   <img src="/docs/screenshots/kminion-groups.png" width="250" /> 
