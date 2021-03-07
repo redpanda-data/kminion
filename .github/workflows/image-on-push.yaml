@@ -23,7 +23,10 @@ jobs:
         with:
           images: quay.io/cloudhut/kminion
           tag-sha: true # add git short SHA as Docker tag
-          tag-match-latest: true
+          tag-semver: |
+            - v{{version}}
+            - v{{major}}.{{minor}}
+            - v{{major}}
 
       - name: Login to Quay
         uses: docker/login-action@v1
