@@ -1,5 +1,5 @@
 release:
-  name_template: "{{.Tag}}"
+  name_template: "{{.Version}} / {{.Date}}"
 
 changelog:
   skip: false
