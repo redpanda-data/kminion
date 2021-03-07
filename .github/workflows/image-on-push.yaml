@@ -2,6 +2,8 @@ name: Docker Image for master branch
 
 on:
   push:
+    tags:
+      - '*'
     branches:
       - master
     paths-ignore:
