@@ -1,5 +1,5 @@
 release:
-  name_template: "{{.Version}} / {{time "01/02/2006"}}"
+  name_template: '{{.Version}} / {{time "01/02/2006"}}'
 
 changelog:
   skip: false
