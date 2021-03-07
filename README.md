@@ -41,6 +41,9 @@ All options in KMinion can be configured via YAML or environment variables. Conf
 via environment variables is also possible. Environment variables take precedence in this case. You can find the
 reference config with additional documentation in [/docs/reference-config.yaml](/docs/reference-config.yaml).
 
+If you want to use a YAML config file, specify the path to the config file by setting the env variable
+`CONFIG_FILEPATH`.
+
 ### 📊 Grafana Dashboards
 
 I uploaded three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config.
