@@ -14,5 +14,6 @@ spec:
       {{- include "kminion.labels" . | nindent 4}}
   endpoints:
     - port: metrics
+      path: /metrics
       honorLabels: {{ .Values.serviceMonitor.honorLabels }}
 {{- end }}

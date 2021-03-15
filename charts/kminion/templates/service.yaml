@@ -8,8 +8,8 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: http
+      targetPort: metrics
       protocol: TCP
-      name: http
+      name: metrics
   selector:
     {{- include "kminion.selectorLabels" . | nindent 4 }}
