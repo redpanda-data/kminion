@@ -161,7 +161,7 @@ kminion:
 #        # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
 #        # you aren't interested in per partition lags you could choose "topic" where all partition lags will be summed
 #        # and only topic lags will be exported.
-#        granularity: partitions
+#        granularity: partition
 #        # AllowedGroups are regex strings of group ids that shall be exported
 #        # You can specify allowed groups by providing literals like "my-consumergroup-name" or by providing regex expressions
 #        # like "/internal-.*/".
@@ -193,8 +193,6 @@ kminion:
 #      host: ""
 #      # Port that shall be used to bind the HTTP server on
 #      port: 8080
-#      # Path to serve the Prometheus metrics
-#      path: "/metrics"
 #
 #    logger:
 #      # Level is a logging priority. Higher levels are more important. Valid values are: debug, info, warn, error, fatal, panic
