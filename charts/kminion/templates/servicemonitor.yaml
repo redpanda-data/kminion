@@ -11,7 +11,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "kminion.labels" . | nindent 4}}
+      {{- include "kminion.labels" . | nindent 6}}
   endpoints:
     - port: metrics
       path: /metrics
