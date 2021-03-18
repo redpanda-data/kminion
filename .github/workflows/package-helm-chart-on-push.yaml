@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - 'charts/**'
+      - 'charts/kminion/Chart.yaml'
       - '!charts/**.md'
 
 jobs:
