@@ -3,14 +3,15 @@ package minion
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"sync"
+	"time"
+
 	"github.com/cloudhut/kminion/v2/kafka"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
-	"regexp"
-	"sync"
-	"time"
 )
 
 type Service struct {
@@ -29,6 +30,8 @@ type Service struct {
 
 	kafkaSvc *kafka.Service
 	storage  *Storage
+
+	endtoendLatencies []int64
 }
 
 func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Service, error) {
@@ -58,6 +61,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Servi
 
 		kafkaSvc: kafkaSvc,
 		storage:  storage,
+
+		endtoendLatencies: []int64{},
 	}, nil
 }
 
@@ -69,6 +74,10 @@ func (s *Service) Start(ctx context.Context) error {
 
 	if s.Cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
 		go s.startConsumingOffsets(ctx)
+	}
+
+	if s.Cfg.EndToEnd.Enabled {
+		go s.initEndToEnd(ctx)
 	}
 
 	return nil

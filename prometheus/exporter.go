@@ -2,12 +2,13 @@ package prometheus
 
 import (
 	"context"
+	"os"
+	"time"
+
 	"github.com/cloudhut/kminion/v2/minion"
 	uuid2 "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"os"
-	"time"
 )
 
 // Exporter is the Prometheus exporter that implements the prometheus.Collector interface
@@ -42,6 +43,9 @@ type Exporter struct {
 	consumerGroupTopicPartitionLag *prometheus.Desc
 	consumerGroupTopicLag          *prometheus.Desc
 	offsetCommits                  *prometheus.Desc
+
+	// EndToEnd
+	endToEndLatencyInfo *prometheus.Desc
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
@@ -168,7 +172,6 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"group_id"},
 		nil,
 	)
-
 }
 
 // Describe implements the prometheus.Collector interface. It sends the
