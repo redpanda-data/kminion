@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
@@ -31,11 +32,16 @@ type Service struct {
 	kafkaSvc *kafka.Service
 	storage  *Storage
 
-	endtoendLatencies []int64
+	endtoendLatencyHistogram *prometheus.HistogramVec
+	commitLatencyHistogram   *prometheus.HistogramVec
+
+	metricNamespace string
 }
 
-func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Service, error) {
+func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
 	storage, err := newStorage(logger)
+	endtoendLatencyHistogram := initEndtoendLatencyHistogram(cfg, metricNamespace)
+	commitLatencyHistogram := initCommitLatencyHistogram(cfg, metricNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
@@ -62,7 +68,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Servi
 		kafkaSvc: kafkaSvc,
 		storage:  storage,
 
-		endtoendLatencies: []int64{},
+		endtoendLatencyHistogram: endtoendLatencyHistogram,
+		commitLatencyHistogram:   commitLatencyHistogram,
 	}, nil
 }
 

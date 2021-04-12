@@ -3,6 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"time"
+
 	"github.com/cloudhut/kminion/v2/kafka"
 	"github.com/cloudhut/kminion/v2/logging"
 	"github.com/cloudhut/kminion/v2/minion"
@@ -10,12 +17,6 @@ import (
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"strconv"
-	"time"
 )
 
 func main() {
@@ -67,7 +68,7 @@ func main() {
 
 	// Create minion service that does most of the work. The Prometheus exporter only talks to the minion service
 	// which issues all the requests to Kafka and wraps the interface accordingly.
-	minionSvc, err := minion.NewService(cfg.Minion, logger, kafkaSvc)
+	minionSvc, err := minion.NewService(cfg.Minion, logger, kafkaSvc, cfg.Exporter.Namespace)
 	if err != nil {
 		logger.Fatal("failed to setup minion service", zap.Error(err))
 	}
