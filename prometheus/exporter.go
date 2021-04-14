@@ -45,6 +45,7 @@ type Exporter struct {
 	offsetCommits                  *prometheus.Desc
 
 	// EndToEnd
+	endToEndProducerUp  *prometheus.Desc
 	endToEndLatencyInfo *prometheus.Desc
 }
 
@@ -172,6 +173,15 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"group_id"},
 		nil,
 	)
+
+	// End-to-End metrics
+	// Producer up
+	e.endToEndProducerUp = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_producer_up"),
+		"Gauge value is 1 if end-to-end producer is up.",
+		nil,
+		nil,
+	)
 }
 
 // Describe implements the prometheus.Collector interface. It sends the
@@ -200,6 +210,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ok = e.collectTopicPartitionOffsets(ctx, ch) && ok
 	ok = e.collectConsumerGroupLags(ctx, ch) && ok
 	ok = e.collectTopicInfo(ctx, ch) && ok
+	ok = e.collectEndToEnd(ctx, ch) && ok
 
 	if ok {
 		ch <- prometheus.MustNewConstMetric(e.exporterUp, prometheus.GaugeValue, 1.0)
