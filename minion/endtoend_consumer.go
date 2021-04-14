@@ -44,6 +44,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					zap.Error(err.Err))
 			}
 
+			startConsumeTimestamp := timeNowMs()
 			iter := fetches.RecordIter()
 			var record *kgo.Record
 			for !iter.Done() {

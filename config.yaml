@@ -51,7 +51,7 @@ minion:
     enabled: true # Default is false
     topicManagement:
       enabled: true
-      name: kminion-end-to-end # This is the default
+      name: kminion-end-to-end-0 # This is the default
       replicationFactor: 1
       partitionsPerBroker: 2
       reconcilationInterval: 10m
