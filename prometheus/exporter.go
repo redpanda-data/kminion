@@ -46,6 +46,7 @@ type Exporter struct {
 
 	// EndToEnd
 	endToEndProducerUp  *prometheus.Desc
+	endToEndConsumerUp  *prometheus.Desc
 	endToEndLatencyInfo *prometheus.Desc
 }
 
@@ -179,6 +180,13 @@ func (e *Exporter) InitializeMetrics() {
 	e.endToEndProducerUp = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_producer_up"),
 		"Gauge value is 1 if end-to-end producer is up.",
+		nil,
+		nil,
+	)
+	// Consumer up
+	e.endToEndConsumerUp = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_consumer_up"),
+		"Gauge value is 1 if end-to-end consumer is up.",
 		nil,
 		nil,
 	)
