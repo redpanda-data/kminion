@@ -5,6 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"time"
+
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -14,9 +18,6 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"net"
-	"time"
 
 	krbconfig "github.com/jcmturner/gokrb5/v8/config"
 )

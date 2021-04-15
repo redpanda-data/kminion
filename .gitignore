@@ -17,3 +17,5 @@ zk-multiple-kafka-multiple
 
 config
 kminion
+config.yaml
+ca.pem

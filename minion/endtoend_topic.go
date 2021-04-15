@@ -14,6 +14,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 	expectedReplicationFactor := s.Cfg.EndToEnd.TopicManagement.ReplicationFactor
 	expectedNumPartitionsPerBroker := s.Cfg.EndToEnd.TopicManagement.PartitionsPerBroker
+	expectedTotalNumPartitions := expectedNumPartitionsPerBroker * expectedReplicationFactor
 	topicMetadata, err := s.getTopicMetadata(ctx)
 	if err != nil {
 		return err

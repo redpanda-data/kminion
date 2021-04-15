@@ -3,12 +3,9 @@ package minion
 import (
 	"context"
 	"encoding/json"
-<<<<<<< HEAD
 	"fmt"
 	"time"
 
-=======
->>>>>>> d882b6b (EnToEnd Consumer Availability)
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
