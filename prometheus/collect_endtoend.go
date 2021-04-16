@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -23,6 +24,14 @@ func (e *Exporter) collectEndToEnd(ctx context.Context, ch chan<- prometheus.Met
 		ch <- prometheus.MustNewConstMetric(e.endToEndConsumerUp, prometheus.GaugeValue, 1.0)
 	} else {
 		ch <- prometheus.MustNewConstMetric(e.endToEndConsumerUp, prometheus.GaugeValue, 0.0)
+	}
+
+	// Check if the consumer can commit offset (manually), if yes the value is 1
+	commitOffsetsOk := e.minionSvc.OffsetCommitAvailability(ctx)
+	if commitOffsetsOk {
+		ch <- prometheus.MustNewConstMetric(e.endToEndOffsetCommitAvailability, prometheus.GaugeValue, 1.0)
+	} else {
+		ch <- prometheus.MustNewConstMetric(e.endToEndOffsetCommitAvailability, prometheus.GaugeValue, 0.0)
 	}
 
 	return true

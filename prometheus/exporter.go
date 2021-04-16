@@ -45,9 +45,10 @@ type Exporter struct {
 	offsetCommits                  *prometheus.Desc
 
 	// EndToEnd
-	endToEndProducerUp  *prometheus.Desc
-	endToEndConsumerUp  *prometheus.Desc
-	endToEndLatencyInfo *prometheus.Desc
+	endToEndProducerUp               *prometheus.Desc
+	endToEndConsumerUp               *prometheus.Desc
+	endToEndLatencyInfo              *prometheus.Desc
+	endToEndOffsetCommitAvailability *prometheus.Desc
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
@@ -187,6 +188,13 @@ func (e *Exporter) InitializeMetrics() {
 	e.endToEndConsumerUp = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_consumer_up"),
 		"Gauge value is 1 if end-to-end consumer is up.",
+		nil,
+		nil,
+	)
+	// OffsetCommit Availability
+	e.endToEndOffsetCommitAvailability = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_offset_commit_availability"),
+		"Gauge value is 1 if end-to-end is able to commit offset.",
 		nil,
 		nil,
 	)
