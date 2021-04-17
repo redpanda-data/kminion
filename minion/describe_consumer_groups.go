@@ -53,7 +53,7 @@ func (s *Service) listConsumerGroups(ctx context.Context) (*kmsg.ListGroupsRespo
 }
 
 func (s *Service) DescribeConsumerGroups(ctx context.Context) ([]DescribeConsumerGroupsResponse, error) {
-	var listRes, err = s.listConsumerGroupsCached(ctx)
+	listRes, err := s.listConsumerGroupsCached(ctx)
 	if err != nil {
 		return nil, err
 	}
