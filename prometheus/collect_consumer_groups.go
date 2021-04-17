@@ -18,18 +18,11 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		return false
 	}
 
-	// iterate over responses of each broker
-	for _, response := range groups.Groups {
-		if response.Error != nil {
-			e.logger.Warn("failed to describe consumer groups from one group coordinator",
-				zap.Error(response.Error),
-				zap.Int32("coordinator_id", response.BrokerMetadata.NodeID),
-			)
-			continue
-		}
-		coordinator := response.BrokerMetadata.NodeID
-		// iterate over all groups coordinated by this broker
-		for _, group := range response.Groups.Groups {
+	// The list of groups may be incomplete due to group coordinators that might fail to respond. We do log a error
+	// message in that case (in the kafka request method) and groups will not be included in this list.
+	for _, grp := range groups {
+		coordinator := grp.BrokerMetadata.NodeID
+		for _, group := range grp.Groups.Groups {
 			err := kerr.ErrorForCode(group.ErrorCode)
 			if err != nil {
 				e.logger.Warn("failed to describe consumer group, internal kafka error",

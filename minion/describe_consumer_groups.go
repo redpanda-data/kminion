@@ -6,19 +6,13 @@ import (
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
+	"go.uber.org/zap"
 	"time"
 )
-
-type DescribeConsumerGroupsResponseSharded struct {
-	Groups         []DescribeConsumerGroupsResponse
-	RequestsSent   int
-	RequestsFailed int
-}
 
 type DescribeConsumerGroupsResponse struct {
 	BrokerMetadata kgo.BrokerMetadata
 	Groups         *kmsg.DescribeGroupsResponse
-	Error          error
 }
 
 func (s *Service) listConsumerGroupsCached(ctx context.Context) (*kmsg.ListGroupsResponse, error) {
@@ -58,7 +52,7 @@ func (s *Service) listConsumerGroups(ctx context.Context) (*kmsg.ListGroupsRespo
 	return res, nil
 }
 
-func (s *Service) DescribeConsumerGroups(ctx context.Context) (*DescribeConsumerGroupsResponseSharded, error) {
+func (s *Service) DescribeConsumerGroups(ctx context.Context) ([]DescribeConsumerGroupsResponse, error) {
 	var listRes, err = s.listConsumerGroupsCached(ctx)
 	if err != nil {
 		return nil, err
@@ -73,28 +67,22 @@ func (s *Service) DescribeConsumerGroups(ctx context.Context) (*DescribeConsumer
 	describeReq.Groups = groupIDs
 	describeReq.IncludeAuthorizedOperations = false
 	shardedResp := s.kafkaSvc.Client.RequestSharded(ctx, &describeReq)
-	describeRes := &DescribeConsumerGroupsResponseSharded{
-		Groups:         make([]DescribeConsumerGroupsResponse, 0),
-		RequestsSent:   0,
-		RequestsFailed: 0,
-	}
-	var kErr error
+
+	describedGroups := make([]DescribeConsumerGroupsResponse, 0)
 	for _, kresp := range shardedResp {
-		describeRes.RequestsSent++
 		if kresp.Err != nil {
-			describeRes.RequestsFailed++
-			kErr = kresp.Err
+			s.logger.Warn("broker failed to respond to the described groups request",
+				zap.Int32("broker_id", kresp.Meta.NodeID),
+				zap.Error(kresp.Err))
+			continue
 		}
 		res := kresp.Resp.(*kmsg.DescribeGroupsResponse)
 
-		describeRes.Groups = append(describeRes.Groups, DescribeConsumerGroupsResponse{
+		describedGroups = append(describedGroups, DescribeConsumerGroupsResponse{
 			BrokerMetadata: kresp.Meta,
 			Groups:         res,
-			Error:          kresp.Err,
 		})
 	}
-	if describeRes.RequestsSent > 0 && describeRes.RequestsSent == describeRes.RequestsFailed {
-		return describeRes, fmt.Errorf("all '%v' requests have failed, last error: %w", len(shardedResp), kErr)
-	}
-	return describeRes, nil
+
+	return describedGroups, nil
 }
