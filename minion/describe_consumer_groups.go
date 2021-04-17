@@ -4,9 +4,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
+	"go.uber.org/zap"
 	"time"
 )
+
+type DescribeConsumerGroupsResponse struct {
+	BrokerMetadata kgo.BrokerMetadata
+	Groups         *kmsg.DescribeGroupsResponse
+}
 
 func (s *Service) listConsumerGroupsCached(ctx context.Context) (*kmsg.ListGroupsResponse, error) {
 	reqId := ctx.Value("requestId").(string)
@@ -45,7 +52,7 @@ func (s *Service) listConsumerGroups(ctx context.Context) (*kmsg.ListGroupsRespo
 	return res, nil
 }
 
-func (s *Service) DescribeConsumerGroups(ctx context.Context) (*kmsg.DescribeGroupsResponse, error) {
+func (s *Service) DescribeConsumerGroups(ctx context.Context) ([]DescribeConsumerGroupsResponse, error) {
 	listRes, err := s.listConsumerGroupsCached(ctx)
 	if err != nil {
 		return nil, err
@@ -58,10 +65,24 @@ func (s *Service) DescribeConsumerGroups(ctx context.Context) (*kmsg.DescribeGro
 
 	describeReq := kmsg.NewDescribeGroupsRequest()
 	describeReq.Groups = groupIDs
-	describeRes, err := describeReq.RequestWith(ctx, s.kafkaSvc.Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to describe consumer groups: %w", err)
+	describeReq.IncludeAuthorizedOperations = false
+	shardedResp := s.kafkaSvc.Client.RequestSharded(ctx, &describeReq)
+
+	describedGroups := make([]DescribeConsumerGroupsResponse, 0)
+	for _, kresp := range shardedResp {
+		if kresp.Err != nil {
+			s.logger.Warn("broker failed to respond to the described groups request",
+				zap.Int32("broker_id", kresp.Meta.NodeID),
+				zap.Error(kresp.Err))
+			continue
+		}
+		res := kresp.Resp.(*kmsg.DescribeGroupsResponse)
+
+		describedGroups = append(describedGroups, DescribeConsumerGroupsResponse{
+			BrokerMetadata: kresp.Meta,
+			Groups:         res,
+		})
 	}
 
-	return describeRes, err
+	return describedGroups, nil
 }

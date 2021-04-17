@@ -137,7 +137,7 @@ func (e *Exporter) InitializeMetrics() {
 	e.consumerGroupInfo = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_info"),
 		"Consumer Group info metrics. It will report 1 if the group is in the stable state, otherwise 0.",
-		[]string{"group_id", "member_count", "protocol", "protocol_type", "state"},
+		[]string{"group_id", "member_count", "protocol", "protocol_type", "state", "coordinator_id"},
 		nil,
 	)
 	// Topic / Partition Offset Sum (useful for calculating the consumed messages / sec on a topic)

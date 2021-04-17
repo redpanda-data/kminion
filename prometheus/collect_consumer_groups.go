@@ -18,31 +18,38 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		return false
 	}
 
-	for _, group := range groups.Groups {
-		if !e.minionSvc.IsGroupAllowed(group.Group) {
-			continue
+	// The list of groups may be incomplete due to group coordinators that might fail to respond. We do log a error
+	// message in that case (in the kafka request method) and groups will not be included in this list.
+	for _, grp := range groups {
+		coordinator := grp.BrokerMetadata.NodeID
+		for _, group := range grp.Groups.Groups {
+			err := kerr.ErrorForCode(group.ErrorCode)
+			if err != nil {
+				e.logger.Warn("failed to describe consumer group, internal kafka error",
+					zap.Error(err),
+					zap.String("group_id", group.Group),
+				)
+				continue
+			}
+			if !e.minionSvc.IsGroupAllowed(group.Group) {
+				continue
+			}
+			state := 0
+			if group.State == "Stable" {
+				state = 1
+			}
+			ch <- prometheus.MustNewConstMetric(
+				e.consumerGroupInfo,
+				prometheus.GaugeValue,
+				float64(state),
+				group.Group,
+				strconv.Itoa(len(group.Members)),
+				group.Protocol,
+				group.ProtocolType,
+				group.State,
+				strconv.FormatInt(int64(coordinator), 10),
+			)
 		}
-		err := kerr.ErrorForCode(group.ErrorCode)
-		if err != nil {
-			e.logger.Warn("consumer group could not be described", zap.Error(err))
-			continue
-		}
-
-		val := 0
-		if group.State == "Stable" {
-			val = 1
-		}
-
-		ch <- prometheus.MustNewConstMetric(
-			e.consumerGroupInfo,
-			prometheus.GaugeValue,
-			float64(val),
-			group.Group,
-			strconv.Itoa(len(group.Members)),
-			group.Protocol,
-			group.ProtocolType,
-			group.State,
-		)
 	}
 	return true
 }
