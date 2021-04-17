@@ -69,7 +69,7 @@ kminion_kafka_topic_high_water_mark_sum{topic_name="__consumer_offsets"} 1.51202
 ```
 # HELP kminion_kafka_consumer_group_info Consumer Group info metrics. It will report 1 if the group is in the stable state, otherwise 0.
 # TYPE kminion_kafka_consumer_group_info gauge
-kminion_kafka_consumer_group_info{group_id="bigquery-sink",member_count="2",protocol="range",protocol_type="consumer",state="Stable"} 1
+kminion_kafka_consumer_group_info{coordinator_id="0",group_id="bigquery-sink",member_count="2",protocol="range",protocol_type="consumer",state="Stable"} 1
 
 # HELP kminion_kafka_consumer_group_topic_offset_sum The sum of all committed group offsets across all partitions in a topic
 # TYPE kminion_kafka_consumer_group_topic_offset_sum gauge
