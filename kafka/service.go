@@ -3,12 +3,13 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
-	"strings"
 )
 
 type Service struct {
@@ -17,12 +18,15 @@ type Service struct {
 	logger *zap.Logger
 }
 
-func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
+func NewService(cfg Config, logger *zap.Logger, opts []kgo.Opt) (*Service, error) {
 	// Create Kafka Client
 	hooksChildLogger := logger.With(zap.String("source", "kafka_client_hooks"))
 	clientHooks := newClientHooks(hooksChildLogger, "")
 
 	kgoOpts, err := NewKgoConfig(cfg, logger, clientHooks)
+	for _, opt := range opts {
+		kgoOpts = append(kgoOpts, opt)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a valid kafka Client config: %w", err)
 	}

@@ -34,5 +34,18 @@ func (e *Exporter) collectEndToEnd(ctx context.Context, ch chan<- prometheus.Met
 		ch <- prometheus.MustNewConstMetric(e.endToEndOffsetCommitAvailability, prometheus.GaugeValue, 0.0)
 	}
 
+	messageProduced := e.minionSvc.ProduceCounts(ctx)
+	messageProducedAcks := e.minionSvc.ProduceAcks(ctx)
+	if e.minionSvc.Cfg.EndToEnd.Enabled && e.minionSvc.Cfg.EndToEnd.Producer.RequiredAcks != 0 {
+		if messageProduced == 0 {
+			// Avoid division by zero
+			ch <- prometheus.MustNewConstMetric(e.endToEndMessageLossRate, prometheus.GaugeValue, 0)
+		} else {
+			// lossRate is 1 - successRate
+			lossRate := 1 - (float64(messageProducedAcks) / float64(messageProduced))
+			ch <- prometheus.MustNewConstMetric(e.endToEndMessageLossRate, prometheus.GaugeValue, lossRate)
+		}
+	}
+
 	return true
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/cloudhut/kminion/v2/prometheus"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 )
 
@@ -54,8 +55,23 @@ func main() {
 		}
 	}()
 
+	// Preparing RequiredAcks option, as client can't be altered after initialized
+	kgoOpts := []kgo.Opt{}
+	if cfg.Minion.EndToEnd.Enabled {
+		ack := kgo.AllISRAcks()
+		switch cfg.Minion.EndToEnd.Producer.RequiredAcks {
+		case 0:
+			ack = kgo.NoAck()
+		case 1:
+			ack = kgo.LeaderAck()
+		}
+		kgoOpts = append(kgoOpts, kgo.RequiredAcks(ack))
+		if cfg.Minion.EndToEnd.Producer.RequiredAcks != -1 {
+			kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
+		}
+	}
 	// Create kafka service and check if client can successfully connect to Kafka cluster
-	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger)
+	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger, kgoOpts)
 	if err != nil {
 		logger.Fatal("failed to setup kafka service", zap.Error(err))
 	}
