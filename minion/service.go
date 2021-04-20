@@ -32,16 +32,22 @@ type Service struct {
 	kafkaSvc *kafka.Service
 	storage  *Storage
 
-	endtoendLatencyHistogram *prometheus.HistogramVec
-	commitLatencyHistogram   *prometheus.HistogramVec
+	endtoendLatencyHistogram *prometheus.Histogram
+	commitLatencyHistogram   *prometheus.Histogram
 
 	metricNamespace string
 }
 
 func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
 	storage, err := newStorage(logger)
-	endtoendLatencyHistogram := initEndtoendLatencyHistogram(cfg, metricNamespace)
-	commitLatencyHistogram := initCommitLatencyHistogram(cfg, metricNamespace)
+	var endtoendLatencyHistogram *prometheus.Histogram
+	var commitLatencyHistogram *prometheus.Histogram
+
+	if cfg.EndToEnd.Enabled {
+		endtoendLatencyHistogram = initEndtoendLatencyHistogram(cfg, metricNamespace)
+		commitLatencyHistogram = initCommitLatencyHistogram(cfg, metricNamespace)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}

@@ -15,7 +15,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 	client := s.kafkaSvc.Client
 	topicMessage := s.Cfg.EndToEnd.TopicManagement.Name
 	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicMessage)
-	balancer := kgo.Balancers(kgo.CooperativeStickyBalancer())
+	balancer := kgo.Balancers(kgo.CooperativeStickyBalancer()) // Default GroupBalancer
 	switch s.Cfg.EndToEnd.Consumer.RebalancingProtocol {
 	case RoundRobin:
 		balancer = kgo.Balancers(kgo.RoundRobinBalancer())
@@ -60,23 +60,21 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 				latencySec := float64(timeNowMs()-res.Timestamp) / float64(1000)
 				s.observeLatencyHistogram(latencySec, int(record.Partition))
 				s.storage.markRecordConsumed(record)
-				uncommittedOffset := client.UncommittedOffsets()
-				// Only commit if uncommittedOffset return value
-				if uncommittedOffset != nil {
-					startCommitTimestamp := timeNowMs()
-					client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, _ *kmsg.OffsetCommitResponse, err error) {
-						if err != nil {
-							if err != kgo.ErrNoDial {
-								s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
-							}
-							s.setCachedItem("end_to_end_consumer_offset_availability", false, 120*time.Second)
-						} else {
-							commitLatencySec := float64(timeNowMs()-startCommitTimestamp) / float64(1000)
-							s.observeCommitLatencyHistogram(commitLatencySec, int(record.Partition))
-							s.setCachedItem("end_to_end_consumer_offset_availability", true, 120*time.Second)
-						}
-					})
-				}
+			}
+			uncommittedOffset := client.UncommittedOffsets()
+			// Only commit if uncommittedOffset returns value
+			if uncommittedOffset != nil {
+				startCommitTimestamp := timeNowMs()
+				client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, _ *kmsg.OffsetCommitResponse, err error) {
+					if err != nil {
+						s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
+						s.setCachedItem("end_to_end_consumer_offset_availability", false, 120*time.Second)
+					} else {
+						commitLatencySec := float64(timeNowMs()-startCommitTimestamp) / float64(1000)
+						s.observeCommitLatencyHistogram(commitLatencySec, int(record.Partition))
+						s.setCachedItem("end_to_end_consumer_offset_availability", true, 120*time.Second)
+					}
+				})
 			}
 			s.setCachedItem("end_to_end_consume_duration", timeNowMs()-startConsumeTimestamp, 120*time.Second)
 		}

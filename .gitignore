@@ -16,6 +16,3 @@ zk-multiple-kafka-multiple
 .idea
 
 config
-kminion
-config.yaml
-ca.pem

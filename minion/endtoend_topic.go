@@ -20,6 +20,11 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	}
 
 	// If metadata is not reachable, then there is a problem in connecting to broker or lack of Authorization
+	// TopicMetadataArray could be empty, therefore needs to do this check beforehand
+	topicMetadataArray := topicMetadata.Topics
+	if len(topicMetadataArray) == 0 {
+		return fmt.Errorf("Unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
+	}
 	doesTopicReachable := topicMetadata.Topics[0].Topic != ""
 	if !doesTopicReachable {
 		return fmt.Errorf("Unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
@@ -47,17 +52,16 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	isTotalPartitionTooLow := len(topicMetadata.Topics[0].Partitions) < expectedNumPartitionsPerBroker
 	if isTotalPartitionTooLow {
 		// Create partition if the number partition is lower, can't delete partition
-		assignment := kmsg.CreatePartitionsRequestTopicAssignment{
-			Replicas: topicMetadata.Topics[0].Partitions[0].Replicas,
-		}
-		topic := kmsg.CreatePartitionsRequestTopic{
-			Topic:      s.Cfg.EndToEnd.TopicManagement.Name,
-			Count:      int32(expectedNumPartitionsPerBroker), // Should be greater than current partition number
-			Assignment: []kmsg.CreatePartitionsRequestTopicAssignment{assignment},
-		}
-		create := kmsg.CreatePartitionsRequest{
-			Topics: []kmsg.CreatePartitionsRequestTopic{topic},
-		}
+		assignment := kmsg.NewCreatePartitionsRequestTopicAssignment()
+		assignment.Replicas = topicMetadata.Topics[0].Partitions[0].Replicas
+
+		topic := kmsg.NewCreatePartitionsRequestTopic()
+		topic.Topic = s.Cfg.EndToEnd.TopicManagement.Name
+		topic.Count = int32(expectedNumPartitionsPerBroker) // Should be greater than current partition number
+		topic.Assignment = []kmsg.CreatePartitionsRequestTopicAssignment{assignment}
+
+		create := kmsg.NewCreatePartitionsRequest()
+		create.Topics = []kmsg.CreatePartitionsRequestTopic{topic}
 		_, err := create.RequestWith(ctx, s.kafkaSvc.Client)
 		if err != nil {
 			return fmt.Errorf("failed to do kmsg request on creating partitions: %w", err)
@@ -96,19 +100,19 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		partitions := make([]int32, s.Cfg.EndToEnd.TopicManagement.PartitionsPerBroker)
 		reassignedPartitions := []kmsg.AlterPartitionAssignmentsRequestTopicPartition{}
 		for index := range partitions {
-			reassignedPartitions = append(reassignedPartitions, kmsg.AlterPartitionAssignmentsRequestTopicPartition{
-				Partition: int32(index),
-				Replicas:  assignedReplicas,
-			})
+			rp := kmsg.NewAlterPartitionAssignmentsRequestTopicPartition()
+			rp.Partition = int32(index)
+			rp.Replicas = assignedReplicas
+			reassignedPartitions = append(reassignedPartitions, rp)
 		}
 
-		managamentTopicReassignment := kmsg.AlterPartitionAssignmentsRequestTopic{
-			Topic:      s.Cfg.EndToEnd.TopicManagement.Name,
-			Partitions: reassignedPartitions,
-		}
-		reassignment := kmsg.AlterPartitionAssignmentsRequest{
-			Topics: []kmsg.AlterPartitionAssignmentsRequestTopic{managamentTopicReassignment},
-		}
+		managamentTopicReassignment := kmsg.NewAlterPartitionAssignmentsRequestTopic()
+		managamentTopicReassignment.Topic = s.Cfg.EndToEnd.TopicManagement.Name
+		managamentTopicReassignment.Partitions = reassignedPartitions
+
+		reassignment := kmsg.NewAlterPartitionAssignmentsRequest()
+		reassignment.Topics = []kmsg.AlterPartitionAssignmentsRequestTopic{managamentTopicReassignment}
+
 		_, err := reassignment.RequestWith(ctx, s.kafkaSvc.Client)
 		if err != nil {
 			return fmt.Errorf("failed to do kmsg request on topic reassignment: %w", err)
@@ -120,30 +124,26 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 }
 
 func getTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestTopicConfig {
+
+	minISRConf := kmsg.NewCreateTopicsRequestTopicConfig()
 	minISR := strconv.Itoa(cfgTopic.ReplicationFactor)
+	minISRConf.Name = "min.insync.replicas"
+	minISRConf.Value = &minISR
 
-	minISRConf := kmsg.CreateTopicsRequestTopicConfig{
-		Name:  "min.insync.replicas",
-		Value: &minISR,
-	}
-
+	cleanupPolicyConf := kmsg.NewCreateTopicsRequestTopicConfig()
 	cleanupStr := "delete"
-	cleanupPolicyConf := kmsg.CreateTopicsRequestTopicConfig{
-		Name:  "cleanup.policy",
-		Value: &cleanupStr,
-	}
+	cleanupPolicyConf.Name = "cleanup.policy"
+	cleanupPolicyConf.Value = &cleanupStr
 
+	retentionByteConf := kmsg.NewCreateTopicsRequestTopicConfig()
 	retentionStr := "10000000"
-	retentionByteConf := kmsg.CreateTopicsRequestTopicConfig{
-		Name:  "retention.bytes",
-		Value: &retentionStr,
-	}
+	retentionByteConf.Name = "retention.bytes"
+	retentionByteConf.Value = &retentionStr
 
+	segmentByteConf := kmsg.NewCreateTopicsRequestTopicConfig()
 	segmentStr := "1000000"
-	segmentByteConf := kmsg.CreateTopicsRequestTopicConfig{
-		Name:  "segment.bytes",
-		Value: &segmentStr,
-	}
+	segmentByteConf.Name = "segment.bytes"
+	segmentByteConf.Value = &segmentStr
 
 	return []kmsg.CreateTopicsRequestTopicConfig{
 		minISRConf,
@@ -160,12 +160,11 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 	cfgTopic := s.Cfg.EndToEnd.TopicManagement
 	topicConfigs := getTopicConfig(cfgTopic)
 
-	topic := kmsg.CreateTopicsRequestTopic{
-		Topic:             cfgTopic.Name,
-		NumPartitions:     int32(cfgTopic.PartitionsPerBroker),
-		ReplicationFactor: int16(cfgTopic.ReplicationFactor),
-		Configs:           topicConfigs,
-	}
+	topic := kmsg.NewCreateTopicsRequestTopic()
+	topic.Topic = cfgTopic.Name
+	topic.NumPartitions = int32(cfgTopic.PartitionsPerBroker)
+	topic.ReplicationFactor = int16(cfgTopic.ReplicationFactor)
+	topic.Configs = topicConfigs
 
 	// Workaround for wrong assignment on 1 ReplicationFactor with automatic assignment on topic creation, this will create the assignment manually, automatic assignment works on more than 1 RepFactor
 	// Issue: Instead of putting the number of PartitionPerBroker in One Broker/Replica, the client will assign one partition on different Broker/Replica
@@ -175,23 +174,18 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 		var assignment []kmsg.CreateTopicsRequestTopicReplicaAssignment
 		partitions := make([]int32, cfgTopic.PartitionsPerBroker)
 		for index := range partitions {
-			assignment = append(assignment, kmsg.CreateTopicsRequestTopicReplicaAssignment{
-				Partition: int32(index),
-				Replicas:  []int32{brokerID},
-			})
+			replicaAssignment := kmsg.NewCreateTopicsRequestTopicReplicaAssignment()
+			replicaAssignment.Partition = int32(index)
+			replicaAssignment.Replicas = []int32{brokerID}
+			assignment = append(assignment, replicaAssignment)
 		}
-		topic = kmsg.CreateTopicsRequestTopic{
-			Topic:             cfgTopic.Name,
-			NumPartitions:     -1, // Need to set this as -1 on Manual Assignment
-			ReplicationFactor: -1, // Need to set this as -1 on Manual Assignment
-			ReplicaAssignment: assignment,
-			Configs:           topicConfigs,
-		}
+		topic.NumPartitions = -1     // Need to set this as -1 on Manual Assignment
+		topic.ReplicationFactor = -1 // Need to set this as -1 on Manual Assignment
+		topic.ReplicaAssignment = assignment
 	}
 
-	req := kmsg.CreateTopicsRequest{
-		Topics: []kmsg.CreateTopicsRequestTopic{topic},
-	}
+	req := kmsg.NewCreateTopicsRequest()
+	req.Topics = []kmsg.CreateTopicsRequestTopic{topic}
 
 	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
 	// Sometimes it won't throw Error, but the Error will be abstracted to res.Topics[0].ErrorMessage
@@ -209,13 +203,11 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse, error) {
 
 	cfg := s.Cfg.EndToEnd.TopicManagement
-	topic := kmsg.MetadataRequestTopic{
-		Topic: &cfg.Name,
-	}
+	topicReq := kmsg.NewMetadataRequestTopic()
+	topicReq.Topic = &cfg.Name
 
-	req := kmsg.MetadataRequest{
-		Topics: []kmsg.MetadataRequestTopic{topic},
-	}
+	req := kmsg.NewMetadataRequest()
+	req.Topics = []kmsg.MetadataRequestTopic{topicReq}
 
 	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
 	if err != nil {
@@ -226,17 +218,31 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 }
 
 func (s *Service) initEndToEnd(ctx context.Context) {
-	err := s.validateManagementTopic(ctx)
-	if err != nil {
+
+	reconciliationInterval := s.Cfg.EndToEnd.TopicManagement.ReconcilationInterval
+	c1 := make(chan error, 1)
+
+	// Run long running function on validating or reconciling that might be timeout
+	go func() {
+		err := s.validateManagementTopic(ctx)
+		c1 <- err
+	}()
+
+	// Listen on our channel AND a timeout channel - which ever happens first.
+	select {
+	case err := <-c1:
 		s.logger.Warn("failed to validate management topic for endtoend metrics", zap.Error(err))
 		return
-	}
+	case <-time.After(reconciliationInterval):
+		s.logger.Warn("time exceeded while validating/reconciling management topic of endtoend metrics")
+		return
+	default:
+		go s.ConsumeFromManagementTopic(ctx)
 
-	go s.ConsumeFromManagementTopic(ctx)
-
-	t := time.NewTicker(s.Cfg.EndToEnd.ProbeInterval)
-	for range t.C {
-		s.ProduceToManagementTopic(ctx)
+		t := time.NewTicker(s.Cfg.EndToEnd.ProbeInterval)
+		for range t.C {
+			s.ProduceToManagementTopic(ctx)
+		}
 	}
 }
 

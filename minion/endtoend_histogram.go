@@ -2,7 +2,6 @@ package minion
 
 import (
 	"math"
-	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -20,40 +19,42 @@ func getBucket(cfg Config) []float64 {
 	return bucket
 }
 
-func initEndtoendLatencyHistogram(cfg Config, metricNamespace string) *prometheus.HistogramVec {
-	histogramVec := promauto.NewHistogramVec(prometheus.HistogramOpts{
+func initEndtoendLatencyHistogram(cfg Config, metricNamespace string) *prometheus.Histogram {
+	histogram := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
 		Subsystem: "kafka",
 		Name:      "endtoend_latency_seconds",
 		Help:      "Time it has taken to consume a Kafka message via a Consumer Group which KMinion has produced before",
 		Buckets:   getBucket(cfg),
-	}, []string{"partition_id"})
+	})
 
-	return histogramVec
+	return &histogram
 }
 
-func initCommitLatencyHistogram(cfg Config, metricNamespace string) *prometheus.HistogramVec {
-	histogramVec := promauto.NewHistogramVec(prometheus.HistogramOpts{
+func initCommitLatencyHistogram(cfg Config, metricNamespace string) *prometheus.Histogram {
+	histogram := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
 		Subsystem: "kafka",
 		Name:      "commit_latency_seconds",
 		Help:      "Time it has taken to commit the message via a Consumer Group on KMinion Management Topic",
 		Buckets:   getBucket(cfg),
-	}, []string{"partition_id"})
+	})
 
-	return histogramVec
+	return &histogram
 }
 
-func (s *Service) GetLatencyHistogram() *prometheus.HistogramVec {
+func (s *Service) GetLatencyHistogram() *prometheus.Histogram {
 	return s.endtoendLatencyHistogram
 }
 
 func (s *Service) observeLatencyHistogram(time float64, partition int) error {
-	s.endtoendLatencyHistogram.WithLabelValues(strconv.Itoa(partition)).Observe(time)
+	h := *s.endtoendLatencyHistogram
+	h.Observe(time)
 	return nil
 }
 
 func (s *Service) observeCommitLatencyHistogram(time float64, partition int) error {
-	s.commitLatencyHistogram.WithLabelValues(strconv.Itoa(partition)).Observe(time)
+	h := *s.commitLatencyHistogram
+	h.Observe(time)
 	return nil
 }

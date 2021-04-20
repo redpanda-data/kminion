@@ -16,6 +16,7 @@ type EndToEndTopicConfig struct {
 func (c *EndToEndTopicConfig) SetDefaults() {
 	c.Enabled = true
 	c.Name = "kminion-end-to-end"
+	c.ReconcilationInterval = 10 * time.Minute
 }
 
 func (c *EndToEndTopicConfig) Validate() error {
@@ -28,9 +29,9 @@ func (c *EndToEndTopicConfig) Validate() error {
 		return fmt.Errorf("failed to parse partitionsPerBroker, it should be more than 1, retrieved value %v", c.ReplicationFactor)
 	}
 
-	_, err := time.ParseDuration(c.ReconcilationInterval.String())
-	if err != nil {
-		return fmt.Errorf("failed to parse '%s' to time.Duration: %v", c.ReconcilationInterval.String(), err)
+	// If the timeduration is 0s or 0ms or its variation of zero, it will be parsed as 0
+	if c.ReconcilationInterval == 0 {
+		return fmt.Errorf("failed to validate topic.ReconcilationInterval config, the duration can't be zero")
 	}
 
 	return nil

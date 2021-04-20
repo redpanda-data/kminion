@@ -59,16 +59,11 @@ func main() {
 	kgoOpts := []kgo.Opt{}
 	if cfg.Minion.EndToEnd.Enabled {
 		ack := kgo.AllISRAcks()
-		switch cfg.Minion.EndToEnd.Producer.RequiredAcks {
-		case 0:
-			ack = kgo.NoAck()
-		case 1:
+		if cfg.Minion.EndToEnd.Producer.RequiredAcks == 1 {
 			ack = kgo.LeaderAck()
-		}
-		kgoOpts = append(kgoOpts, kgo.RequiredAcks(ack))
-		if cfg.Minion.EndToEnd.Producer.RequiredAcks != -1 {
 			kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
 		}
+		kgoOpts = append(kgoOpts, kgo.RequiredAcks(ack))
 	}
 	// Create kafka service and check if client can successfully connect to Kafka cluster
 	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger, kgoOpts)
