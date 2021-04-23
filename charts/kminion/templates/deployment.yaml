@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{include "kminion.fullname" .}}
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kminion.labels" . | nindent 4}}
     {{- if .Values.customLabels}}
