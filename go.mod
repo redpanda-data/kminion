@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/common v0.20.0 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
-	github.com/twmb/franz-go v0.6.12
+	github.com/twmb/franz-go v0.6.14
 	go.uber.org/atomic v1.7.0
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0
