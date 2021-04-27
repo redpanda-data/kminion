@@ -3,19 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cloudhut/kminion/v2/kafka"
-	"github.com/cloudhut/kminion/v2/logging"
-	"github.com/cloudhut/kminion/v2/minion"
-	"github.com/cloudhut/kminion/v2/prometheus"
-	promclient "github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"time"
+
+	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/cloudhut/kminion/v2/logging"
+	"github.com/cloudhut/kminion/v2/minion"
+	"github.com/cloudhut/kminion/v2/prometheus"
+	promclient "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -53,8 +55,18 @@ func main() {
 		}
 	}()
 
+	// Preparing RequiredAcks option, as client can't be altered after initialized
+	kgoOpts := []kgo.Opt{}
+	if cfg.Minion.EndToEnd.Enabled {
+		ack := kgo.AllISRAcks()
+		if cfg.Minion.EndToEnd.Producer.RequiredAcks == 1 {
+			ack = kgo.LeaderAck()
+			kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
+		}
+		kgoOpts = append(kgoOpts, kgo.RequiredAcks(ack))
+	}
 	// Create kafka service and check if client can successfully connect to Kafka cluster
-	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger)
+	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger, kgoOpts)
 	if err != nil {
 		logger.Fatal("failed to setup kafka service", zap.Error(err))
 	}
@@ -67,7 +79,7 @@ func main() {
 
 	// Create minion service that does most of the work. The Prometheus exporter only talks to the minion service
 	// which issues all the requests to Kafka and wraps the interface accordingly.
-	minionSvc, err := minion.NewService(cfg.Minion, logger, kafkaSvc)
+	minionSvc, err := minion.NewService(cfg.Minion, logger, kafkaSvc, cfg.Exporter.Namespace)
 	if err != nil {
 		logger.Fatal("failed to setup minion service", zap.Error(err))
 	}

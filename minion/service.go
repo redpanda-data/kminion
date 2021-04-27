@@ -3,14 +3,16 @@ package minion
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"sync"
+	"time"
+
 	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
-	"regexp"
-	"sync"
-	"time"
 )
 
 type Service struct {
@@ -29,10 +31,23 @@ type Service struct {
 
 	kafkaSvc *kafka.Service
 	storage  *Storage
+
+	endtoendLatencyHistogram *prometheus.Histogram
+	commitLatencyHistogram   *prometheus.Histogram
+
+	metricNamespace string
 }
 
-func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Service, error) {
+func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
 	storage, err := newStorage(logger)
+	var endtoendLatencyHistogram *prometheus.Histogram
+	var commitLatencyHistogram *prometheus.Histogram
+
+	if cfg.EndToEnd.Enabled {
+		endtoendLatencyHistogram = initEndtoendLatencyHistogram(cfg, metricNamespace)
+		commitLatencyHistogram = initCommitLatencyHistogram(cfg, metricNamespace)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
@@ -58,6 +73,9 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service) (*Servi
 
 		kafkaSvc: kafkaSvc,
 		storage:  storage,
+
+		endtoendLatencyHistogram: endtoendLatencyHistogram,
+		commitLatencyHistogram:   commitLatencyHistogram,
 	}, nil
 }
 
@@ -69,6 +87,10 @@ func (s *Service) Start(ctx context.Context) error {
 
 	if s.Cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
 		go s.startConsumingOffsets(ctx)
+	}
+
+	if s.Cfg.EndToEnd.Enabled {
+		go s.initEndToEnd(ctx)
 	}
 
 	return nil

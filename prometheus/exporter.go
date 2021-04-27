@@ -2,12 +2,13 @@ package prometheus
 
 import (
 	"context"
+	"os"
+	"time"
+
 	"github.com/cloudhut/kminion/v2/minion"
 	uuid2 "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"os"
-	"time"
 )
 
 // Exporter is the Prometheus exporter that implements the prometheus.Collector interface
@@ -42,6 +43,13 @@ type Exporter struct {
 	consumerGroupTopicPartitionLag *prometheus.Desc
 	consumerGroupTopicLag          *prometheus.Desc
 	offsetCommits                  *prometheus.Desc
+
+	// EndToEnd
+	endToEndProducerUp               *prometheus.Desc
+	endToEndConsumerUp               *prometheus.Desc
+	endToEndLatencyInfo              *prometheus.Desc
+	endToEndOffsetCommitAvailability *prometheus.Desc
+	endToEndMessageLossRate          *prometheus.Desc
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
@@ -169,6 +177,36 @@ func (e *Exporter) InitializeMetrics() {
 		nil,
 	)
 
+	// End-to-End metrics
+	// Producer up
+	e.endToEndProducerUp = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_producer_up"),
+		"Gauge value is 1 if end-to-end producer is up.",
+		nil,
+		nil,
+	)
+	// Consumer up
+	e.endToEndConsumerUp = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_consumer_up"),
+		"Gauge value is 1 if end-to-end consumer is up.",
+		nil,
+		nil,
+	)
+	// OffsetCommit Availability
+	e.endToEndOffsetCommitAvailability = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_offset_commit_availability"),
+		"Gauge value is 1 if end-to-end is able to commit offset.",
+		nil,
+		nil,
+	)
+
+	// OffsetCommit Availability
+	e.endToEndMessageLossRate = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "end_to_end_message_loss_rate"),
+		"Gauge value is 1 if end-to-end is able to commit offset.",
+		nil,
+		nil,
+	)
 }
 
 // Describe implements the prometheus.Collector interface. It sends the
@@ -197,6 +235,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ok = e.collectTopicPartitionOffsets(ctx, ch) && ok
 	ok = e.collectConsumerGroupLags(ctx, ch) && ok
 	ok = e.collectTopicInfo(ctx, ch) && ok
+	ok = e.collectEndToEnd(ctx, ch) && ok
 
 	if ok {
 		ch <- prometheus.MustNewConstMetric(e.exporterUp, prometheus.GaugeValue, 1.0)
