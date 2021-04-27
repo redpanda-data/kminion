@@ -219,7 +219,7 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 
 func (s *Service) initEndToEnd(ctx context.Context) {
 
-	reconciliationInterval := s.Cfg.EndToEnd.TopicManagement.ReconcilationInterval
+	reconciliationInterval := s.Cfg.EndToEnd.TopicManagement.ReconciliationInterval
 	c1 := make(chan error, 1)
 
 	// Run long running function on validating or reconciling that might be timeout

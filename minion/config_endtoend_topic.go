@@ -6,17 +6,17 @@ import (
 )
 
 type EndToEndTopicConfig struct {
-	Enabled               bool          `koanf:"enabled"`
-	Name                  string        `koanf:"name"`
-	ReplicationFactor     int           `koanf:"replicationFactor"`
-	PartitionsPerBroker   int           `koanf:"partitionsPerBroker"`
-	ReconcilationInterval time.Duration `koanf:"reconcilationInterval"`
+	Enabled                bool          `koanf:"enabled"`
+	Name                   string        `koanf:"name"`
+	ReplicationFactor      int           `koanf:"replicationFactor"`
+	PartitionsPerBroker    int           `koanf:"partitionsPerBroker"`
+	ReconciliationInterval time.Duration `koanf:"reconciliationInterval"`
 }
 
 func (c *EndToEndTopicConfig) SetDefaults() {
 	c.Enabled = true
 	c.Name = "kminion-end-to-end"
-	c.ReconcilationInterval = 10 * time.Minute
+	c.ReconciliationInterval = 10 * time.Minute
 }
 
 func (c *EndToEndTopicConfig) Validate() error {
@@ -30,8 +30,8 @@ func (c *EndToEndTopicConfig) Validate() error {
 	}
 
 	// If the timeduration is 0s or 0ms or its variation of zero, it will be parsed as 0
-	if c.ReconcilationInterval == 0 {
-		return fmt.Errorf("failed to validate topic.ReconcilationInterval config, the duration can't be zero")
+	if c.ReconciliationInterval == 0 {
+		return fmt.Errorf("failed to validate topic.ReconciliationInterval config, the duration can't be zero")
 	}
 
 	return nil
