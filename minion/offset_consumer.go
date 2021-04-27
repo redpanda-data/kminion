@@ -3,12 +3,13 @@ package minion
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/twmb/franz-go/pkg/kbin"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
-	"time"
 )
 
 // startConsumingOffsets consumes the __consumer_offsets topic and forwards the kafka messages to their respective
@@ -108,7 +109,13 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		consumedOffsets := s.storage.getConsumedOffsets()
 		topicRes := highMarksRes.Topics[0]
 		isReady := true
-		partitionsLagging := 0
+
+		type laggingParition struct {
+			Name string
+			Id   int32
+			Lag  int64
+		}
+		var partitionsLagging []laggingParition
 		totalLag := int64(0)
 		for _, partition := range topicRes.Partitions {
 			err := kerr.ErrorForCode(partition.ErrorCode)
@@ -126,7 +133,11 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 			}
 
 			if partitionLag > 0 {
-				partitionsLagging++
+				partitionsLagging = append(partitionsLagging, laggingParition{
+					Name: topicRes.Topic,
+					Id:   partition.Partition,
+					Lag:  partitionLag,
+				})
 				totalLag += partitionLag
 				s.logger.Debug("consumer_offsets topic lag has not been caught up yet",
 					zap.Int32("partition_id", partition.Partition),
@@ -143,7 +154,8 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 			return
 		} else {
 			s.logger.Info("catching up the message lag on consumer offsets",
-				zap.Int("lagging_partitions", partitionsLagging),
+				zap.Int("lagging_partitions_count", len(partitionsLagging)),
+				zap.Any("lagging_partitions", partitionsLagging),
 				zap.Int64("total_lag", totalLag))
 		}
 	}
