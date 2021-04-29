@@ -123,7 +123,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	return nil
 }
 
-func getTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestTopicConfig {
+func createTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestTopicConfig {
 
 	minISRConf := kmsg.NewCreateTopicsRequestTopicConfig()
 	minISR := strconv.Itoa(cfgTopic.ReplicationFactor)
@@ -158,7 +158,7 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 	s.logger.Info(fmt.Sprintf("creating topic %s for EndToEnd metrics", s.Cfg.EndToEnd.TopicManagement.Name))
 
 	cfgTopic := s.Cfg.EndToEnd.TopicManagement
-	topicConfigs := getTopicConfig(cfgTopic)
+	topicConfigs := createTopicConfig(cfgTopic)
 
 	topic := kmsg.NewCreateTopicsRequestTopic()
 	topic.Topic = cfgTopic.Name
@@ -241,7 +241,7 @@ func (s *Service) initEndToEnd(ctx context.Context) {
 
 		t := time.NewTicker(s.Cfg.EndToEnd.ProbeInterval)
 		for range t.C {
-			s.ProduceToManagementTopic(ctx)
+			s.produceToManagementTopic(ctx)
 		}
 	}
 }

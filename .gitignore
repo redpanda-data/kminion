@@ -19,3 +19,5 @@ config
 
 # go debug binary
 __debug_bin
+
+notes.md

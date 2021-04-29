@@ -13,8 +13,8 @@ import (
 
 func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 	client := s.kafkaSvc.Client
-	topicMessage := s.Cfg.EndToEnd.TopicManagement.Name
-	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicMessage)
+	topicName := s.Cfg.EndToEnd.TopicManagement.Name
+	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicName)
 	balancer := kgo.Balancers(kgo.CooperativeStickyBalancer()) // Default GroupBalancer
 	switch s.Cfg.EndToEnd.Consumer.RebalancingProtocol {
 	case RoundRobin:
@@ -25,16 +25,18 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 		balancer = kgo.Balancers(kgo.StickyBalancer())
 	}
 	client.AssignPartitions(topic)
-	client.AssignGroup(s.Cfg.EndToEnd.Consumer.GroupId, kgo.GroupTopics(topicMessage), balancer)
-	s.logger.Info("starting to consume topicManagement")
+
+	// todo: use minionID as part of group id
+	//
+	client.AssignGroup(s.Cfg.EndToEnd.Consumer.GroupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
+	s.logger.Info("Starting to consume " + topicName)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			startConsumeTimestamp := timeNowMs()
-			fetches := client.PollFetches(ctx)
+			fetches := client.PollRecords(ctx, 10)
 			errors := fetches.Errors()
 			for _, err := range errors {
 				// Log all errors and continue afterwards as we might get errors and still have some fetch results
@@ -44,6 +46,10 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					zap.Error(err.Err))
 			}
 
+			receiveTimestamp := timeNowMs()
+
+			//
+			// Process messages
 			iter := fetches.RecordIter()
 			var record *kgo.Record
 			for !iter.Done() {
@@ -53,30 +59,56 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					continue
 				}
 
-				res := TopicManagementRecord{}
-				json.Unmarshal(record.Value, &res)
+				// Deserialize message
+				var msg TopicManagementRecord
+				if jerr := json.Unmarshal(record.Value, &msg); jerr != nil {
+					continue // failed, maybe sent by an older version?
+				}
 
-				// Push the latency to endtoendLatencies that will be consumed by prometheus later
-				latencySec := float64(timeNowMs()-res.Timestamp) / float64(1000)
-				s.observeLatencyHistogram(latencySec, int(record.Partition))
-				s.storage.markRecordConsumed(record)
+				if msg.MinionID != s.minionID {
+					continue // we didn't send this message
+				}
+
+				if msg.Timestamp < s.lastRoundtripTimestamp {
+					continue // received an older message
+				}
+
+				latencyMs := receiveTimestamp - msg.Timestamp
+				if latencyMs > s.Cfg.EndToEnd.Consumer.RoundtripSla.Milliseconds() {
+					s.endToEndWithinRoundtripSla.Set(0) // we're no longer within the roundtrip sla
+					continue                            // message is too old
+				}
+
+				// Message is a match and arrived in time!
+				s.lastRoundtripTimestamp = msg.Timestamp
+				s.endToEndMessagesReceived.Inc()
+				s.endToEndRoundtripLatency.Observe(float64(latencyMs) / 1000)
 			}
-			uncommittedOffset := client.UncommittedOffsets()
-			// Only commit if uncommittedOffset returns value
-			if uncommittedOffset != nil {
+
+			//
+			// Commit offsets for processed messages
+			if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
+
 				startCommitTimestamp := timeNowMs()
+
 				client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, _ *kmsg.OffsetCommitResponse, err error) {
+					// got commit response
 					if err != nil {
 						s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
 						s.setCachedItem("end_to_end_consumer_offset_availability", false, 120*time.Second)
 					} else {
 						commitLatencySec := float64(timeNowMs()-startCommitTimestamp) / float64(1000)
-						s.observeCommitLatencyHistogram(commitLatencySec, int(record.Partition))
-						s.setCachedItem("end_to_end_consumer_offset_availability", true, 120*time.Second)
+						s.endToEndCommitLatency.Observe(commitLatencySec)
+						s.endToEndMessagesCommitted.Inc()
+
+						if commitLatencySec <= s.Cfg.EndToEnd.Consumer.CommitSla.Seconds() {
+							s.endToEndWithinCommitSla.Set(1)
+						} else {
+							s.endToEndWithinCommitSla.Set(0)
+						}
 					}
 				})
 			}
-			s.setCachedItem("end_to_end_consume_duration", timeNowMs()-startConsumeTimestamp, 120*time.Second)
 		}
 	}
 

@@ -2,20 +2,23 @@ package minion
 
 import (
 	"fmt"
-	"github.com/orcaman/concurrent-map"
+	"strconv"
+	"time"
+
+	cmap "github.com/orcaman/concurrent-map"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
-	"strconv"
-	"time"
 )
 
 // Storage stores the current state of all consumer group information that has been consumed using the offset consumer.
 type Storage struct {
 	logger *zap.Logger
 
-	// offsetCommits is a map of all consumer offsets. A unique key in the format "group:topic:partition" is used as map key.
+	// offsetCommits is a map of all consumer offsets.
+	// A unique key in the format "group:topic:partition" is used as map key.
+	// Value is of type OffsetCommit
 	offsetCommits cmap.ConcurrentMap
 
 	// progressTracker is a map that tracks what offsets in each partition have already been consumed

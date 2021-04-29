@@ -13,15 +13,18 @@ const (
 )
 
 type EndToEndConsumerConfig struct {
-	GroupId             string        `koanf:"groupId"`
-	LatencySla          time.Duration `koanf:"latencySla"`
-	RebalancingProtocol string        `koanf:"rebalancingProtocol"`
+	GroupId             string `koanf:"groupId"`
+	RebalancingProtocol string `koanf:"rebalancingProtocol"`
+
+	RoundtripSla time.Duration `koanf:"roundtripSla"`
+	CommitSla    time.Duration `koanf:"commitSla"`
 }
 
 func (c *EndToEndConsumerConfig) SetDefaults() {
 	c.GroupId = "kminion-end-to-end"
 	c.RebalancingProtocol = "cooperativeSticky"
-	c.LatencySla = 20 * time.Second
+	c.RoundtripSla = 20 * time.Second
+	c.CommitSla = 10 * time.Second // no idea what to use as a good default value
 }
 
 func (c *EndToEndConsumerConfig) Validate() error {
@@ -32,9 +35,12 @@ func (c *EndToEndConsumerConfig) Validate() error {
 		return fmt.Errorf("given RebalancingProtocol '%v' is invalid", c.RebalancingProtocol)
 	}
 
-	// If the timeduration is 0s or 0ms or its variation of zero, it will be parsed as 0
-	if c.LatencySla == 0 {
-		return fmt.Errorf("failed to validate consumer.latencySla config, the duration can't be zero")
+	if c.RoundtripSla <= 0 {
+		return fmt.Errorf("consumer.roundtripSla must be greater than zero")
+	}
+
+	if c.CommitSla <= 0 {
+		return fmt.Errorf("consumer.commitSla must be greater than zero")
 	}
 
 	return nil
