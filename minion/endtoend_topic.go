@@ -3,7 +3,6 @@ package minion
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -125,31 +124,30 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 func createTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestTopicConfig {
 
-	minISRConf := kmsg.NewCreateTopicsRequestTopicConfig()
-	minISR := strconv.Itoa(cfgTopic.ReplicationFactor)
-	minISRConf.Name = "min.insync.replicas"
-	minISRConf.Value = &minISR
+	topicConfig := func(name string, value interface{}) kmsg.CreateTopicsRequestTopicConfig {
+		prop := kmsg.NewCreateTopicsRequestTopicConfig()
+		prop.Name = name
+		valStr := string(fmt.Sprintf("%v", value))
+		prop.Value = &valStr
+		return prop
+	}
 
-	cleanupPolicyConf := kmsg.NewCreateTopicsRequestTopicConfig()
-	cleanupStr := "delete"
-	cleanupPolicyConf.Name = "cleanup.policy"
-	cleanupPolicyConf.Value = &cleanupStr
+	minISR := 1
+	if cfgTopic.ReplicationFactor >= 3 {
+		// Only with 3+ replicas does it make sense to require acks from 2 brokers
+		// todo: think about if we should change how 'producer.requiredAcks' works.
+		//       we probably don't even need this configured on the topic directly...
+		minISR = 2
+	}
 
-	retentionByteConf := kmsg.NewCreateTopicsRequestTopicConfig()
-	retentionStr := "10000000"
-	retentionByteConf.Name = "retention.bytes"
-	retentionByteConf.Value = &retentionStr
-
-	segmentByteConf := kmsg.NewCreateTopicsRequestTopicConfig()
-	segmentStr := "1000000"
-	segmentByteConf.Name = "segment.bytes"
-	segmentByteConf.Value = &segmentStr
-
+	// Even though kminion's end-to-end feature actually does not require any
+	// real persistence beyond a few minutes; it might be good too keep messages
+	// around a bit for debugging.
 	return []kmsg.CreateTopicsRequestTopicConfig{
-		minISRConf,
-		cleanupPolicyConf,
-		retentionByteConf,
-		segmentByteConf,
+		topicConfig("cleanup.policy", "delete"),
+		topicConfig("segment.ms", (time.Hour * 12).Milliseconds()),   // new segment every 12h
+		topicConfig("retention.ms", (time.Hour * 24).Milliseconds()), // discard segments older than 24h
+		topicConfig("min.insync.replicas", minISR),
 	}
 }
 
