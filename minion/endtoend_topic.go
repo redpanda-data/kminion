@@ -22,11 +22,11 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	// TopicMetadataArray could be empty, therefore needs to do this check beforehand
 	topicMetadataArray := topicMetadata.Topics
 	if len(topicMetadataArray) == 0 {
-		return fmt.Errorf("Unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
+		return fmt.Errorf("unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
 	}
 	doesTopicReachable := topicMetadata.Topics[0].Topic != ""
 	if !doesTopicReachable {
-		return fmt.Errorf("Unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
+		return fmt.Errorf("unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
 	}
 
 	// Create the management end to end topic if it does not exist
@@ -43,7 +43,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	// topicMetadata.Brokers will return all the available brokers from the cluster
 	isNumBrokerValid := len(topicMetadata.Brokers) >= expectedReplicationFactor
 	if !isNumBrokerValid {
-		return fmt.Errorf("Current cluster size differs from the expected size. Expected broker: %v NumOfBroker: %v", len(topicMetadata.Brokers), expectedReplicationFactor)
+		return fmt.Errorf("current cluster size differs from the expected size. expected broker: %v NumOfBroker: %v", len(topicMetadata.Brokers), expectedReplicationFactor)
 	}
 
 	// Check the number of Partition per broker, if it is too low create partition
@@ -244,6 +244,6 @@ func (s *Service) initEndToEnd(ctx context.Context) {
 	}
 }
 
-func timeNowMs() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
+func timeNowMs() float64 {
+	return float64(time.Now().UnixNano()) / float64(time.Millisecond)
 }

@@ -36,8 +36,8 @@ type Service struct {
 	storage  *Storage
 
 	// EndToEnd
-	minionID               string // unique identifier, reported in metrics, in case multiple instances run at the same time
-	lastRoundtripTimestamp int64  // creation time (in utc ms) of the message that most recently passed the roundtripSla check
+	minionID               string  // unique identifier, reported in metrics, in case multiple instances run at the same time
+	lastRoundtripTimestamp float64 // creation time (in utc ms) of the message that most recently passed the roundtripSla check
 
 	// EndToEnd Metrics
 	endToEndMessagesProduced  prometheus.Counter
@@ -45,16 +45,9 @@ type Service struct {
 	endToEndMessagesReceived  prometheus.Counter
 	endToEndMessagesCommitted prometheus.Counter
 
-	endToEndWithinAckSla       prometheus.Gauge
-	endToEndWithinRoundtripSla prometheus.Gauge
-	endToEndWithinCommitSla    prometheus.Gauge
-
-	endToEndProduceLatency   prometheus.Histogram
+	endToEndAckLatency       prometheus.Histogram
 	endToEndRoundtripLatency prometheus.Histogram
 	endToEndCommitLatency    prometheus.Histogram
-
-	// todo: produce latency histogram
-
 }
 
 func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
@@ -92,14 +85,6 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 
 	// End-to-End metrics
 	if cfg.EndToEnd.Enabled {
-		makeGauge := func(name string, help string) prometheus.Gauge {
-			return promauto.NewGauge(prometheus.GaugeOpts{
-				Namespace: metricNamespace,
-				Subsystem: "end_to_end",
-				Name:      name,
-				Help:      help,
-			})
-		}
 		makeCounter := func(name string, help string) prometheus.Counter {
 			return promauto.NewCounter(prometheus.CounterOpts{
 				Namespace: metricNamespace,
@@ -119,26 +104,18 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 		}
 
 		// Low-level info
-		// Users can construct stuff like "message commits failed" themselves from those
-		service.endToEndMessagesProduced = makeCounter("messages_produced", "Number of messages that kminion's end-to-end test has tried to send to kafka")
-		service.endToEndMessagesAcked = makeCounter("messages_acked", "Number of messages kafka acknowledged as produced")
-		service.endToEndMessagesReceived = makeCounter("messages_received", "Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)")
-		service.endToEndMessagesCommitted = makeCounter("messages_committed", "Number of *matching* messages kminion successfully commited as read/processed. See 'messages_received' for what 'matching' means. Kminion will commit late/mismatching messages to kafka as well, but those won't be counted in this metric.")
-
-		// High-level SLA reporting
-		// Simple gauges that report if stuff is within the configured SLAs
-		// Naturally those will potentially not trigger if, for example, only a single message is lost in-between scrap intervals.
-		gaugeHelp := "Will be either 0 (false) or 1 (true), depending on the durations (SLAs) configured in kminion's config"
-		service.endToEndWithinAckSla = makeGauge("is_within_ack_sla", "Reports whether messages can be produced. A message is only considered 'produced' when the broker has sent an ack within the configured timeout. "+gaugeHelp)
-		service.endToEndWithinRoundtripSla = makeGauge("is_within_roundtrip_sla", "Reports whether or not kminion receives the test messages it produces within the configured timeout. "+gaugeHelp)
-		service.endToEndWithinCommitSla = makeGauge("is_within_commit_sla", "Reports whether or not kminion can successfully commit offsets for the messages it receives/processes within the configured timeout. "+gaugeHelp)
+		// Users can construct alerts like "can't produce messages" themselves from those
+		service.endToEndMessagesProduced = makeCounter("messages_produced_total", "Number of messages that kminion's end-to-end test has tried to send to kafka")
+		service.endToEndMessagesAcked = makeCounter("messages_acked_total", "Number of messages kafka acknowledged as produced")
+		service.endToEndMessagesReceived = makeCounter("messages_received_total", "Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)")
+		service.endToEndMessagesCommitted = makeCounter("messages_committed_total", "Number of *matching* messages kminion successfully commited as read/processed. See 'messages_received' for what 'matching' means. Kminion will commit late/mismatching messages to kafka as well, but those won't be counted in this metric.")
 
 		// Latency Histograms
 		// More detailed info about how long stuff took
-		// Since histograms also have an 'infinite' bucket, they can be used to detect small hickups that won't trigger the SLA gauges
-		service.endToEndProduceLatency = makeHistogram("produce_latency", cfg.EndToEnd.Producer.AckSla, "Time until we received an ack for a produced message")
-		service.endToEndRoundtripLatency = makeHistogram("roundtrip_latency", cfg.EndToEnd.Consumer.RoundtripSla, "Time it took between sending (producing) and receiving (consuming) a message")
-		service.endToEndCommitLatency = makeHistogram("commit_latency", cfg.EndToEnd.Consumer.CommitSla, "Time kafka took to respond to kminion's offset commit")
+		// Since histograms also have an 'infinite' bucket, they can be used to detect small hickups "lost" messages
+		service.endToEndAckLatency = makeHistogram("produce_latency_seconds", cfg.EndToEnd.Producer.AckSla, "Time until we received an ack for a produced message")
+		service.endToEndRoundtripLatency = makeHistogram("roundtrip_latency_seconds", cfg.EndToEnd.Consumer.RoundtripSla, "Time it took between sending (producing) and receiving (consuming) a message")
+		service.endToEndCommitLatency = makeHistogram("commit_latency_seconds", cfg.EndToEnd.Consumer.CommitSla, "Time kafka took to respond to kminion's offset commit")
 	}
 
 	return service, nil
@@ -235,4 +212,42 @@ func createHistogramBuckets(maxLatency time.Duration) []float64 {
 	bucket := prometheus.ExponentialBuckets(0.005, 2, count)
 
 	return bucket
+}
+
+// called from e2e when a message is acknowledged
+func (s *Service) onAck(partitionId int32, duration time.Duration) {
+	s.endToEndMessagesAcked.Inc()
+	s.endToEndAckLatency.Observe(duration.Seconds())
+}
+
+// called from e2e when a message completes a roundtrip (send to kafka, receive msg from kafka again)
+func (s *Service) onRoundtrip(partitionId int32, duration time.Duration) {
+	if duration > s.Cfg.EndToEnd.Consumer.RoundtripSla {
+		return // message is too old
+	}
+
+	// todo: track "lastRoundtripMessage"
+	// if msg.Timestamp < s.lastRoundtripTimestamp {
+	// 	return // msg older than what we recently processed (out of order, should never happen)
+	// }
+
+	s.endToEndMessagesReceived.Inc()
+	s.endToEndRoundtripLatency.Observe(duration.Seconds())
+}
+
+// called from e2e when an offset commit is confirmed
+func (s *Service) onOffsetCommit(partitionId int32, duration time.Duration) {
+
+	// todo:
+	// if the commit took too long, don't count it in 'commits' but add it to the histogram?
+	// and how do we want to handle cases where we get an error??
+	// should we have another metric that tells us about failed commits? or a label on the counter?
+
+	s.endToEndCommitLatency.Observe(duration.Seconds())
+
+	if duration > s.Cfg.EndToEnd.Consumer.CommitSla {
+		return
+	}
+
+	s.endToEndMessagesCommitted.Inc()
 }

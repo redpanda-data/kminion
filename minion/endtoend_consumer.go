@@ -46,7 +46,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					zap.Error(err.Err))
 			}
 
-			receiveTimestamp := timeNowMs()
+			receiveTimestampMs := timeNowMs()
 
 			//
 			// Process messages
@@ -59,13 +59,13 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					continue
 				}
 
-				s.processMessage(record, receiveTimestamp)
+				s.processMessage(record, receiveTimestampMs)
 			}
 
 			//
 			// Commit offsets for processed messages
-			// todo:
-			// - do we need to keep track of what offset to commit for which partition??
+			// todo: the normal way to commit offsets with franz-go is pretty good, but in our special case
+			// 		 we want to do it manually, seperately for each partition, so we can track how long it took
 			if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
 
 				startCommitTimestamp := timeNowMs()
@@ -74,18 +74,14 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					// got commit response
 					if err != nil {
 						s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
-						s.setCachedItem("end_to_end_consumer_offset_availability", false, 120*time.Second)
-					} else {
-						commitLatencySec := float64(timeNowMs()-startCommitTimestamp) / float64(1000)
-						s.endToEndCommitLatency.Observe(commitLatencySec)
-						s.endToEndMessagesCommitted.Inc()
-
-						if commitLatencySec <= s.Cfg.EndToEnd.Consumer.CommitSla.Seconds() {
-							s.endToEndWithinCommitSla.Set(1)
-						} else {
-							s.endToEndWithinCommitSla.Set(0)
-						}
+						return
 					}
+
+					latencyMs := timeNowMs() - startCommitTimestamp
+					commitLatency := time.Duration(latencyMs * float64(time.Millisecond))
+
+					// todo: partitionID
+					s.onOffsetCommit(0, commitLatency)
 				})
 			}
 		}
@@ -99,7 +95,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 // processMessage takes a message and:
 // - checks if it matches minionID and latency
 // - updates metrics accordingly
-func (s *Service) processMessage(record *kgo.Record, receiveTimestamp int64) {
+func (s *Service) processMessage(record *kgo.Record, receiveTimestampMs float64) {
 	var msg EndToEndMessage
 	if jerr := json.Unmarshal(record.Value, &msg); jerr != nil {
 		return // maybe older version
@@ -109,17 +105,7 @@ func (s *Service) processMessage(record *kgo.Record, receiveTimestamp int64) {
 		return // not from us
 	}
 
-	if msg.Timestamp < s.lastRoundtripTimestamp {
-		return // msg older than what we recently processed (out of order, should never happen)
-	}
+	latency := time.Duration((receiveTimestampMs - msg.Timestamp) * float64(time.Millisecond))
 
-	latencyMs := receiveTimestamp - msg.Timestamp
-	if latencyMs > s.Cfg.EndToEnd.Consumer.RoundtripSla.Milliseconds() {
-		s.endToEndWithinRoundtripSla.Set(0)
-		return // too late!
-	}
-
-	s.lastRoundtripTimestamp = msg.Timestamp
-	s.endToEndMessagesReceived.Inc()
-	s.endToEndRoundtripLatency.Observe(float64(latencyMs) / 1000)
+	s.onRoundtrip(record.Partition, latency)
 }
