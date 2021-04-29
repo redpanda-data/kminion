@@ -9,7 +9,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-type TopicManagementRecord struct {
+type EndToEndMessage struct {
 	MinionID  string `json:"minionID"`
 	Timestamp int64  `json:"timestamp"`
 }
@@ -60,7 +60,7 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 func createEndToEndRecord(topicName string, minionID string) (*kgo.Record, error) {
 
 	timestamp := timeNowMs()
-	message := TopicManagementRecord{
+	message := EndToEndMessage{
 		MinionID:  minionID,
 		Timestamp: timestamp,
 	}

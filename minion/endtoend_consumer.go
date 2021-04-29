@@ -40,7 +40,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 			errors := fetches.Errors()
 			for _, err := range errors {
 				// Log all errors and continue afterwards as we might get errors and still have some fetch results
-				s.logger.Error("failed to fetch records from kafka",
+				s.logger.Error("kafka fetch error",
 					zap.String("topic", err.Topic),
 					zap.Int32("partition", err.Partition),
 					zap.Error(err.Err))
@@ -59,34 +59,13 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					continue
 				}
 
-				// Deserialize message
-				var msg TopicManagementRecord
-				if jerr := json.Unmarshal(record.Value, &msg); jerr != nil {
-					continue // failed, maybe sent by an older version?
-				}
-
-				if msg.MinionID != s.minionID {
-					continue // we didn't send this message
-				}
-
-				if msg.Timestamp < s.lastRoundtripTimestamp {
-					continue // received an older message
-				}
-
-				latencyMs := receiveTimestamp - msg.Timestamp
-				if latencyMs > s.Cfg.EndToEnd.Consumer.RoundtripSla.Milliseconds() {
-					s.endToEndWithinRoundtripSla.Set(0) // we're no longer within the roundtrip sla
-					continue                            // message is too old
-				}
-
-				// Message is a match and arrived in time!
-				s.lastRoundtripTimestamp = msg.Timestamp
-				s.endToEndMessagesReceived.Inc()
-				s.endToEndRoundtripLatency.Observe(float64(latencyMs) / 1000)
+				s.processMessage(record, receiveTimestamp)
 			}
 
 			//
 			// Commit offsets for processed messages
+			// todo:
+			// - do we need to keep track of what offset to commit for which partition??
 			if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
 
 				startCommitTimestamp := timeNowMs()
@@ -114,18 +93,33 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 
 }
 
-func (s *Service) ConsumeDurationMs(ctx context.Context) (int64, bool) {
-	ms, exists := s.getCachedItem("end_to_end_consume_duration")
-	if exists {
-		return ms.(int64), true
-	}
-	return 0, false
-}
+// todo: extract whole end-to-end feature into its own package
+// todo: then also create a "tracker" that knows about in-flight messages, and the latest successful roundtrips
 
-func (s *Service) OffsetCommitAvailability(ctx context.Context) bool {
-	ok, exists := s.getCachedItem("end_to_end_consumer_offset_availability")
-	if !exists {
-		return false
+// processMessage takes a message and:
+// - checks if it matches minionID and latency
+// - updates metrics accordingly
+func (s *Service) processMessage(record *kgo.Record, receiveTimestamp int64) {
+	var msg EndToEndMessage
+	if jerr := json.Unmarshal(record.Value, &msg); jerr != nil {
+		return // maybe older version
 	}
-	return ok.(bool)
+
+	if msg.MinionID != s.minionID {
+		return // not from us
+	}
+
+	if msg.Timestamp < s.lastRoundtripTimestamp {
+		return // msg older than what we recently processed (out of order, should never happen)
+	}
+
+	latencyMs := receiveTimestamp - msg.Timestamp
+	if latencyMs > s.Cfg.EndToEnd.Consumer.RoundtripSla.Milliseconds() {
+		s.endToEndWithinRoundtripSla.Set(0)
+		return // too late!
+	}
+
+	s.lastRoundtripTimestamp = msg.Timestamp
+	s.endToEndMessagesReceived.Inc()
+	s.endToEndRoundtripLatency.Observe(float64(latencyMs) / 1000)
 }
