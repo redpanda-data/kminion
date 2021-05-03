@@ -1,12 +1,16 @@
 package minion
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/cloudhut/kminion/v2/e2e"
+)
 
 type Config struct {
 	ConsumerGroups ConsumerGroupConfig `koanf:"consumerGroups"`
 	Topics         TopicConfig         `koanf:"topics"`
 	LogDirs        LogDirsConfig       `koanf:"logDirs"`
-	EndToEnd       EndToEndConfig      `koanf:"endToEnd"`
+	EndToEnd       e2e.Config          `koanf:"endToEnd"`
 }
 
 func (c *Config) SetDefaults() {

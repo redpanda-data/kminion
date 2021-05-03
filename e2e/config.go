@@ -1,11 +1,11 @@
-package minion
+package e2e
 
 import (
 	"fmt"
 	"time"
 )
 
-type EndToEndConfig struct {
+type Config struct {
 	Enabled         bool                   `koanf:"enabled"`
 	TopicManagement EndToEndTopicConfig    `koanf:"topicManagement"`
 	ProbeInterval   time.Duration          `koanf:"probeInterval"`
@@ -13,7 +13,7 @@ type EndToEndConfig struct {
 	Consumer        EndToEndConsumerConfig `koanf:"consumer"`
 }
 
-func (c *EndToEndConfig) SetDefaults() {
+func (c *Config) SetDefaults() {
 	c.Enabled = false
 	c.ProbeInterval = 2 * time.Second
 	c.TopicManagement.SetDefaults()
@@ -21,7 +21,7 @@ func (c *EndToEndConfig) SetDefaults() {
 	c.Consumer.SetDefaults()
 }
 
-func (c *EndToEndConfig) Validate() error {
+func (c *Config) Validate() error {
 
 	if !c.Enabled {
 		return nil

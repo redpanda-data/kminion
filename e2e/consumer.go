@@ -1,4 +1,4 @@
-package minion
+package e2e
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 
 func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 	client := s.kafkaSvc.Client
-	topicName := s.Cfg.EndToEnd.TopicManagement.Name
+	topicName := s.config.TopicManagement.Name
 	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicName)
 	balancer := kgo.Balancers(kgo.CooperativeStickyBalancer()) // Default GroupBalancer
-	switch s.Cfg.EndToEnd.Consumer.RebalancingProtocol {
+	switch s.config.Consumer.RebalancingProtocol {
 	case RoundRobin:
 		balancer = kgo.Balancers(kgo.RoundRobinBalancer())
 	case Range:
@@ -28,7 +28,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 
 	// todo: use minionID as part of group id
 	//
-	client.AssignGroup(s.Cfg.EndToEnd.Consumer.GroupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
+	client.AssignGroup(s.config.Consumer.GroupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
 	s.logger.Info("Starting to consume " + topicName)
 
 	for {

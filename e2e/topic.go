@@ -1,4 +1,4 @@
-package minion
+package e2e
 
 import (
 	"context"
@@ -11,8 +11,10 @@ import (
 
 func (s *Service) validateManagementTopic(ctx context.Context) error {
 
-	expectedReplicationFactor := s.Cfg.EndToEnd.TopicManagement.ReplicationFactor
-	expectedNumPartitionsPerBroker := s.Cfg.EndToEnd.TopicManagement.PartitionsPerBroker
+	s.logger.Info("validating end-to-end topic...")
+
+	expectedReplicationFactor := s.config.TopicManagement.ReplicationFactor
+	expectedNumPartitionsPerBroker := s.config.TopicManagement.PartitionsPerBroker
 	topicMetadata, err := s.getTopicMetadata(ctx)
 	if err != nil {
 		return err
@@ -43,7 +45,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	// topicMetadata.Brokers will return all the available brokers from the cluster
 	isNumBrokerValid := len(topicMetadata.Brokers) >= expectedReplicationFactor
 	if !isNumBrokerValid {
-		return fmt.Errorf("current cluster size differs from the expected size. expected broker: %v NumOfBroker: %v", len(topicMetadata.Brokers), expectedReplicationFactor)
+		return fmt.Errorf("current cluster size differs from the expected size (based on config topicManagement.replicationFactor). expected broker: %v NumOfBroker: %v", len(topicMetadata.Brokers), expectedReplicationFactor)
 	}
 
 	// Check the number of Partition per broker, if it is too low create partition
@@ -55,7 +57,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		assignment.Replicas = topicMetadata.Topics[0].Partitions[0].Replicas
 
 		topic := kmsg.NewCreatePartitionsRequestTopic()
-		topic.Topic = s.Cfg.EndToEnd.TopicManagement.Name
+		topic.Topic = s.config.TopicManagement.Name
 		topic.Count = int32(expectedNumPartitionsPerBroker) // Should be greater than current partition number
 		topic.Assignment = []kmsg.CreatePartitionsRequestTopicAssignment{assignment}
 
@@ -86,17 +88,17 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 			}
 		}
 	}
-	assignmentInvalid := len(distinctLeaderNodes) != s.Cfg.EndToEnd.TopicManagement.ReplicationFactor
+	assignmentInvalid := len(distinctLeaderNodes) != s.config.TopicManagement.ReplicationFactor
 	// Reassign Partitions on invalid assignment
 	if assignmentInvalid {
 		// Get the new AssignedReplicas by checking the ReplicationFactor config
-		assignedReplicas := make([]int32, s.Cfg.EndToEnd.TopicManagement.ReplicationFactor)
+		assignedReplicas := make([]int32, s.config.TopicManagement.ReplicationFactor)
 		for index := range assignedReplicas {
 			assignedReplicas[index] = int32(index)
 		}
 
 		// Generate the partition assignments from PartitionPerBroker config
-		partitions := make([]int32, s.Cfg.EndToEnd.TopicManagement.PartitionsPerBroker)
+		partitions := make([]int32, s.config.TopicManagement.PartitionsPerBroker)
 		reassignedPartitions := []kmsg.AlterPartitionAssignmentsRequestTopicPartition{}
 		for index := range partitions {
 			rp := kmsg.NewAlterPartitionAssignmentsRequestTopicPartition()
@@ -106,7 +108,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		}
 
 		managamentTopicReassignment := kmsg.NewAlterPartitionAssignmentsRequestTopic()
-		managamentTopicReassignment.Topic = s.Cfg.EndToEnd.TopicManagement.Name
+		managamentTopicReassignment.Topic = s.config.TopicManagement.Name
 		managamentTopicReassignment.Partitions = reassignedPartitions
 
 		reassignment := kmsg.NewAlterPartitionAssignmentsRequest()
@@ -153,9 +155,9 @@ func createTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestT
 
 func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg.MetadataResponse) error {
 
-	s.logger.Info(fmt.Sprintf("creating topic %s for EndToEnd metrics", s.Cfg.EndToEnd.TopicManagement.Name))
+	s.logger.Info(fmt.Sprintf("creating topic %s for EndToEnd metrics", s.config.TopicManagement.Name))
 
-	cfgTopic := s.Cfg.EndToEnd.TopicManagement
+	cfgTopic := s.config.TopicManagement
 	topicConfigs := createTopicConfig(cfgTopic)
 
 	topic := kmsg.NewCreateTopicsRequestTopic()
@@ -200,7 +202,7 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 
 func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse, error) {
 
-	cfg := s.Cfg.EndToEnd.TopicManagement
+	cfg := s.config.TopicManagement
 	topicReq := kmsg.NewMetadataRequestTopic()
 	topicReq.Topic = &cfg.Name
 
@@ -217,31 +219,38 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 
 func (s *Service) initEndToEnd(ctx context.Context) {
 
-	reconciliationInterval := s.Cfg.EndToEnd.TopicManagement.ReconciliationInterval
-	c1 := make(chan error, 1)
-
-	// Run long running function on validating or reconciling that might be timeout
+	validateTopicTicker := time.NewTicker(s.config.TopicManagement.ReconciliationInterval)
+	produceTicker := time.NewTicker(s.config.ProbeInterval)
+	// stop tickers when context is cancelled
 	go func() {
-		err := s.validateManagementTopic(ctx)
-		c1 <- err
+		<-ctx.Done()
+		produceTicker.Stop()
+		validateTopicTicker.Stop()
 	}()
 
-	// Listen on our channel AND a timeout channel - which ever happens first.
-	select {
-	case err := <-c1:
-		s.logger.Warn("failed to validate management topic for endtoend metrics", zap.Error(err))
-		return
-	case <-time.After(reconciliationInterval):
-		s.logger.Warn("time exceeded while validating/reconciling management topic of endtoend metrics")
-		return
-	default:
-		go s.ConsumeFromManagementTopic(ctx)
-
-		t := time.NewTicker(s.Cfg.EndToEnd.ProbeInterval)
-		for range t.C {
-			s.produceToManagementTopic(ctx)
+	// keep checking end-to-end topic
+	go func() {
+		for range validateTopicTicker.C {
+			err := s.validateManagementTopic(ctx)
+			if err != nil {
+				s.logger.Error("failed to validate end-to-end topic: %w", zap.Error(err))
+			}
 		}
-	}
+	}()
+
+	// start consuming topic
+	go s.ConsumeFromManagementTopic(ctx)
+
+	// start producing to topic
+	go func() {
+		for range produceTicker.C {
+			err := s.produceToManagementTopic(ctx)
+			if err != nil {
+				s.logger.Error("failed to produce to end-to-end topic: %w", zap.Error(err))
+			}
+		}
+	}()
+
 }
 
 func timeNowMs() float64 {

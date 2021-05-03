@@ -1,4 +1,4 @@
-package minion
+package e2e
 
 import (
 	"context"
@@ -17,7 +17,7 @@ type EndToEndMessage struct {
 
 func (s *Service) produceToManagementTopic(ctx context.Context) error {
 
-	topicName := s.Cfg.EndToEnd.TopicManagement.Name
+	topicName := s.config.TopicManagement.Name
 
 	record, err := createEndToEndRecord(topicName, s.minionID)
 	if err != nil {
