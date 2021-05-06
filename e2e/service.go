@@ -37,13 +37,18 @@ type Service struct {
 }
 
 // NewService creates a new instance of the e2e moinitoring service (wow)
-func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
+func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string, ctx context.Context) (*Service, error) {
+
+	client, err := createKafkaClient(cfg, logger, kafkaSvc, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kafka client for e2e: %w", err)
+	}
 
 	svc := &Service{
 		config:   cfg,
-		logger:   logger,
+		logger:   logger.With(zap.String("source", "end_to_end")),
 		kafkaSvc: kafkaSvc,
-		client:   nil,
+		client:   client,
 
 		minionID: uuid.NewString(),
 	}
@@ -81,6 +86,28 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 	svc.endToEndCommitLatency = makeHistogram("commit_latency_seconds", cfg.Consumer.CommitSla, "Time kafka took to respond to kminion's offset commit")
 
 	return svc, nil
+}
+
+func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, ctx context.Context) (*kgo.Client, error) {
+
+	// Add RequiredAcks, as options can't be altered later
+	kgoOpts := []kgo.Opt{}
+	if cfg.Enabled {
+		ack := kgo.AllISRAcks()
+		if cfg.Producer.RequiredAcks == 1 {
+			ack = kgo.LeaderAck()
+			kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
+		}
+		kgoOpts = append(kgoOpts, kgo.RequiredAcks(ack))
+	}
+
+	// Prepare hooks
+	hooksChildLogger := logger.With(zap.String("source", "end_to_end"))
+	e2eHooks := newEndToEndClientHooks(hooksChildLogger, "")
+	kgoOpts = append(kgoOpts, kgo.WithHooks(e2eHooks))
+
+	// Create kafka service and check if client can successfully connect to Kafka cluster
+	return kafkaSvc.CreateAndTestClient(logger, kgoOpts, ctx)
 }
 
 // Start starts the service (wow)

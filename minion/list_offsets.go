@@ -3,9 +3,10 @@ package minion
 import (
 	"context"
 	"fmt"
-	"github.com/twmb/franz-go/pkg/kmsg"
 	"strconv"
 	"time"
+
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 func (s *Service) ListOffsetsCached(ctx context.Context, timestamp int64) (*kmsg.ListOffsetsResponse, error) {
@@ -59,5 +60,5 @@ func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListO
 	req := kmsg.NewListOffsetsRequest()
 	req.Topics = topicReqs
 
-	return req.RequestWith(ctx, s.kafkaSvc.Client)
+	return req.RequestWith(ctx, s.client)
 }

@@ -15,7 +15,7 @@ import (
 // startConsumingOffsets consumes the __consumer_offsets topic and forwards the kafka messages to their respective
 // methods where they'll be decoded and further processed.
 func (s *Service) startConsumingOffsets(ctx context.Context) {
-	client := s.kafkaSvc.Client
+	client := s.client
 	topic := kgo.ConsumeTopics(kgo.NewOffset().AtStart(), "__consumer_offsets")
 	client.AssignPartitions(topic)
 
@@ -67,7 +67,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		topic.Topic = &topicName
 		req.Topics = []kmsg.MetadataRequestTopic{topic}
 
-		res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+		res, err := req.RequestWith(ctx, s.client)
 		if err != nil {
 			s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because metadata request failed",
 				zap.Error(err))
@@ -92,7 +92,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		}
 		offsetReq := kmsg.NewListOffsetsRequest()
 		offsetReq.Topics = topicReqs
-		highMarksRes, err := offsetReq.RequestWith(ctx, s.kafkaSvc.Client)
+		highMarksRes, err := offsetReq.RequestWith(ctx, s.client)
 		if err != nil {
 			s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because high watermark request failed",
 				zap.Error(err))

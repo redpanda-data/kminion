@@ -3,11 +3,11 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"go.uber.org/zap"
 )
 
 type EndToEndMessage struct {
@@ -32,13 +32,13 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 			startTime := timeNowMs()
 			s.endToEndMessagesProduced.Inc()
 
-			err = s.kafkaSvc.Client.Produce(ctx, record, func(r *kgo.Record, err error) {
+			err = s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
 				endTime := timeNowMs()
 				ackDurationMs := endTime - startTime
 				ackDuration := time.Duration(ackDurationMs) * time.Millisecond
 
 				if err != nil {
-					fmt.Printf("record had a produce error: %v\n", err)
+					s.logger.Error("error producing record: %w", zap.Error(err))
 				} else {
 					s.onAck(r.Partition, ackDuration)
 				}

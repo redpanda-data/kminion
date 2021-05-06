@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudhut/kminion/v2/e2e"
 	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
@@ -29,17 +29,24 @@ type Service struct {
 	AllowedTopicsExpr   []*regexp.Regexp
 	IgnoredTopicsExpr   []*regexp.Regexp
 
-	kafkaSvc *kafka.Service
-	storage  *Storage
-
-	endToEndService *e2e.Service
+	client  *kgo.Client
+	storage *Storage
 }
 
-func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
+func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricsNamespace string, ctx context.Context) (*Service, error) {
 	storage, err := newStorage(logger)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	// Kafka client
+	hooksChildLogger := logger.With(zap.String("source", "minion_kafka_client"))
+	minionHooks := newMinionClientHooks(hooksChildLogger, metricsNamespace)
+	kgoOpts := []kgo.Opt{kgo.WithHooks(minionHooks)}
+
+	client, err := kafkaSvc.CreateAndTestClient(logger, kgoOpts, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kafka client: %w", err)
 	}
 
 	// Compile regexes. We can ignore the errors because valid compilation has been validated already
@@ -61,24 +68,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 		AllowedTopicsExpr:   allowedTopicsExpr,
 		IgnoredTopicsExpr:   ignoredTopicsExpr,
 
-		kafkaSvc: kafkaSvc,
-		storage:  storage,
-
-		endToEndService: nil,
-	}
-
-	// Create end-to-end service
-	if cfg.EndToEnd.Enabled {
-		service.endToEndService, err = e2e.NewService(
-			cfg.EndToEnd,
-			logger.With(zap.String("component", "endToEnd")),
-			kafkaSvc,
-			metricNamespace,
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to create end-to-end monitoring service: %w", err)
-		}
+		client:  client,
+		storage: storage,
 	}
 
 	return service, nil
@@ -92,10 +83,6 @@ func (s *Service) Start(ctx context.Context) error {
 
 	if s.Cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
 		go s.startConsumingOffsets(ctx)
-	}
-
-	if s.Cfg.EndToEnd.Enabled {
-		go s.endToEndService.Start(ctx)
 	}
 
 	return nil

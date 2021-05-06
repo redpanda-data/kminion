@@ -3,6 +3,7 @@ package minion
 import (
 	"context"
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
@@ -23,7 +24,7 @@ func (s *Service) GetTopicConfigs(ctx context.Context) (*kmsg.DescribeConfigsRes
 		req.Resources = append(req.Resources, resourceReq)
 	}
 
-	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := req.RequestWith(ctx, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request metadata: %w", err)
 	}

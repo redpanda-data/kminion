@@ -3,8 +3,9 @@ package minion
 import (
 	"context"
 	"fmt"
-	"github.com/twmb/franz-go/pkg/kmsg"
 	"time"
+
+	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
 func (s *Service) GetMetadataCached(ctx context.Context) (*kmsg.MetadataResponse, error) {
@@ -36,7 +37,7 @@ func (s *Service) GetMetadata(ctx context.Context) (*kmsg.MetadataResponse, erro
 	req := kmsg.NewMetadataRequest()
 	req.Topics = nil
 
-	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := req.RequestWith(ctx, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request metadata: %w", err)
 	}

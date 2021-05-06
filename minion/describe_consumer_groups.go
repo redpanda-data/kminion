@@ -3,11 +3,12 @@ package minion
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
-	"time"
 )
 
 type DescribeConsumerGroupsResponse struct {
@@ -40,7 +41,7 @@ func (s *Service) listConsumerGroupsCached(ctx context.Context) (*kmsg.ListGroup
 
 func (s *Service) listConsumerGroups(ctx context.Context) (*kmsg.ListGroupsResponse, error) {
 	listReq := kmsg.NewListGroupsRequest()
-	res, err := listReq.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := listReq.RequestWith(ctx, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list consumer groups: %w", err)
 	}
@@ -66,7 +67,7 @@ func (s *Service) DescribeConsumerGroups(ctx context.Context) ([]DescribeConsume
 	describeReq := kmsg.NewDescribeGroupsRequest()
 	describeReq.Groups = groupIDs
 	describeReq.IncludeAuthorizedOperations = false
-	shardedResp := s.kafkaSvc.Client.RequestSharded(ctx, &describeReq)
+	shardedResp := s.client.RequestSharded(ctx, &describeReq)
 
 	describedGroups := make([]DescribeConsumerGroupsResponse, 0)
 	for _, kresp := range shardedResp {

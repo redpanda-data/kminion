@@ -63,7 +63,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 		create := kmsg.NewCreatePartitionsRequest()
 		create.Topics = []kmsg.CreatePartitionsRequestTopic{topic}
-		_, err := create.RequestWith(ctx, s.kafkaSvc.Client)
+		_, err := create.RequestWith(ctx, s.client)
 		if err != nil {
 			return fmt.Errorf("failed to do kmsg request on creating partitions: %w", err)
 		}
@@ -114,7 +114,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		reassignment := kmsg.NewAlterPartitionAssignmentsRequest()
 		reassignment.Topics = []kmsg.AlterPartitionAssignmentsRequestTopic{managamentTopicReassignment}
 
-		_, err := reassignment.RequestWith(ctx, s.kafkaSvc.Client)
+		_, err := reassignment.RequestWith(ctx, s.client)
 		if err != nil {
 			return fmt.Errorf("failed to do kmsg request on topic reassignment: %w", err)
 		}
@@ -187,7 +187,7 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 	req := kmsg.NewCreateTopicsRequest()
 	req.Topics = []kmsg.CreateTopicsRequestTopic{topic}
 
-	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := req.RequestWith(ctx, s.client)
 	// Sometimes it won't throw Error, but the Error will be abstracted to res.Topics[0].ErrorMessage
 	if res.Topics[0].ErrorMessage != nil {
 		return fmt.Errorf("failed to create topic: %s", *res.Topics[0].ErrorMessage)
@@ -209,7 +209,7 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 	req := kmsg.NewMetadataRequest()
 	req.Topics = []kmsg.MetadataRequestTopic{topicReq}
 
-	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := req.RequestWith(ctx, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request metadata: %w", err)
 	}

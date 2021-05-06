@@ -3,10 +3,11 @@ package minion
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"sync"
 )
 
 // ListAllConsumerGroupOffsetsInternal returns a map from the in memory storage. The map value is the offset commit
@@ -69,7 +70,7 @@ func (s *Service) listConsumerGroupOffsets(ctx context.Context, group string) (*
 	req := kmsg.NewOffsetFetchRequest()
 	req.Group = group
 	req.Topics = nil
-	res, err := req.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := req.RequestWith(ctx, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request group offsets for group '%v': %w", group, err)
 	}

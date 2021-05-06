@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
-	client := s.kafkaSvc.Client
+	client := s.client
 	topicName := s.config.TopicManagement.Name
 	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicName)
 	balancer := kgo.Balancers(kgo.CooperativeStickyBalancer()) // Default GroupBalancer
