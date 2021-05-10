@@ -89,7 +89,6 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 
 }
 
-// todo: extract whole end-to-end feature into its own package
 // todo: then also create a "tracker" that knows about in-flight messages, and the latest successful roundtrips
 
 // processMessage takes a message and:

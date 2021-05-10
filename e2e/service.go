@@ -102,8 +102,7 @@ func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, 
 	}
 
 	// Prepare hooks
-	hooksChildLogger := logger.With(zap.String("source", "end_to_end"))
-	e2eHooks := newEndToEndClientHooks(hooksChildLogger, "")
+	e2eHooks := newEndToEndClientHooks(logger)
 	kgoOpts = append(kgoOpts, kgo.WithHooks(e2eHooks))
 
 	// Create kafka service and check if client can successfully connect to Kafka cluster

@@ -4,8 +4,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 )
@@ -13,43 +11,14 @@ import (
 // in e2e we only use client hooks for logging connect/disconnect messages
 type clientHooks struct {
 	logger *zap.Logger
-
-	requestSentCount prometheus.Counter
-	bytesSent        prometheus.Counter
-
-	requestsReceivedCount prometheus.Counter
-	bytesReceived         prometheus.Counter
 }
 
-func newEndToEndClientHooks(logger *zap.Logger, metricsNamespace string) *clientHooks {
-	requestSentCount := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: metricsNamespace,
-		Subsystem: "kafka",
-		Name:      "requests_sent_total"})
-	bytesSent := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: metricsNamespace,
-		Subsystem: "kafka",
-		Name:      "sent_bytes",
-	})
+func newEndToEndClientHooks(logger *zap.Logger) *clientHooks {
 
-	requestsReceivedCount := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: metricsNamespace,
-		Subsystem: "kafka",
-		Name:      "requests_received_total"})
-	bytesReceived := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: metricsNamespace,
-		Subsystem: "kafka",
-		Name:      "received_bytes",
-	})
+	logger = logger.With(zap.String("source", "end_to_end"))
 
 	return &clientHooks{
 		logger: logger,
-
-		requestSentCount: requestSentCount,
-		bytesSent:        bytesSent,
-
-		requestsReceivedCount: requestsReceivedCount,
-		bytesReceived:         bytesReceived,
 	}
 }
 
@@ -76,8 +45,7 @@ func (c clientHooks) OnDisconnect(meta kgo.BrokerMetadata, _ net.Conn) {
 // The bytes written does not count any tls overhead.
 // OnRead is called after a read from a broker.
 func (c clientHooks) OnRead(_ kgo.BrokerMetadata, _ int16, bytesRead int, _, _ time.Duration, _ error) {
-	c.requestsReceivedCount.Inc()
-	c.bytesReceived.Add(float64(bytesRead))
+
 }
 
 // OnWrite is passed the broker metadata, the key for the request that
@@ -88,6 +56,5 @@ func (c clientHooks) OnRead(_ kgo.BrokerMetadata, _ int16, bytesRead int, _, _ t
 // The bytes written does not count any tls overhead.
 // OnWrite is called after a write to a broker.
 func (c clientHooks) OnWrite(_ kgo.BrokerMetadata, _ int16, bytesWritten int, _, _ time.Duration, _ error) {
-	c.requestSentCount.Inc()
-	c.bytesSent.Add(float64(bytesWritten))
+
 }
