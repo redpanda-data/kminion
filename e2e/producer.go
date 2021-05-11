@@ -11,8 +11,9 @@ import (
 )
 
 type EndToEndMessage struct {
-	MinionID  string  `json:"minionID"`
-	Timestamp float64 `json:"timestamp"`
+	MinionID  string  `json:"minionID"`  // unique for each running kminion instance
+	MessageID string  `json:"messageID"` // unique for each message
+	Timestamp float64 `json:"timestamp"` // when the message was created, unix milliseconds
 }
 
 func (s *Service) produceToManagementTopic(ctx context.Context) error {
@@ -31,6 +32,8 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 		default:
 			startTime := timeNowMs()
 			s.endToEndMessagesProduced.Inc()
+
+			s.logger.Info("producing message...", zap.Any("record", record))
 
 			err = s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
 				endTime := timeNowMs()
@@ -56,8 +59,11 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 func createEndToEndRecord(topicName string, minionID string) (*kgo.Record, error) {
 
 	timestamp := timeNowMs()
+	msgId := uuid.NewString()
+
 	message := EndToEndMessage{
 		MinionID:  minionID,
+		MessageID: msgId,
 		Timestamp: timestamp,
 	}
 	mjson, err := json.Marshal(message)
@@ -66,7 +72,7 @@ func createEndToEndRecord(topicName string, minionID string) (*kgo.Record, error
 	}
 	record := &kgo.Record{
 		Topic: topicName,
-		Key:   []byte(uuid.NewString()),
+		// Key:   []byte(msgId),
 		Value: []byte(mjson),
 	}
 

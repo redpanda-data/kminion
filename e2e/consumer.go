@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
 )
 
@@ -26,17 +25,17 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 	}
 	client.AssignPartitions(topic)
 
-	// todo: use minionID as part of group id
-	//
-	client.AssignGroup(s.config.Consumer.GroupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
-	s.logger.Info("Starting to consume " + topicName)
+	// Create a consumer group with the prefix
+	groupId := fmt.Sprintf("%v-%v", s.config.Consumer.GroupIdPrefix, s.minionID)
+	client.AssignGroup(groupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
+	s.logger.Info("Starting to consume end-to-end", zap.String("topicName", topicName), zap.String("groupId", groupId))
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			fetches := client.PollRecords(ctx, 10)
+			fetches := client.PollFetches(ctx)
 			errors := fetches.Errors()
 			for _, err := range errors {
 				// Log all errors and continue afterwards as we might get errors and still have some fetch results
@@ -66,24 +65,28 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 			// Commit offsets for processed messages
 			// todo: the normal way to commit offsets with franz-go is pretty good, but in our special case
 			// 		 we want to do it manually, seperately for each partition, so we can track how long it took
-			if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
 
-				startCommitTimestamp := timeNowMs()
+			// todo: use findGroupCoordinatorID
+			// maybe ask travis about return value, we want to know what coordinator the offsets was committed to
+			// kminion probably already exposed coordinator for every group
 
-				client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, _ *kmsg.OffsetCommitResponse, err error) {
-					// got commit response
-					if err != nil {
-						s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
-						return
-					}
+			// if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
 
-					latencyMs := timeNowMs() - startCommitTimestamp
-					commitLatency := time.Duration(latencyMs * float64(time.Millisecond))
+			// 	startCommitTimestamp := timeNowMs()
 
-					// todo: partitionID
-					s.onOffsetCommit(0, commitLatency)
-				})
-			}
+			// 	client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, _ *kmsg.OffsetCommitResponse, err error) {
+			// 		// got commit response
+			// 		if err != nil {
+			// 			s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
+			// 			return
+			// 		}
+
+			// 		latencyMs := timeNowMs() - startCommitTimestamp
+			// 		commitLatency := time.Duration(latencyMs * float64(time.Millisecond))
+
+			// 		s.onOffsetCommit(commitLatency)
+			// 	})
+			// }
 		}
 	}
 

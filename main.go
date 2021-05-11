@@ -64,9 +64,11 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to setup minion service", zap.Error(err))
 	}
-	err = minionSvc.Start(ctx)
-	if err != nil {
-		logger.Fatal("failed to start minion service", zap.Error(err))
+	if false {
+		err = minionSvc.Start(ctx)
+		if err != nil {
+			logger.Fatal("failed to start minion service", zap.Error(err))
+		}
 	}
 
 	// Create end to end testing service

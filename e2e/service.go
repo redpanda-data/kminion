@@ -31,9 +31,9 @@ type Service struct {
 	endToEndMessagesReceived  prometheus.Counter
 	endToEndMessagesCommitted prometheus.Counter
 
-	endToEndAckLatency       prometheus.Histogram
-	endToEndRoundtripLatency prometheus.Histogram
-	endToEndCommitLatency    prometheus.Histogram
+	endToEndAckLatency       *prometheus.HistogramVec
+	endToEndRoundtripLatency *prometheus.HistogramVec
+	endToEndCommitLatency    *prometheus.HistogramVec
 }
 
 // NewService creates a new instance of the e2e moinitoring service (wow)
@@ -61,14 +61,14 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 			Help:      help,
 		})
 	}
-	makeHistogram := func(name string, maxLatency time.Duration, help string) prometheus.Histogram {
-		return promauto.NewHistogram(prometheus.HistogramOpts{
+	makeHistogramVec := func(name string, maxLatency time.Duration, labelNames []string, help string) *prometheus.HistogramVec {
+		return promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: metricNamespace,
 			Subsystem: "end_to_end",
 			Name:      name,
 			Help:      help,
 			Buckets:   createHistogramBuckets(maxLatency),
-		})
+		}, labelNames)
 	}
 
 	// Low-level info
@@ -81,9 +81,9 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 	// Latency Histograms
 	// More detailed info about how long stuff took
 	// Since histograms also have an 'infinite' bucket, they can be used to detect small hickups "lost" messages
-	svc.endToEndAckLatency = makeHistogram("produce_latency_seconds", cfg.Producer.AckSla, "Time until we received an ack for a produced message")
-	svc.endToEndRoundtripLatency = makeHistogram("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, "Time it took between sending (producing) and receiving (consuming) a message")
-	svc.endToEndCommitLatency = makeHistogram("commit_latency_seconds", cfg.Consumer.CommitSla, "Time kafka took to respond to kminion's offset commit")
+	svc.endToEndAckLatency = makeHistogramVec("produce_latency_seconds", cfg.Producer.AckSla, []string{"partitionId"}, "Time until we received an ack for a produced message")
+	svc.endToEndRoundtripLatency = makeHistogramVec("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, []string{"partitionId"}, "Time it took between sending (producing) and receiving (consuming) a message")
+	svc.endToEndCommitLatency = makeHistogramVec("commit_latency_seconds", cfg.Consumer.CommitSla, []string{"groupCoordinator"}, "Time kafka took to respond to kminion's offset commit")
 
 	return svc, nil
 }
@@ -124,7 +124,7 @@ func (s *Service) Start(ctx context.Context) error {
 // called from e2e when a message is acknowledged
 func (s *Service) onAck(partitionId int32, duration time.Duration) {
 	s.endToEndMessagesAcked.Inc()
-	s.endToEndAckLatency.Observe(duration.Seconds())
+	s.endToEndAckLatency.WithLabelValues(string(partitionId)).Observe(duration.Seconds())
 }
 
 // called from e2e when a message completes a roundtrip (send to kafka, receive msg from kafka again)
@@ -139,18 +139,18 @@ func (s *Service) onRoundtrip(partitionId int32, duration time.Duration) {
 	// }
 
 	s.endToEndMessagesReceived.Inc()
-	s.endToEndRoundtripLatency.Observe(duration.Seconds())
+	s.endToEndRoundtripLatency.WithLabelValues(string(partitionId)).Observe(duration.Seconds())
 }
 
 // called from e2e when an offset commit is confirmed
-func (s *Service) onOffsetCommit(partitionId int32, duration time.Duration) {
+func (s *Service) onOffsetCommit(duration time.Duration, groupCoordinator string) {
 
 	// todo:
 	// if the commit took too long, don't count it in 'commits' but add it to the histogram?
 	// and how do we want to handle cases where we get an error??
 	// should we have another metric that tells us about failed commits? or a label on the counter?
 
-	s.endToEndCommitLatency.Observe(duration.Seconds())
+	s.endToEndCommitLatency.WithLabelValues(groupCoordinator).Observe(duration.Seconds())
 
 	if duration > s.config.Consumer.CommitSla {
 		return

@@ -13,7 +13,7 @@ const (
 )
 
 type EndToEndConsumerConfig struct {
-	GroupId             string `koanf:"groupId"`
+	GroupIdPrefix       string `koanf:"groupIdPrefix"`
 	RebalancingProtocol string `koanf:"rebalancingProtocol"`
 
 	RoundtripSla time.Duration `koanf:"roundtripSla"`
@@ -21,7 +21,7 @@ type EndToEndConsumerConfig struct {
 }
 
 func (c *EndToEndConsumerConfig) SetDefaults() {
-	c.GroupId = "kminion-end-to-end"
+	c.GroupIdPrefix = "kminion-end-to-end"
 	c.RebalancingProtocol = "cooperativeSticky"
 	c.RoundtripSla = 20 * time.Second
 	c.CommitSla = 10 * time.Second // no idea what to use as a good default value
