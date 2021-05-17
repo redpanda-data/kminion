@@ -22,8 +22,12 @@ type Service struct {
 	client   *kgo.Client
 
 	// Service
-	minionID               string  // unique identifier, reported in metrics, in case multiple instances run at the same time
-	lastRoundtripTimestamp float64 // creation time (in utc ms) of the message that most recently passed the roundtripSla check
+	minionID     string        // unique identifier, reported in metrics, in case multiple instances run at the same time
+	groupId      string        // our own consumer group
+	groupTracker *groupTracker // tracks consumer groups starting with the kminion prefix and deletes them if they are unused for some time
+
+	// todo: tracker for in-flight messages
+	// lastRoundtripTimestamp float64 // creation time (in utc ms) of the message that most recently passed the roundtripSla check
 
 	// Metrics
 	endToEndMessagesProduced  prometheus.Counter
@@ -44,14 +48,19 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 		return nil, fmt.Errorf("failed to create kafka client for e2e: %w", err)
 	}
 
+	minionId := uuid.NewString()
+
 	svc := &Service{
 		config:   cfg,
 		logger:   logger.With(zap.String("source", "end_to_end")),
 		kafkaSvc: kafkaSvc,
 		client:   client,
 
-		minionID: uuid.NewString(),
+		minionID: minionId,
+		groupId:  fmt.Sprintf("%v-%v", cfg.Consumer.GroupIdPrefix, minionId),
 	}
+
+	svc.groupTracker = newGroupTracker(svc, ctx)
 
 	makeCounter := func(name string, help string) prometheus.Counter {
 		return promauto.NewCounter(prometheus.CounterOpts{
@@ -124,7 +133,7 @@ func (s *Service) Start(ctx context.Context) error {
 // called from e2e when a message is acknowledged
 func (s *Service) onAck(partitionId int32, duration time.Duration) {
 	s.endToEndMessagesAcked.Inc()
-	s.endToEndAckLatency.WithLabelValues(string(partitionId)).Observe(duration.Seconds())
+	s.endToEndAckLatency.WithLabelValues(fmt.Sprintf("%v", partitionId)).Observe(duration.Seconds())
 }
 
 // called from e2e when a message completes a roundtrip (send to kafka, receive msg from kafka again)
@@ -139,7 +148,7 @@ func (s *Service) onRoundtrip(partitionId int32, duration time.Duration) {
 	// }
 
 	s.endToEndMessagesReceived.Inc()
-	s.endToEndRoundtripLatency.WithLabelValues(string(partitionId)).Observe(duration.Seconds())
+	s.endToEndRoundtripLatency.WithLabelValues(fmt.Sprintf("%v", partitionId)).Observe(duration.Seconds())
 }
 
 // called from e2e when an offset commit is confirmed

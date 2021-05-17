@@ -3,10 +3,12 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"sync/atomic"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
 )
 
@@ -25,10 +27,52 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 	}
 	client.AssignPartitions(topic)
 
-	// Create a consumer group with the prefix
-	groupId := fmt.Sprintf("%v-%v", s.config.Consumer.GroupIdPrefix, s.minionID)
-	client.AssignGroup(groupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
-	s.logger.Info("Starting to consume end-to-end", zap.String("topicName", topicName), zap.String("groupId", groupId))
+	// Create our own consumer group
+	client.AssignGroup(s.groupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
+	s.logger.Info("Starting to consume end-to-end", zap.String("topicName", topicName), zap.String("groupId", s.groupId))
+
+	// Keep checking for the coordinator
+	var currentCoordinator atomic.Value
+	currentCoordinator.Store(kgo.BrokerMetadata{})
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				describeReq := kmsg.NewDescribeGroupsRequest()
+				describeReq.Groups = []string{s.groupId}
+				describeReq.IncludeAuthorizedOperations = false
+
+				shards := client.RequestSharded(ctx, &describeReq)
+				for _, shard := range shards {
+					// since we're only interested in the coordinator, we only check for broker errors on the response that contains our group
+					response, ok := shard.Resp.(*kmsg.DescribeGroupsResponse)
+					if !ok {
+						s.logger.Warn("cannot cast shard response to DescribeGroupsResponse")
+						continue
+					}
+					if len(response.Groups) == 0 {
+						s.logger.Warn("DescribeGroupsResponse contained no groups")
+						continue
+					}
+					group := response.Groups[0]
+					groupErr := kerr.ErrorForCode(group.ErrorCode)
+					if groupErr != nil {
+						s.logger.Error("couldn't describe end-to-end consumer group, error in group", zap.Error(groupErr), zap.Any("broker", shard.Meta))
+						continue
+					}
+
+					currentCoordinator.Store(shard.Meta)
+					break
+				}
+			}
+		}
+	}()
 
 	for {
 		select {
@@ -70,23 +114,32 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 			// maybe ask travis about return value, we want to know what coordinator the offsets was committed to
 			// kminion probably already exposed coordinator for every group
 
-			// if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
+			if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
 
-			// 	startCommitTimestamp := timeNowMs()
+				startCommitTimestamp := timeNowMs()
 
-			// 	client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, _ *kmsg.OffsetCommitResponse, err error) {
-			// 		// got commit response
-			// 		if err != nil {
-			// 			s.logger.Error(fmt.Sprintf("record had an error on commit: %v\n", err))
-			// 			return
-			// 		}
+				client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
+					// got commit response
+					latencyMs := timeNowMs() - startCommitTimestamp
+					commitLatency := time.Duration(latencyMs * float64(time.Millisecond))
 
-			// 		latencyMs := timeNowMs() - startCommitTimestamp
-			// 		commitLatency := time.Duration(latencyMs * float64(time.Millisecond))
+					if err != nil {
+						s.logger.Error("offset commit failed", zap.Error(err), zap.Int64("latencyMilliseconds", commitLatency.Milliseconds()))
+						return
+					}
 
-			// 		s.onOffsetCommit(commitLatency)
-			// 	})
-			// }
+					// todo: check each partitions error code
+
+					// only report commit latency if the coordinator is known
+					coordinator := currentCoordinator.Load().(kgo.BrokerMetadata)
+					if len(coordinator.Host) > 0 {
+						s.onOffsetCommit(commitLatency, coordinator.Host)
+					} else {
+						s.logger.Warn("won't report commit latency since broker coordinator is still unknown", zap.Int64("latencyMilliseconds", commitLatency.Milliseconds()))
+					}
+
+				})
+			}
 		}
 	}
 

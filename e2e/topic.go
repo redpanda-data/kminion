@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -130,7 +129,7 @@ func createTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestT
 	topicConfig := func(name string, value interface{}) kmsg.CreateTopicsRequestTopicConfig {
 		prop := kmsg.NewCreateTopicsRequestTopicConfig()
 		prop.Name = name
-		valStr := string(fmt.Sprintf("%v", value))
+		valStr := fmt.Sprintf("%v", value)
 		prop.Value = &valStr
 		return prop
 	}
@@ -218,59 +217,15 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 	return res, nil
 }
 
-func (s *Service) checkAndDeleteOldConsumerGroups(ctx context.Context) error {
-	var groupsRq kmsg.ListGroupsRequest
-	groupsRq.Default()
-	groupsRq.StatesFilter = []string{"Empty"}
-
-	s.logger.Info("checking for empty consumer groups with kminion prefix...")
-
-	shardedResponse := s.client.RequestSharded(ctx, &groupsRq)
-	errorCount := 0
-
-	matchingGroups := make([]string, 0, 10)
-
-	for _, responseShard := range shardedResponse {
-		if responseShard.Err != nil {
-			errorCount++
-			s.logger.Error("error in response to ListGroupsRequest", zap.Error(responseShard.Err))
-			continue
-		}
-
-		r, ok := responseShard.Resp.(*kmsg.ListGroupsResponse)
-		if !ok {
-			s.logger.Error("cannot cast responseShard.Resp to kmsg.ListGroupsResponse")
-			errorCount++
-			continue
-		}
-
-		for _, group := range r.Groups {
-			name := group.Group
-			if strings.HasPrefix(name, s.config.Consumer.GroupIdPrefix) {
-				matchingGroups = append(matchingGroups, name)
-			}
-		}
-	}
-
-	s.logger.Info(fmt.Sprintf("found %v matching consumer groups", len(matchingGroups)))
-	for i, name := range matchingGroups {
-		s.logger.Info(fmt.Sprintf("consumerGroups %v: %v", i, name))
-	}
-
-	return nil
-}
-
 func (s *Service) initEndToEnd(ctx context.Context) {
 
 	validateTopicTicker := time.NewTicker(s.config.TopicManagement.ReconciliationInterval)
 	produceTicker := time.NewTicker(s.config.ProbeInterval)
-	deleteOldGroupsTicker := time.NewTicker(5 * time.Second)
 	// stop tickers when context is cancelled
 	go func() {
 		<-ctx.Done()
 		produceTicker.Stop()
 		validateTopicTicker.Stop()
-		deleteOldGroupsTicker.Stop()
 	}()
 
 	// keep checking end-to-end topic
@@ -283,15 +238,8 @@ func (s *Service) initEndToEnd(ctx context.Context) {
 		}
 	}()
 
-	// look for old consumer groups and delete them
-	go func() {
-		for range deleteOldGroupsTicker.C {
-			err := s.checkAndDeleteOldConsumerGroups(ctx)
-			if err != nil {
-				s.logger.Error("failed to check for old consumer groups: %w", zap.Error(err))
-			}
-		}
-	}()
+	go s.groupTracker.start()
+
 	// start consuming topic
 	go s.ConsumeFromManagementTopic(ctx)
 

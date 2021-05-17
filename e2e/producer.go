@@ -33,7 +33,7 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 			startTime := timeNowMs()
 			s.endToEndMessagesProduced.Inc()
 
-			s.logger.Info("producing message...", zap.Any("record", record))
+			s.logger.Debug("producing message...", zap.Any("record", record))
 
 			err = s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
 				endTime := timeNowMs()

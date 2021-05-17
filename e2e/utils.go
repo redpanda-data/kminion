@@ -32,3 +32,12 @@ func createHistogramBuckets(maxLatency time.Duration) []float64 {
 
 	return bucket
 }
+
+func containsStr(ar []string, x string) (bool, int) {
+	for i, item := range ar {
+		if item == x {
+			return true, i
+		}
+	}
+	return false, -1
+}
