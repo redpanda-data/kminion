@@ -35,7 +35,8 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 
 			s.logger.Debug("producing message...", zap.Any("record", record))
 
-			err = s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
+			errCh := make(chan error)
+			s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
 				endTime := timeNowMs()
 				ackDurationMs := endTime - startTime
 				ackDuration := time.Duration(ackDurationMs) * time.Millisecond
@@ -47,10 +48,7 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 				}
 			})
 
-			if err != nil {
-				return err
-			}
-			return nil
+			return <-errCh
 		}
 	}
 
