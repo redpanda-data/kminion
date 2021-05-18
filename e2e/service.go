@@ -152,14 +152,14 @@ func (s *Service) onRoundtrip(partitionId int32, duration time.Duration) {
 }
 
 // called from e2e when an offset commit is confirmed
-func (s *Service) onOffsetCommit(duration time.Duration, groupCoordinator string) {
+func (s *Service) onOffsetCommit(brokerId int32, duration time.Duration) {
 
 	// todo:
 	// if the commit took too long, don't count it in 'commits' but add it to the histogram?
 	// and how do we want to handle cases where we get an error??
 	// should we have another metric that tells us about failed commits? or a label on the counter?
-
-	s.endToEndCommitLatency.WithLabelValues(groupCoordinator).Observe(duration.Seconds())
+	brokerIdStr := fmt.Sprintf("%v", brokerId)
+	s.endToEndCommitLatency.WithLabelValues(brokerIdStr).Observe(duration.Seconds())
 
 	if duration > s.config.Consumer.CommitSla {
 		return

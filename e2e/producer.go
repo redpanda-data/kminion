@@ -41,14 +41,19 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 				ackDurationMs := endTime - startTime
 				ackDuration := time.Duration(ackDurationMs) * time.Millisecond
 
+				errCh <- err
+
 				if err != nil {
-					s.logger.Error("error producing record: %w", zap.Error(err))
-				} else {
 					s.onAck(r.Partition, ackDuration)
 				}
 			})
 
-			return <-errCh
+			err := <-errCh
+			if err != nil {
+				s.logger.Error("error producing record", zap.Error(err))
+				return err
+			}
+			return nil
 		}
 	}
 

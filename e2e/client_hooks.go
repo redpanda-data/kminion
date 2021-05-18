@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
 )
 
@@ -24,28 +25,17 @@ func newEndToEndClientHooks(logger *zap.Logger) *clientHooks {
 
 func (c clientHooks) OnConnect(meta kgo.BrokerMetadata, dialDur time.Duration, _ net.Conn, err error) {
 	if err != nil {
-		c.logger.Debug("kafka connection failed", zap.String("broker_host", meta.Host), zap.Error(err))
+		c.logger.Error("kafka connection failed", zap.String("broker_host", meta.Host), zap.Int32("broker_id", meta.NodeID), zap.Error(err))
 		return
 	}
 	c.logger.Debug("kafka connection succeeded",
-		zap.String("host", meta.Host),
+		zap.String("host", meta.Host), zap.Int32("broker_id", meta.NodeID),
 		zap.Duration("dial_duration", dialDur))
 }
 
 func (c clientHooks) OnDisconnect(meta kgo.BrokerMetadata, _ net.Conn) {
-	c.logger.Debug("kafka broker disconnected",
+	c.logger.Warn("kafka broker disconnected", zap.Int32("broker_id", meta.NodeID),
 		zap.String("host", meta.Host))
-}
-
-// OnRead is passed the broker metadata, the key for the response that
-// was read, the number of bytes read, how long the Client waited
-// before reading the response, how long it took to read the response,
-// and any error.
-//
-// The bytes written does not count any tls overhead.
-// OnRead is called after a read from a broker.
-func (c clientHooks) OnRead(_ kgo.BrokerMetadata, _ int16, bytesRead int, _, _ time.Duration, _ error) {
-
 }
 
 // OnWrite is passed the broker metadata, the key for the request that
@@ -55,6 +45,45 @@ func (c clientHooks) OnRead(_ kgo.BrokerMetadata, _ int16, bytesRead int, _, _ t
 //
 // The bytes written does not count any tls overhead.
 // OnWrite is called after a write to a broker.
-func (c clientHooks) OnWrite(_ kgo.BrokerMetadata, _ int16, bytesWritten int, _, _ time.Duration, _ error) {
+//
+// OnWrite(meta BrokerMetadata, key int16, bytesWritten int, writeWait, timeToWrite time.Duration, err error)
+func (c clientHooks) OnWrite(meta kgo.BrokerMetadata, key int16, bytesWritten int, writeWait, timeToWrite time.Duration, err error) {
+	keyName := kmsg.NameForKey(key)
+	if keyName != "OffsetCommit" {
+		return
+	}
+
+	c.logger.Info("hooks onWrite",
+		zap.Duration("timeToWrite", timeToWrite),
+		zap.NamedError("err", err))
+
+	offsetCommitStarted = time.Now()
+}
+
+var (
+	offsetCommitStarted time.Time
+)
+
+// OnRead is passed the broker metadata, the key for the response that
+// was read, the number of bytes read, how long the Client waited
+// before reading the response, how long it took to read the response,
+// and any error.
+//
+// The bytes written does not count any tls overhead.
+// OnRead is called after a read from a broker.
+// OnRead(meta BrokerMetadata, key int16, bytesRead int, readWait, timeToRead time.Duration, err error)
+func (c clientHooks) OnRead(meta kgo.BrokerMetadata, key int16, bytesRead int, readWait, timeToRead time.Duration, err error) {
+
+	keyName := kmsg.NameForKey(key)
+	if keyName != "OffsetCommit" {
+		return
+	}
+
+	dur := time.Since(offsetCommitStarted)
+
+	c.logger.Info("hooks onRead",
+		zap.Int64("timeToReadMs", timeToRead.Milliseconds()),
+		zap.Int64("totalTime", dur.Milliseconds()),
+		zap.NamedError("err", err))
 
 }

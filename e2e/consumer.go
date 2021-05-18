@@ -120,6 +120,7 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 
 				client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
 					// got commit response
+
 					latencyMs := timeNowMs() - startCommitTimestamp
 					commitLatency := time.Duration(latencyMs * float64(time.Millisecond))
 
@@ -133,13 +134,14 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 					// only report commit latency if the coordinator is known
 					coordinator := currentCoordinator.Load().(kgo.BrokerMetadata)
 					if len(coordinator.Host) > 0 {
-						s.onOffsetCommit(commitLatency, coordinator.Host)
+						s.onOffsetCommit(coordinator.NodeID, commitLatency)
 					} else {
 						s.logger.Warn("won't report commit latency since broker coordinator is still unknown", zap.Int64("latencyMilliseconds", commitLatency.Milliseconds()))
 					}
 
 				})
 			}
+
 		}
 	}
 

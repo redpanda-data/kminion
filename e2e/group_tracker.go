@@ -168,14 +168,14 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 
 		resp, ok := shard.Resp.(*kmsg.DeleteGroupsResponse)
 		if !ok {
-			g.logger.Error("failed to cast shard response to DeleteGroupsResponse while handling an error for deleting groups", zap.String("shardHost", shard.Meta.Host), zap.NamedError("shardError", shard.Err))
+			g.logger.Error("failed to cast shard response to DeleteGroupsResponse while handling an error for deleting groups", zap.String("shardHost", shard.Meta.Host), zap.Int32("broker_id", shard.Meta.NodeID), zap.NamedError("shardError", shard.Err))
 			continue
 		}
 
 		for _, groupResp := range resp.Groups {
 			err := kerr.ErrorForCode(groupResp.ErrorCode)
 			if err != nil {
-				g.logger.Error("failed to delete consumer group", zap.String("shard", shard.Meta.Host), zap.String("group", groupResp.Group), zap.Error(err))
+				g.logger.Error("failed to delete consumer group", zap.String("shard", shard.Meta.Host), zap.Int32("broker_id", shard.Meta.NodeID), zap.String("group", groupResp.Group), zap.Error(err))
 
 				if groupResp.ErrorCode == kerr.GroupAuthorizationFailed.Code {
 					foundNotAuthorizedError = true
