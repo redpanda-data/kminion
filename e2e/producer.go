@@ -11,16 +11,39 @@ import (
 )
 
 type EndToEndMessage struct {
-	MinionID  string  `json:"minionID"`  // unique for each running kminion instance
-	MessageID string  `json:"messageID"` // unique for each message
-	Timestamp float64 `json:"timestamp"` // when the message was created, unix milliseconds
+	MinionID  string `json:"minionID"`     // unique for each running kminion instance
+	MessageID string `json:"messageID"`    // unique for each message
+	Timestamp int64  `json:"createdUtcNs"` // when the message was created, unix nanoseconds
+
+	partition  int
+	hasArrived bool // used in tracker
 }
 
-func (s *Service) produceToManagementTopic(ctx context.Context) error {
+func (m *EndToEndMessage) creationTime() time.Time {
+	return time.Unix(0, m.Timestamp)
+}
+
+// Goes through each partition and sends a EndToEndMessage to it
+
+func (s *Service) produceLatencyMessages(ctx context.Context) {
+
+	for i := 0; i < s.partitionCount; i++ {
+		err := s.produceSingleMessage(ctx, i)
+		if err != nil {
+			s.logger.Error("failed to produce to end-to-end topic",
+				zap.String("topicName", s.config.TopicManagement.Name),
+				zap.Int("partition", i),
+				zap.Error(err))
+		}
+	}
+
+}
+
+func (s *Service) produceSingleMessage(ctx context.Context, partition int) error {
 
 	topicName := s.config.TopicManagement.Name
 
-	record, err := createEndToEndRecord(topicName, s.minionID)
+	record, msg, err := createEndToEndRecord(s.minionID, topicName, partition)
 	if err != nil {
 		return err
 	}
@@ -30,21 +53,22 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		default:
-			startTime := timeNowMs()
+			startTime := time.Now()
 			s.endToEndMessagesProduced.Inc()
-
-			s.logger.Debug("producing message...", zap.Any("record", record))
 
 			errCh := make(chan error)
 			s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
-				endTime := timeNowMs()
-				ackDurationMs := endTime - startTime
-				ackDuration := time.Duration(ackDurationMs) * time.Millisecond
+				ackDuration := time.Since(startTime)
 
 				errCh <- err
 
-				if err != nil {
+				// only notify ack if it is successful
+				if err == nil {
+					// notify service about ack
 					s.onAck(r.Partition, ackDuration)
+
+					// add to tracker
+					s.messageTracker.addToTracker(msg)
 				}
 			})
 
@@ -59,25 +83,28 @@ func (s *Service) produceToManagementTopic(ctx context.Context) error {
 
 }
 
-func createEndToEndRecord(topicName string, minionID string) (*kgo.Record, error) {
+func createEndToEndRecord(minionID string, topicName string, partition int) (*kgo.Record, *EndToEndMessage, error) {
 
-	timestamp := timeNowMs()
-	msgId := uuid.NewString()
-
-	message := EndToEndMessage{
+	message := &EndToEndMessage{
 		MinionID:  minionID,
-		MessageID: msgId,
-		Timestamp: timestamp,
+		MessageID: uuid.NewString(),
+		Timestamp: time.Now().UnixNano(),
+
+		partition: partition,
+		// todo: maybe indicate what broker was the leader for that partition at the time of sending,
+		//       so that when receiving the message again, we could
 	}
+
 	mjson, err := json.Marshal(message)
 	if err != nil {
-		return nil, err
-	}
-	record := &kgo.Record{
-		Topic: topicName,
-		// Key:   []byte(msgId),
-		Value: []byte(mjson),
+		return nil, nil, err
 	}
 
-	return record, nil
+	record := &kgo.Record{
+		Topic:     topicName,
+		Value:     []byte(mjson),
+		Partition: int32(partition), // we set partition for producing so our customPartitioner can make use of it
+	}
+
+	return record, message, nil
 }

@@ -13,28 +13,35 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 	s.logger.Info("validating end-to-end topic...")
 
-	expectedReplicationFactor := s.config.TopicManagement.ReplicationFactor
-	expectedNumPartitionsPerBroker := s.config.TopicManagement.PartitionsPerBroker
-	topicMetadata, err := s.getTopicMetadata(ctx)
+	// expectedReplicationFactor := s.config.TopicManagement.ReplicationFactor
+	expectedPartitionsPerBroker := s.config.TopicManagement.PartitionsPerBroker
+
+	// Check how many brokers we have
+	allMeta, err := s.getAllTopicsMetadata(ctx)
+	if err != nil {
+		return fmt.Errorf("validateManagementTopic cannot get metadata of all brokers/topics: %w", err)
+	}
+	expectedPartitions := expectedPartitionsPerBroker * len(allMeta.Brokers)
+
+	topicMeta, err := s.getTopicMetadata(ctx)
 	if err != nil {
 		return err
 	}
 
 	// If metadata is not reachable, then there is a problem in connecting to broker or lack of Authorization
 	// TopicMetadataArray could be empty, therefore needs to do this check beforehand
-	topicMetadataArray := topicMetadata.Topics
-	if len(topicMetadataArray) == 0 {
-		return fmt.Errorf("unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
-	}
-	doesTopicReachable := topicMetadata.Topics[0].Topic != ""
-	if !doesTopicReachable {
-		return fmt.Errorf("unable to retrieve metadata, please make sure the brokers are up and/or you have right to access them")
-	}
+
+	// todo: check if len(meta.Topics) != 1
+	// todo: assign topic := meta.Topics[0]
+	// if len(meta.Topics) != 1 {
+	// return fmt.Errorf("topic metadata request returned != 1 topics, please make sure the brokers are up and/or you have right to access them. got %v topics but expected 1", len(topicMetadataArray))
+	// }
 
 	// Create the management end to end topic if it does not exist
-	doesTopicExist := topicMetadata.Topics[0].Partitions != nil
-	if !doesTopicExist {
-		err = s.createManagementTopic(ctx, topicMetadata)
+	topicExists := topicMeta.Topics[0].Partitions != nil
+	if !topicExists {
+		s.logger.Warn("end-to-end testing topic does not exist, will create it...")
+		err = s.createManagementTopic(ctx, topicMeta)
 		if err != nil {
 			return err
 		}
@@ -43,36 +50,49 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 	// If the number of broker is less than expected Replication Factor it means the cluster brokers number is too small
 	// topicMetadata.Brokers will return all the available brokers from the cluster
-	isNumBrokerValid := len(topicMetadata.Brokers) >= expectedReplicationFactor
-	if !isNumBrokerValid {
-		return fmt.Errorf("current cluster size differs from the expected size (based on config topicManagement.replicationFactor). expected broker: %v NumOfBroker: %v", len(topicMetadata.Brokers), expectedReplicationFactor)
-	}
 
-	// Check the number of Partition per broker, if it is too low create partition
+	// todo:
+	// isNumBrokerValid := len(topicMeta.Brokers) >= expectedReplicationFactor
+	// if !isNumBrokerValid {
+	// 	return fmt.Errorf("current cluster size differs from the expected size (based on config topicManagement.replicationFactor). expected broker: %v NumOfBroker: %v", len(topicMeta.Brokers), expectedReplicationFactor)
+	// }
+
+	// Check the number of Partitions per broker, if it is too low create partition
 	// topicMetadata.Topics[0].Partitions is the number of PartitionsPerBroker
-	isTotalPartitionTooLow := len(topicMetadata.Topics[0].Partitions) < expectedNumPartitionsPerBroker
-	if isTotalPartitionTooLow {
+	if len(topicMeta.Topics[0].Partitions) < expectedPartitions {
+		s.logger.Warn("e2e test topic does not have enough partitions, partitionCount is less than brokerCount * partitionsPerBroker. will add partitions to the topic...",
+			zap.Int("expectedPartitionCount", expectedPartitions),
+			zap.Int("actualPartitionCount", len(topicMeta.Topics[0].Partitions)),
+			zap.Int("brokerCount", len(allMeta.Brokers)),
+			zap.Int("config.partitionsPerBroker", s.config.TopicManagement.PartitionsPerBroker),
+		)
 		// Create partition if the number partition is lower, can't delete partition
 		assignment := kmsg.NewCreatePartitionsRequestTopicAssignment()
-		assignment.Replicas = topicMetadata.Topics[0].Partitions[0].Replicas
+		assignment.Replicas = topicMeta.Topics[0].Partitions[0].Replicas
 
 		topic := kmsg.NewCreatePartitionsRequestTopic()
 		topic.Topic = s.config.TopicManagement.Name
-		topic.Count = int32(expectedNumPartitionsPerBroker) // Should be greater than current partition number
+
+		topic.Count = int32(expectedPartitionsPerBroker) // Should be greater than current partition number
 		topic.Assignment = []kmsg.CreatePartitionsRequestTopicAssignment{assignment}
 
 		create := kmsg.NewCreatePartitionsRequest()
 		create.Topics = []kmsg.CreatePartitionsRequestTopic{topic}
 		_, err := create.RequestWith(ctx, s.client)
 		if err != nil {
-			return fmt.Errorf("failed to do kmsg request on creating partitions: %w", err)
+			return fmt.Errorf("failed to add partitions to topic: %w", err)
 		}
+
+		// todo: why return? shouldn't we check for distinct leaders anyway??
 		return nil
 	}
 
 	// Check distinct Leader Nodes, if it is more than replicationFactor it means the partitions got assigned wrongly
+	// todo: rewrite this. its entirely possible that one broker leads multiple partitions (for example when a broker was temporarily offline).
+	//       we only have to ensure that every available broker leads at least one of our partitions.
+
 	distinctLeaderNodes := []int32{}
-	for _, partition := range topicMetadata.Topics[0].Partitions {
+	for _, partition := range topicMeta.Topics[0].Partitions {
 		if len(distinctLeaderNodes) == 0 {
 			distinctLeaderNodes = append(distinctLeaderNodes, partition.Leader)
 		} else {
@@ -91,6 +111,12 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	assignmentInvalid := len(distinctLeaderNodes) != s.config.TopicManagement.ReplicationFactor
 	// Reassign Partitions on invalid assignment
 	if assignmentInvalid {
+
+		s.logger.Warn("e2e test topic partition assignments are invalid. not every broker leads at least one partition. will reassign partitions...",
+			zap.String("todo", "not yet implemented"),
+		)
+		return nil
+
 		// Get the new AssignedReplicas by checking the ReplicationFactor config
 		assignedReplicas := make([]int32, s.config.TopicManagement.ReplicationFactor)
 		for index := range assignedReplicas {
@@ -202,30 +228,36 @@ func (s *Service) createManagementTopic(ctx context.Context, topicMetadata *kmsg
 
 func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse, error) {
 
-	cfg := s.config.TopicManagement
 	topicReq := kmsg.NewMetadataRequestTopic()
-	topicReq.Topic = &cfg.Name
+	topicName := s.config.TopicManagement.Name
+	topicReq.Topic = &topicName
 
 	req := kmsg.NewMetadataRequest()
 	req.Topics = []kmsg.MetadataRequestTopic{topicReq}
 
-	res, err := req.RequestWith(ctx, s.client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to request metadata: %w", err)
-	}
+	return req.RequestWith(ctx, s.client)
+}
+func (s *Service) getAllTopicsMetadata(ctx context.Context) (*kmsg.MetadataResponse, error) {
 
-	return res, nil
+	// need to request metadata of all topics in order to get metadata of all brokers
+	// not sure if there is a better way (copied from kowl)
+	req := kmsg.NewMetadataRequest()
+	req.Topics = []kmsg.MetadataRequestTopic{} // empty array should get us all topics, in all kafka versions
+
+	return req.RequestWith(ctx, s.client)
 }
 
 func (s *Service) initEndToEnd(ctx context.Context) {
 
 	validateTopicTicker := time.NewTicker(s.config.TopicManagement.ReconciliationInterval)
 	produceTicker := time.NewTicker(s.config.ProbeInterval)
+	commitTicker := time.NewTicker(5 * time.Second)
 	// stop tickers when context is cancelled
 	go func() {
 		<-ctx.Done()
 		produceTicker.Stop()
 		validateTopicTicker.Stop()
+		commitTicker.Stop()
 	}()
 
 	// keep checking end-to-end topic
@@ -233,28 +265,29 @@ func (s *Service) initEndToEnd(ctx context.Context) {
 		for range validateTopicTicker.C {
 			err := s.validateManagementTopic(ctx)
 			if err != nil {
-				s.logger.Error("failed to validate end-to-end topic: %w", zap.Error(err))
+				s.logger.Error("failed to validate end-to-end topic", zap.Error(err))
 			}
 		}
 	}()
 
+	// keep track of groups, delete old unused groups
 	go s.groupTracker.start()
 
 	// start consuming topic
-	go s.ConsumeFromManagementTopic(ctx)
+	go s.startConsumeMessages(ctx)
+
+	// start comitting offsets
+	go func() {
+		for range commitTicker.C {
+			s.commitOffsets(ctx)
+		}
+	}()
 
 	// start producing to topic
 	go func() {
 		for range produceTicker.C {
-			err := s.produceToManagementTopic(ctx)
-			if err != nil {
-				s.logger.Error("failed to produce to end-to-end topic: %w", zap.Error(err))
-			}
+			s.produceLatencyMessages(ctx)
 		}
 	}()
 
-}
-
-func timeNowMs() float64 {
-	return float64(time.Now().UnixNano()) / float64(time.Millisecond)
 }

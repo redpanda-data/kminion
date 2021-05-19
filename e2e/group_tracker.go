@@ -32,7 +32,7 @@ type groupTracker struct {
 	groupId                string               // our own groupId
 	potentiallyEmptyGroups map[string]time.Time // groupName -> utc timestamp when the group was first seen
 
-	isNotAuthorized bool
+	isNotAuthorized bool // if we get a not authorized response while trying to delete old groups, this will be set to true, essentially disabling the tracker
 }
 
 func newGroupTracker(svc *Service, ctx context.Context) *groupTracker {
@@ -120,7 +120,7 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 		_, exists := g.potentiallyEmptyGroups[name]
 		if !exists {
 			// add it with the current timestamp
-			now := time.Now().UTC()
+			now := time.Now()
 			g.potentiallyEmptyGroups[name] = now
 			g.logger.Debug("new empty kminion group, adding to tracker", zap.String("group", name), zap.Time("firstSeen", now))
 		}
@@ -134,7 +134,7 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 		exists, _ := containsStr(matchingGroups, name)
 		if exists {
 			// still there, check age and maybe delete it
-			age := time.Now().UTC().Sub(firstSeen)
+			age := time.Now().Sub(firstSeen)
 			if age > oldGroupMaxAge {
 				// group was unused for too long, delete it
 				groupsToDelete = append(groupsToDelete, name)

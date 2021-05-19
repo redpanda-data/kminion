@@ -15,14 +15,6 @@ import (
 	Why do we want to do that?
 	We want to test all brokers with our "end-to-end test" test (sending message, receiving it again, measuring latency).
 	To do that, we need to ensure we send a message to each broker.
-
-
-	todo:
-	Of course that also requires that we have exactly as many partitions as we have brokers,
-	and that each broker leads exactly one of our test partitions.
-
-	However, we only create the topic initially (with the right amount of partitions and proper leader balancing over the brokers).
-	So should two or more partitions of our topic end up being led (/hosted) by the same broker somehow, we neither detect nor fix that currently.
 */
 
 // Partitioner: Creates a TopicPartitioner for a given topic name

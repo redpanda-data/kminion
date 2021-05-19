@@ -22,10 +22,13 @@ type Service struct {
 	client   *kgo.Client
 
 	// Service
-	minionID     string        // unique identifier, reported in metrics, in case multiple instances run at the same time
-	groupId      string        // our own consumer group
-	groupTracker *groupTracker // tracks consumer groups starting with the kminion prefix and deletes them if they are unused for some time
-	clientHooks  *clientHooks  // captures broker
+	minionID       string             // unique identifier, reported in metrics, in case multiple instances run at the same time
+	groupId        string             // our own consumer group
+	groupTracker   *groupTracker      // tracks consumer groups starting with the kminion prefix and deletes them if they are unused for some time
+	messageTracker *messageTracker    // tracks successfully produced messages,
+	clientHooks    *clientHooks       // logs broker events, tracks the coordinator (i.e. which broker last responded to our offset commit)
+	partitioner    *customPartitioner // takes care of sending our end-to-end messages to the right partition
+	partitionCount int                // number of partitions of our test topic, used to send messages to all partitions
 
 	// todo: tracker for in-flight messages
 	// lastRoundtripTimestamp float64 // creation time (in utc ms) of the message that most recently passed the roundtripSla check
@@ -44,7 +47,7 @@ type Service struct {
 // NewService creates a new instance of the e2e moinitoring service (wow)
 func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string, ctx context.Context) (*Service, error) {
 
-	client, hooks, err := createKafkaClient(cfg, logger, kafkaSvc, ctx)
+	client, hooks, partitioner, err := createKafkaClient(cfg, logger, kafkaSvc, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client for e2e: %w", err)
 	}
@@ -60,9 +63,11 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 		minionID:    minionId,
 		groupId:     fmt.Sprintf("%v-%v", cfg.Consumer.GroupIdPrefix, minionId),
 		clientHooks: hooks,
+		partitioner: partitioner,
 	}
 
 	svc.groupTracker = newGroupTracker(svc, ctx)
+	svc.messageTracker = newMessageTracker(svc)
 
 	makeCounter := func(name string, help string) prometheus.Counter {
 		return promauto.NewCounter(prometheus.CounterOpts{
@@ -94,12 +99,12 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 	// Since histograms also have an 'infinite' bucket, they can be used to detect small hickups "lost" messages
 	svc.endToEndAckLatency = makeHistogramVec("produce_latency_seconds", cfg.Producer.AckSla, []string{"partitionId"}, "Time until we received an ack for a produced message")
 	svc.endToEndRoundtripLatency = makeHistogramVec("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, []string{"partitionId"}, "Time it took between sending (producing) and receiving (consuming) a message")
-	svc.endToEndCommitLatency = makeHistogramVec("commit_latency_seconds", cfg.Consumer.CommitSla, []string{"groupCoordinator"}, "Time kafka took to respond to kminion's offset commit")
+	svc.endToEndCommitLatency = makeHistogramVec("commit_latency_seconds", cfg.Consumer.CommitSla, []string{"groupCoordinatorBrokerId"}, "Time kafka took to respond to kminion's offset commit")
 
 	return svc, nil
 }
 
-func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, ctx context.Context) (*kgo.Client, *clientHooks, error) {
+func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, ctx context.Context) (*kgo.Client, *clientHooks, *customPartitioner, error) {
 
 	// Add RequiredAcks, as options can't be altered later
 	kgoOpts := []kgo.Opt{}
@@ -117,13 +122,15 @@ func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, 
 	kgoOpts = append(kgoOpts, kgo.WithHooks(e2eHooks))
 
 	// Use a custom partitioner that uses the 'PartitionID' of a record to directly assign the right partition
-	kgoOpts = append(kgoOpts, kgo.RecordPartitioner(&customPartitioner{
-		logger: logger.Named("e2e-partitioner"),
-	}))
+	partitioner := &customPartitioner{
+		logger:                 logger.Named("e2e-partitioner"),
+		expectedPartitionCount: 0, // not yet known, will be set before we start producing
+	}
+	kgoOpts = append(kgoOpts, kgo.RecordPartitioner(partitioner))
 
 	// Create kafka service and check if client can successfully connect to Kafka cluster
 	client, err := kafkaSvc.CreateAndTestClient(logger, kgoOpts, ctx)
-	return client, e2eHooks, err
+	return client, e2eHooks, partitioner, err
 }
 
 // Start starts the service (wow)
@@ -133,6 +140,16 @@ func (s *Service) Start(ctx context.Context) error {
 		return fmt.Errorf("could not validate end-to-end topic: %w", err)
 	}
 
+	// after ensuring the topic exists and is configured correctly, we inform our custom partitioner about the partitions
+	topicMetadata, err := s.getTopicMetadata(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get topic metadata after validation: %w", err)
+	}
+	partitions := len(topicMetadata.Topics[0].Partitions)
+	s.partitioner.expectedPartitionCount = partitions
+	s.partitionCount = partitions
+
+	// finally start everything else (producing, consuming, continous validation, consumer group tracking)
 	go s.initEndToEnd(ctx)
 
 	return nil
