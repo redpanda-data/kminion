@@ -21,7 +21,7 @@ type Service struct {
 func NewService(cfg Config, logger *zap.Logger) *Service {
 	return &Service{
 		cfg:    cfg,
-		logger: logger.With(zap.String("source", "kafka_service")),
+		logger: logger.Named("kafka-service"),
 	}
 }
 

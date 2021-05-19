@@ -87,7 +87,7 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 	svc.endToEndMessagesProduced = makeCounter("messages_produced_total", "Number of messages that kminion's end-to-end test has tried to send to kafka")
 	svc.endToEndMessagesAcked = makeCounter("messages_acked_total", "Number of messages kafka acknowledged as produced")
 	svc.endToEndMessagesReceived = makeCounter("messages_received_total", "Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)")
-	svc.endToEndCommits = makeCounter("messages_committed_total", "Counts how many times kminions end-to-end test has committed messages")
+	svc.endToEndCommits = makeCounter("commits_total", "Counts how many times kminions end-to-end test has committed messages")
 
 	// Latency Histograms
 	// More detailed info about how long stuff took

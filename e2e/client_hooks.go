@@ -20,9 +20,8 @@ type clientHooks struct {
 
 func newEndToEndClientHooks(logger *zap.Logger) *clientHooks {
 
-	logger = logger.With(zap.String("source", "end_to_end"))
-
 	return &clientHooks{
+		logger:             logger.Named("e2e-hooks"),
 		currentCoordinator: &atomic.Value{},
 	}
 }
