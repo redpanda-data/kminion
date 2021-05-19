@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"sync/atomic"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -30,49 +29,6 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 	// Create our own consumer group
 	client.AssignGroup(s.groupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
 	s.logger.Info("Starting to consume end-to-end", zap.String("topicName", topicName), zap.String("groupId", s.groupId))
-
-	// Keep checking for the coordinator
-	var currentCoordinator atomic.Value
-	currentCoordinator.Store(kgo.BrokerMetadata{})
-
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-ticker.C:
-				describeReq := kmsg.NewDescribeGroupsRequest()
-				describeReq.Groups = []string{s.groupId}
-				describeReq.IncludeAuthorizedOperations = false
-
-				shards := client.RequestSharded(ctx, &describeReq)
-				for _, shard := range shards {
-					// since we're only interested in the coordinator, we only check for broker errors on the response that contains our group
-					response, ok := shard.Resp.(*kmsg.DescribeGroupsResponse)
-					if !ok {
-						s.logger.Warn("cannot cast shard response to DescribeGroupsResponse")
-						continue
-					}
-					if len(response.Groups) == 0 {
-						s.logger.Warn("DescribeGroupsResponse contained no groups")
-						continue
-					}
-					group := response.Groups[0]
-					groupErr := kerr.ErrorForCode(group.ErrorCode)
-					if groupErr != nil {
-						s.logger.Error("couldn't describe end-to-end consumer group, error in group", zap.Error(groupErr), zap.Any("broker", shard.Meta))
-						continue
-					}
-
-					currentCoordinator.Store(shard.Meta)
-					break
-				}
-			}
-		}
-	}()
 
 	for {
 		select {
@@ -109,16 +65,11 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 			// Commit offsets for processed messages
 			// todo: the normal way to commit offsets with franz-go is pretty good, but in our special case
 			// 		 we want to do it manually, seperately for each partition, so we can track how long it took
-
-			// todo: use findGroupCoordinatorID
-			// maybe ask travis about return value, we want to know what coordinator the offsets was committed to
-			// kminion probably already exposed coordinator for every group
-
 			if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
 
 				startCommitTimestamp := timeNowMs()
 
-				client.CommitOffsets(ctx, uncommittedOffset, func(_ *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
+				client.CommitOffsets(ctx, uncommittedOffset, func(req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
 					// got commit response
 
 					latencyMs := timeNowMs() - startCommitTimestamp
@@ -129,16 +80,20 @@ func (s *Service) ConsumeFromManagementTopic(ctx context.Context) error {
 						return
 					}
 
-					// todo: check each partitions error code
-
-					// only report commit latency if the coordinator is known
-					coordinator := currentCoordinator.Load().(kgo.BrokerMetadata)
-					if len(coordinator.Host) > 0 {
-						s.onOffsetCommit(coordinator.NodeID, commitLatency)
-					} else {
-						s.logger.Warn("won't report commit latency since broker coordinator is still unknown", zap.Int64("latencyMilliseconds", commitLatency.Milliseconds()))
+					for _, t := range r.Topics {
+						for _, p := range t.Partitions {
+							err := kerr.ErrorForCode(p.ErrorCode)
+							if err != nil {
+								s.logger.Error("error committing partition offset", zap.String("topic", t.Topic), zap.Int32("partitionId", p.Partition), zap.Error(err))
+							}
+						}
 					}
 
+					// only report commit latency if the coordinator wasn't set too long ago
+					if time.Since(s.clientHooks.lastCoordinatorUpdate) < 10*time.Second {
+						coordinator := s.clientHooks.currentCoordinator.Load().(kgo.BrokerMetadata)
+						s.onOffsetCommit(coordinator.NodeID, commitLatency)
+					}
 				})
 			}
 
