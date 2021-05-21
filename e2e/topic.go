@@ -154,17 +154,24 @@ func (s *Service) validatePartitionAssignments(ctx context.Context, meta *kmsg.M
 		return fmt.Errorf("topic reassignment request failed: %w", err)
 	}
 	reassignErr := kerr.ErrorForCode(reassignRes.ErrorCode)
-	if reassignErr != nil || reassignRes.ErrorMessage != nil {
+	if reassignErr != nil || (reassignRes.ErrorMessage != nil && *reassignRes.ErrorMessage != "") {
 		// global error
-		return fmt.Errorf("topic reassignment failed with ErrorMessage=\"%v\": %w", reassignRes.ErrorMessage, err)
+		return fmt.Errorf(fmt.Sprintf("topic reassignment failed with ErrorMessage=\"%v\": %v",
+			*reassignRes.ErrorMessage,
+			safeUnwrap(reassignErr),
+		))
 	}
 
 	// errors for individual partitions
 	for _, t := range reassignRes.Topics {
 		for _, p := range t.Partitions {
 			pErr := kerr.ErrorForCode(p.ErrorCode)
-			if pErr != nil || p.ErrorMessage != nil {
-				return fmt.Errorf("topic reassignment failed on partition %v: ErrorMessage \"%v\": %w", p.Partition, reassignRes.ErrorMessage, err)
+			if pErr != nil || (p.ErrorMessage != nil && *p.ErrorMessage != "") {
+				return fmt.Errorf(fmt.Sprintf("topic reassignment failed on partition %v with ErrorMessage=\"%v\": %v",
+					p.Partition,
+					safeUnwrap(pErr),
+					*p.ErrorMessage),
+				)
 			}
 		}
 	}
@@ -214,7 +221,7 @@ func (s *Service) ensureEnoughPartitions(ctx context.Context, meta *kmsg.Metadat
 	nestedErrors := 0
 	for _, topicResponse := range createPartitionsResponse.Topics {
 		tErr := kerr.ErrorForCode(topicResponse.ErrorCode)
-		if tErr != nil || topicResponse.ErrorMessage != nil {
+		if tErr != nil || (topicResponse.ErrorMessage != nil && *topicResponse.ErrorMessage != "") {
 			s.logger.Error("error in createPartitionsResponse",
 				zap.String("topic", topicResponse.Topic),
 				zap.Stringp("errorMessage", topicResponse.ErrorMessage),
@@ -256,8 +263,10 @@ func (s *Service) createManagementTopic(ctx context.Context, allMeta *kmsg.Metad
 	if err != nil {
 		return fmt.Errorf("failed to create e2e topic: %w", err)
 	}
-	if len(res.Topics) > 0 && res.Topics[0].ErrorMessage != nil {
-		return fmt.Errorf("failed to create e2e topic: %s", *res.Topics[0].ErrorMessage)
+	if len(res.Topics) > 0 {
+		if res.Topics[0].ErrorMessage != nil && *res.Topics[0].ErrorMessage != "" {
+			return fmt.Errorf("failed to create e2e topic: %s", *res.Topics[0].ErrorMessage)
+		}
 	}
 
 	return nil

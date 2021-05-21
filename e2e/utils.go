@@ -69,3 +69,10 @@ func (s *Service) logCommitErrors(r *kmsg.OffsetCommitResponse, err error) int {
 
 	return errCount
 }
+
+func safeUnwrap(err error) string {
+	if err == nil {
+		return "<nil>"
+	}
+	return err.Error()
+}

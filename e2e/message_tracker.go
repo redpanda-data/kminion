@@ -49,7 +49,7 @@ func newMessageTracker(svc *Service) *messageTracker {
 }
 
 func (t *messageTracker) addToTracker(msg *EndToEndMessage) {
-	t.cache.SetDefault(msg.MessageID, &msg)
+	t.cache.SetDefault(msg.MessageID, msg)
 }
 
 func (t *messageTracker) onMessageArrived(arrivedMessage *EndToEndMessage) {
