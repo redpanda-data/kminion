@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"context"
 	"time"
 
 	goCache "github.com/patrickmn/go-cache"
@@ -28,7 +27,6 @@ import (
 type messageTracker struct {
 	svc    *Service
 	logger *zap.Logger
-	ctx    context.Context
 	cache  *goCache.Cache
 }
 

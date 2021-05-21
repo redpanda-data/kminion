@@ -5,6 +5,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kmsg"
+	"go.uber.org/zap"
 )
 
 // create histogram buckets for metrics reported by 'end-to-end'
@@ -40,4 +43,29 @@ func containsStr(ar []string, x string) (bool, int) {
 		}
 	}
 	return false, -1
+}
+
+// logs all errors, returns number of errors
+func (s *Service) logCommitErrors(r *kmsg.OffsetCommitResponse, err error) int {
+	if err != nil {
+		s.logger.Error("offset commit failed", zap.Error(err))
+		return 1
+	}
+
+	errCount := 0
+	for _, t := range r.Topics {
+		for _, p := range t.Partitions {
+			err := kerr.ErrorForCode(p.ErrorCode)
+			if err != nil {
+				s.logger.Error("error committing partition offset",
+					zap.String("topic", t.Topic),
+					zap.Int32("partitionId", p.Partition),
+					zap.Error(err),
+				)
+				errCount++
+			}
+		}
+	}
+
+	return errCount
 }

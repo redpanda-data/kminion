@@ -30,9 +30,6 @@ type Service struct {
 	partitioner    *customPartitioner // takes care of sending our end-to-end messages to the right partition
 	partitionCount int                // number of partitions of our test topic, used to send messages to all partitions
 
-	// todo: tracker for in-flight messages
-	// lastRoundtripTimestamp float64 // creation time (in utc ms) of the message that most recently passed the roundtripSla check
-
 	// Metrics
 	endToEndMessagesProduced prometheus.Counter
 	endToEndMessagesAcked    prometheus.Counter
@@ -108,14 +105,16 @@ func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, 
 
 	// Add RequiredAcks, as options can't be altered later
 	kgoOpts := []kgo.Opt{}
-	if cfg.Enabled {
-		ack := kgo.AllISRAcks()
-		if cfg.Producer.RequiredAcks == 1 {
-			ack = kgo.LeaderAck()
-			kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
-		}
-		kgoOpts = append(kgoOpts, kgo.RequiredAcks(ack))
+
+	if cfg.Producer.RequiredAcks == "all" {
+		kgoOpts = append(kgoOpts, kgo.RequiredAcks(kgo.AllISRAcks()))
+	} else {
+		kgoOpts = append(kgoOpts, kgo.RequiredAcks(kgo.LeaderAck()))
+		kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
 	}
+
+	// produce request timeout
+	kgoOpts = append(kgoOpts, kgo.ProduceRequestTimeout(cfg.Producer.AckSla))
 
 	// Prepare hooks
 	e2eHooks := newEndToEndClientHooks(logger)
@@ -136,11 +135,12 @@ func createKafkaClient(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, 
 // Start starts the service (wow)
 func (s *Service) Start(ctx context.Context) error {
 
+	// Ensure topic exists and is configured correctly
 	if err := s.validateManagementTopic(ctx); err != nil {
 		return fmt.Errorf("could not validate end-to-end topic: %w", err)
 	}
 
-	// after ensuring the topic exists and is configured correctly, we inform our custom partitioner about the partitions
+	// Get up-to-date metadata and inform our custom partitioner about the partition count
 	topicMetadata, err := s.getTopicMetadata(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get topic metadata after validation: %w", err)
@@ -155,6 +155,51 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 
+func (s *Service) initEndToEnd(ctx context.Context) {
+
+	validateTopicTicker := time.NewTicker(s.config.TopicManagement.ReconciliationInterval)
+	produceTicker := time.NewTicker(s.config.ProbeInterval)
+	commitTicker := time.NewTicker(5 * time.Second)
+	// stop tickers when context is cancelled
+	go func() {
+		<-ctx.Done()
+		produceTicker.Stop()
+		validateTopicTicker.Stop()
+		commitTicker.Stop()
+	}()
+
+	// keep checking end-to-end topic
+	go func() {
+		for range validateTopicTicker.C {
+			err := s.validateManagementTopic(ctx)
+			if err != nil {
+				s.logger.Error("failed to validate end-to-end topic", zap.Error(err))
+			}
+		}
+	}()
+
+	// keep track of groups, delete old unused groups
+	go s.groupTracker.start()
+
+	// start consuming topic
+	go s.startConsumeMessages(ctx)
+
+	// start comitting offsets
+	go func() {
+		for range commitTicker.C {
+			s.commitOffsets(ctx)
+		}
+	}()
+
+	// start producing to topic
+	go func() {
+		for range produceTicker.C {
+			s.produceLatencyMessages(ctx)
+		}
+	}()
+
+}
+
 // called from e2e when a message is acknowledged
 func (s *Service) onAck(partitionId int32, duration time.Duration) {
 	s.endToEndMessagesAcked.Inc()
@@ -166,11 +211,6 @@ func (s *Service) onRoundtrip(partitionId int32, duration time.Duration) {
 	if duration > s.config.Consumer.RoundtripSla {
 		return // message is too old
 	}
-
-	// todo: track "lastRoundtripMessage"
-	// if msg.Timestamp < s.lastRoundtripTimestamp {
-	// 	return // msg older than what we recently processed (out of order, should never happen)
-	// }
 
 	s.endToEndMessagesReceived.Inc()
 	s.endToEndRoundtripLatency.WithLabelValues(fmt.Sprintf("%v", partitionId)).Observe(duration.Seconds())

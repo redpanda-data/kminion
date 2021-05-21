@@ -15,7 +15,7 @@ type EndToEndMessage struct {
 	MessageID string `json:"messageID"`    // unique for each message
 	Timestamp int64  `json:"createdUtcNs"` // when the message was created, unix nanoseconds
 
-	partition  int
+	partition  int  // used in message tracker
 	hasArrived bool // used in tracker
 }
 
@@ -23,8 +23,7 @@ func (m *EndToEndMessage) creationTime() time.Time {
 	return time.Unix(0, m.Timestamp)
 }
 
-// Goes through each partition and sends a EndToEndMessage to it
-
+// Sends a EndToEndMessage to every partition
 func (s *Service) produceLatencyMessages(ctx context.Context) {
 
 	for i := 0; i < s.partitionCount; i++ {
@@ -42,11 +41,7 @@ func (s *Service) produceLatencyMessages(ctx context.Context) {
 func (s *Service) produceSingleMessage(ctx context.Context, partition int) error {
 
 	topicName := s.config.TopicManagement.Name
-
-	record, msg, err := createEndToEndRecord(s.minionID, topicName, partition)
-	if err != nil {
-		return err
-	}
+	record, msg := createEndToEndRecord(s.minionID, topicName, partition)
 
 	for {
 		select {
@@ -83,7 +78,7 @@ func (s *Service) produceSingleMessage(ctx context.Context, partition int) error
 
 }
 
-func createEndToEndRecord(minionID string, topicName string, partition int) (*kgo.Record, *EndToEndMessage, error) {
+func createEndToEndRecord(minionID string, topicName string, partition int) (*kgo.Record, *EndToEndMessage) {
 
 	message := &EndToEndMessage{
 		MinionID:  minionID,
@@ -91,13 +86,13 @@ func createEndToEndRecord(minionID string, topicName string, partition int) (*kg
 		Timestamp: time.Now().UnixNano(),
 
 		partition: partition,
-		// todo: maybe indicate what broker was the leader for that partition at the time of sending,
-		//       so that when receiving the message again, we could
 	}
 
 	mjson, err := json.Marshal(message)
 	if err != nil {
-		return nil, nil, err
+		// Should never happen since the struct is so simple,
+		// but if it does, something is completely broken anyway
+		panic("cannot serialize EndToEndMessage")
 	}
 
 	record := &kgo.Record{
@@ -106,5 +101,5 @@ func createEndToEndRecord(minionID string, topicName string, partition int) (*kg
 		Partition: int32(partition), // we set partition for producing so our customPartitioner can make use of it
 	}
 
-	return record, message, nil
+	return record, message
 }

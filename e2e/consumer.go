@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
@@ -15,19 +14,14 @@ func (s *Service) startConsumeMessages(ctx context.Context) {
 	client := s.client
 	topicName := s.config.TopicManagement.Name
 	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicName)
-	balancer := kgo.Balancers(kgo.CooperativeStickyBalancer()) // Default GroupBalancer
-	switch s.config.Consumer.RebalancingProtocol {
-	case RoundRobin:
-		balancer = kgo.Balancers(kgo.RoundRobinBalancer())
-	case Range:
-		balancer = kgo.Balancers(kgo.RangeBalancer())
-	case Sticky:
-		balancer = kgo.Balancers(kgo.StickyBalancer())
-	}
 	client.AssignPartitions(topic)
 
 	// Create our own consumer group
-	client.AssignGroup(s.groupId, kgo.GroupTopics(topicName), balancer, kgo.DisableAutoCommit())
+	client.AssignGroup(s.groupId,
+		kgo.GroupTopics(topicName),
+		kgo.Balancers(kgo.CooperativeStickyBalancer()),
+		kgo.DisableAutoCommit(),
+	)
 	s.logger.Info("Starting to consume end-to-end", zap.String("topicName", topicName), zap.String("groupId", s.groupId))
 
 	for {
@@ -59,40 +53,26 @@ func (s *Service) startConsumeMessages(ctx context.Context) {
 
 func (s *Service) commitOffsets(ctx context.Context) {
 	client := s.client
-
-	//
-	// Commit offsets for processed messages
-	// todo: the normal way to commit offsets with franz-go is pretty good, but in our special case
-	// 		 we want to do it manually, seperately for each partition, so we can track how long it took
-	if uncommittedOffset := client.UncommittedOffsets(); uncommittedOffset != nil {
-
-		startCommitTimestamp := time.Now()
-
-		client.CommitOffsets(ctx, uncommittedOffset, func(req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
-			// got commit response
-			latency := time.Since(startCommitTimestamp)
-
-			if err != nil {
-				s.logger.Error("offset commit failed", zap.Error(err), zap.Int64("latencyMilliseconds", latency.Milliseconds()))
-				return
-			}
-
-			for _, t := range r.Topics {
-				for _, p := range t.Partitions {
-					err := kerr.ErrorForCode(p.ErrorCode)
-					if err != nil {
-						s.logger.Error("error committing partition offset", zap.String("topic", t.Topic), zap.Int32("partitionId", p.Partition), zap.Error(err))
-					}
-				}
-			}
-
-			// only report commit latency if the coordinator wasn't set too long ago
-			if time.Since(s.clientHooks.lastCoordinatorUpdate) < 10*time.Second {
-				coordinator := s.clientHooks.currentCoordinator.Load().(kgo.BrokerMetadata)
-				s.onOffsetCommit(coordinator.NodeID, latency)
-			}
-		})
+	uncommittedOffset := client.UncommittedOffsets()
+	if uncommittedOffset == nil {
+		return
 	}
+
+	startCommitTimestamp := time.Now()
+	client.CommitOffsets(ctx, uncommittedOffset, func(req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
+		// Got commit response
+		latency := time.Since(startCommitTimestamp)
+
+		if s.logCommitErrors(r, err) > 0 {
+			return
+		}
+
+		// only report commit latency if the coordinator wasn't set too long ago
+		if time.Since(s.clientHooks.lastCoordinatorUpdate) < 10*time.Second {
+			coordinator := s.clientHooks.currentCoordinator.Load().(kgo.BrokerMetadata)
+			s.onOffsetCommit(coordinator.NodeID, latency)
+		}
+	})
 }
 
 // processMessage:

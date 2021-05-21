@@ -7,23 +7,22 @@ import (
 
 type EndToEndProducerConfig struct {
 	AckSla       time.Duration `koanf:"ackSla"`
-	RequiredAcks int           `koanf:"requiredAcks"`
+	RequiredAcks string        `koanf:"requiredAcks"`
 }
 
 func (c *EndToEndProducerConfig) SetDefaults() {
 	c.AckSla = 5 * time.Second
-	c.RequiredAcks = -1
+	c.RequiredAcks = "all"
 }
 
 func (c *EndToEndProducerConfig) Validate() error {
 
-	if c.AckSla <= 0 {
-		return fmt.Errorf("producer.ackSla must be greater than zero")
+	if c.RequiredAcks != "all" && c.RequiredAcks != "leader" {
+		return fmt.Errorf("producer.requiredAcks must be 'all' or 'leader")
 	}
 
-	// all(-1) or leader(1)
-	if c.RequiredAcks != -1 && c.RequiredAcks != 1 {
-		return fmt.Errorf("producer.requiredAcks must be 1 or -1")
+	if c.AckSla <= 0 {
+		return fmt.Errorf("producer.ackSla must be greater than zero")
 	}
 
 	return nil

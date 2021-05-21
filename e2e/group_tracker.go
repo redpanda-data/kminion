@@ -134,7 +134,7 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 		exists, _ := containsStr(matchingGroups, name)
 		if exists {
 			// still there, check age and maybe delete it
-			age := time.Now().Sub(firstSeen)
+			age := time.Since(firstSeen)
 			if age > oldGroupMaxAge {
 				// group was unused for too long, delete it
 				groupsToDelete = append(groupsToDelete, name)
