@@ -88,9 +88,9 @@ kminion_kafka_consumer_group_topic_lag{group_id="bigquery-sink",topic_name="shop
 kminion_kafka_consumer_group_offset_commits_total{group_id="bigquery-sink"} 1098
 ```
 
-## End To End Monitoring Metrics
+### End-to-End Metrics
 
-
+```
 # HELP kminion_end_to_end_messages_produced_total Number of messages that kminion's end-to-end test has tried to send to kafka
 # TYPE kminion_end_to_end_messages_produced_total counter
 kminion_end_to_end_messages_produced_total 384
@@ -118,3 +118,4 @@ kminion_end_to_end_commit_latency_seconds_bucket{groupCoordinatorBrokerId="0",le
 # HELP kminion_end_to_end_roundtrip_latency_seconds Time it took between sending (producing) and receiving (consuming) a message
 # TYPE kminion_end_to_end_roundtrip_latency_seconds histogram
 kminion_end_to_end_roundtrip_latency_seconds_bucket{partitionId="0",le="0.005"} 0
+```
