@@ -56,7 +56,7 @@ minion:
     #     - Useful for managed kafka clusters that do not provide access to the offsets topic.
     # * offsetsTopic
     #     - Enables kminion_kafka_consumer_group_offset_commits_total metrics.
-    #     - Processing the offsetsTopic requires slightly more memory than using the adminApi. The amount depends on the
+    #     - Processing the offsetsTopic requires slightly more memory and cpu than using the adminApi. The amount depends on the
     #       size and throughput of the offsets topic.
     scrapeMode: adminApi # Valid values: adminApi, offsetsTopic
     # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
