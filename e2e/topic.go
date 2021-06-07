@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Check our end-to-end test topic
+// Check our end-to-end test topic and adapt accordingly if something does not match our expectations.
 // - does it exist?
 // - is it configured correctly?
 //     - does it have enough partitions?
