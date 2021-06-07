@@ -52,6 +52,12 @@ minion:
     enabled: true
     # Mode specifies whether we export consumer group offsets using the Admin API or by consuming the internal
     # __consumer_offsets topic. Both modes have their advantages and disadvantages.
+    # * adminApi:
+    #     - Useful for managed kafka clusters that do not provide access to the offsets topic.
+    # * offsetsTopic
+    #     - Enables kminion_kafka_consumer_group_offset_commits_total metrics.
+    #     - Processing the offsetsTopic requires slightly more memory than using the adminApi. The amount depends on the
+    #       size and throughput of the offsets topic.
     scrapeMode: adminApi # Valid values: adminApi, offsetsTopic
     # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
     # you aren't interested in per partition lags you could choose "topic" where all partition lags will be summed
