@@ -82,8 +82,13 @@ kminion_kafka_consumer_group_topic_partition_lag{group_id="bigquery-sink",partit
 # HELP kminion_kafka_consumer_group_topic_lag The number of messages a consumer group is lagging behind across all partitions in a topic
 # TYPE kminion_kafka_consumer_group_topic_lag gauge
 kminion_kafka_consumer_group_topic_lag{group_id="bigquery-sink",topic_name="shop-activity"} 147481
+```
 
+#### Offset Commits Metrics
+The following metrics are only available when KMinion is configured to use `scrapeMode: offsetsTopic`.
+```
 # HELP kminion_kafka_consumer_group_offset_commits_total The number of offsets committed by a group
 # TYPE kminion_kafka_consumer_group_offset_commits_total counter
 kminion_kafka_consumer_group_offset_commits_total{group_id="bigquery-sink"} 1098
 ```
+
