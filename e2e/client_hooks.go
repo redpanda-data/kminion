@@ -70,9 +70,8 @@ func (c *clientHooks) OnWrite(meta kgo.BrokerMetadata, key int16, bytesWritten i
 // OnRead is called after a read from a broker.
 // OnRead(meta BrokerMetadata, key int16, bytesRead int, readWait, timeToRead time.Duration, err error)
 func (c *clientHooks) OnRead(meta kgo.BrokerMetadata, key int16, bytesRead int, readWait, timeToRead time.Duration, err error) {
-
-	keyName := kmsg.NameForKey(key)
-	if keyName != "OffsetCommit" {
+	expectedRes := kmsg.NewOffsetCommitResponse()
+	if key != expectedRes.Key() {
 		return
 	}
 
