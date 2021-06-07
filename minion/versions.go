@@ -3,6 +3,7 @@ package minion
 import (
 	"context"
 	"fmt"
+
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
@@ -22,7 +23,7 @@ func (s *Service) GetAPIVersions(ctx context.Context) (*kmsg.ApiVersionsResponse
 	versionsReq := kmsg.NewApiVersionsRequest()
 	versionsReq.ClientSoftwareName = "kminion"
 	versionsReq.ClientSoftwareVersion = "v2"
-	res, err := versionsReq.RequestWith(ctx, s.kafkaSvc.Client)
+	res, err := versionsReq.RequestWith(ctx, s.client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request api versions: %w", err)
 	}

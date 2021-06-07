@@ -2,12 +2,13 @@ package prometheus
 
 import (
 	"context"
+	"os"
+	"time"
+
 	"github.com/cloudhut/kminion/v2/minion"
 	uuid2 "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"os"
-	"time"
 )
 
 // Exporter is the Prometheus exporter that implements the prometheus.Collector interface

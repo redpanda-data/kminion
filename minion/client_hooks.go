@@ -1,12 +1,13 @@
-package kafka
+package minion
 
 import (
+	"net"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
-	"net"
-	"time"
 )
 
 // clientHooks implements the various hook interfaces from the franz-go (kafka) library. We can use these hooks to
@@ -21,7 +22,7 @@ type clientHooks struct {
 	bytesReceived         prometheus.Counter
 }
 
-func newClientHooks(logger *zap.Logger, metricsNamespace string) *clientHooks {
+func newMinionClientHooks(logger *zap.Logger, metricsNamespace string) *clientHooks {
 	requestSentCount := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Subsystem: "kafka",

@@ -2,6 +2,7 @@ package minion
 
 import (
 	"context"
+
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
@@ -15,7 +16,7 @@ type LogDirResponseShard struct {
 func (s *Service) DescribeLogDirs(ctx context.Context) []LogDirResponseShard {
 	req := kmsg.NewDescribeLogDirsRequest()
 	req.Topics = nil // Describe all topics
-	responses := s.kafkaSvc.Client.RequestSharded(ctx, &req)
+	responses := s.client.RequestSharded(ctx, &req)
 
 	res := make([]LogDirResponseShard, len(responses))
 	for i, responseShard := range responses {

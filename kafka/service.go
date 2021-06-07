@@ -3,59 +3,73 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
-	"strings"
 )
 
 type Service struct {
 	cfg    Config
-	Client *kgo.Client
 	logger *zap.Logger
 }
 
-func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
-	// Create Kafka Client
-	hooksChildLogger := logger.With(zap.String("source", "kafka_client_hooks"))
-	clientHooks := newClientHooks(hooksChildLogger, "")
+func NewService(cfg Config, logger *zap.Logger) *Service {
+	return &Service{
+		cfg:    cfg,
+		logger: logger.Named("kafka-service"),
+	}
+}
 
-	kgoOpts, err := NewKgoConfig(cfg, logger, clientHooks)
+// Create a client with the services default settings
+// logger: will be used to log connections, errors, warnings about tls config, ...
+func (s *Service) CreateAndTestClient(logger *zap.Logger, opts []kgo.Opt, ctx context.Context) (*kgo.Client, error) {
+	// Config with default options
+	kgoOpts, err := NewKgoConfig(s.cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a valid kafka Client config: %w", err)
 	}
+	// Append user (the service calling this method) provided options
+	kgoOpts = append(kgoOpts, opts...)
 
-	kafkaClient, err := kgo.NewClient(kgoOpts...)
+	// Create kafka client
+	client, err := kgo.NewClient(kgoOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka Client: %w", err)
 	}
 
-	return &Service{
-		cfg:    cfg,
-		Client: kafkaClient,
-		logger: logger,
-	}, nil
+	// Test connection
+	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	err = s.testConnection(client, connectCtx)
+	if err != nil {
+		logger.Fatal("failed to test connectivity to Kafka cluster", zap.Error(err))
+	}
+
+	return client, nil
 }
 
-// TestConnection tries to fetch Broker metadata and prints some information if connection succeeds. An error will be
+// testConnection tries to fetch Broker metadata and prints some information if connection succeeds. An error will be
 // returned if connecting fails.
-func (s *Service) TestConnection(ctx context.Context) error {
+func (s *Service) testConnection(client *kgo.Client, ctx context.Context) error {
 	s.logger.Info("connecting to Kafka seed brokers, trying to fetch cluster metadata",
 		zap.String("seed_brokers", strings.Join(s.cfg.Brokers, ",")))
 
 	req := kmsg.MetadataRequest{
 		Topics: nil,
 	}
-	res, err := req.RequestWith(ctx, s.Client)
+	res, err := req.RequestWith(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to request metadata: %w", err)
 	}
 
 	// Request versions in order to guess Kafka Cluster version
 	versionsReq := kmsg.NewApiVersionsRequest()
-	versionsRes, err := versionsReq.RequestWith(ctx, s.Client)
+	versionsRes, err := versionsReq.RequestWith(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to request api versions: %w", err)
 	}

@@ -13,8 +13,8 @@ KMinion.
 - **Consumer Group Lags:** Number of messages a consumer group is lagging behind the latest offset
 - **Log dir sizes:** Metric for log dir sizes either grouped by broker or by topic
 - **Broker info:** Metric for each broker with its address, broker id, controller and rack id
-- **Configurable granularity:** Export metrics (e.g. consumer group lags) either per partition or per topic. This helps
-  to reduce the number of exported metric series
+- **Configurable granularity:** Export metrics (e.g. consumer group lags) either per partition or per topic. Helps to reduce the number of exported metric series.
+- **End to End Monitoring:** Sends messages to its own topic and consumes them, measuring a messages real-world "roundtrip" latency. Also provides ack-latency and offset-commit-latency. [More Info](/docs/end-to-end.md)
 - **Configurable targets:** You can configure what topics or groups you'd like to export using regex expressions
 - **Multiple config parsers:** It's possible to configure KMinion using YAML, Environment variables or a mix of both
 

@@ -82,13 +82,40 @@ kminion_kafka_consumer_group_topic_partition_lag{group_id="bigquery-sink",partit
 # HELP kminion_kafka_consumer_group_topic_lag The number of messages a consumer group is lagging behind across all partitions in a topic
 # TYPE kminion_kafka_consumer_group_topic_lag gauge
 kminion_kafka_consumer_group_topic_lag{group_id="bigquery-sink",topic_name="shop-activity"} 147481
-```
 
-#### Offset Commits Metrics
-The following metrics are only available when KMinion is configured to use `scrapeMode: offsetsTopic`.
-```
 # HELP kminion_kafka_consumer_group_offset_commits_total The number of offsets committed by a group
 # TYPE kminion_kafka_consumer_group_offset_commits_total counter
 kminion_kafka_consumer_group_offset_commits_total{group_id="bigquery-sink"} 1098
 ```
 
+### End-to-End Metrics
+
+```
+# HELP kminion_end_to_end_messages_produced_total Number of messages that kminion's end-to-end test has tried to send to kafka
+# TYPE kminion_end_to_end_messages_produced_total counter
+kminion_end_to_end_messages_produced_total 384
+
+# HELP kminion_end_to_end_commits_total Counts how many times kminions end-to-end test has committed messages
+# TYPE kminion_end_to_end_commits_total counter
+kminion_end_to_end_commits_total 18
+
+# HELP kminion_end_to_end_messages_acked_total Number of messages kafka acknowledged as produced
+# TYPE kminion_end_to_end_messages_acked_total counter
+kminion_end_to_end_messages_acked_total 383
+
+# HELP kminion_end_to_end_messages_received_total Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)
+# TYPE kminion_end_to_end_messages_received_total counter
+kminion_end_to_end_messages_received_total 383
+
+# HELP kminion_end_to_end_produce_latency_seconds Time until we received an ack for a produced message
+# TYPE kminion_end_to_end_produce_latency_seconds histogram
+kminion_end_to_end_produce_latency_seconds_bucket{partitionId="0",le="0.005"} 0
+
+# HELP kminion_end_to_end_commit_latency_seconds Time kafka took to respond to kminion's offset commit
+# TYPE kminion_end_to_end_commit_latency_seconds histogram
+kminion_end_to_end_commit_latency_seconds_bucket{groupCoordinatorBrokerId="0",le="0.005"} 0
+
+# HELP kminion_end_to_end_roundtrip_latency_seconds Time it took between sending (producing) and receiving (consuming) a message
+# TYPE kminion_end_to_end_roundtrip_latency_seconds histogram
+kminion_end_to_end_roundtrip_latency_seconds_bucket{partitionId="0",le="0.005"} 0
+```

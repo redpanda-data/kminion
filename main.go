@@ -3,6 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+
+	"github.com/cloudhut/kminion/v2/e2e"
 	"github.com/cloudhut/kminion/v2/kafka"
 	"github.com/cloudhut/kminion/v2/logging"
 	"github.com/cloudhut/kminion/v2/minion"
@@ -10,12 +17,6 @@ import (
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"strconv"
-	"time"
 )
 
 func main() {
@@ -53,27 +54,39 @@ func main() {
 		}
 	}()
 
-	// Create kafka service and check if client can successfully connect to Kafka cluster
-	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger)
-	if err != nil {
-		logger.Fatal("failed to setup kafka service", zap.Error(err))
-	}
-	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	err = kafkaSvc.TestConnection(connectCtx)
-	if err != nil {
-		logger.Fatal("failed to test connectivity to Kafka cluster", zap.Error(err))
-	}
+	// Create kafka service
+	kafkaSvc := kafka.NewService(cfg.Kafka, logger)
 
-	// Create minion service that does most of the work. The Prometheus exporter only talks to the minion service
-	// which issues all the requests to Kafka and wraps the interface accordingly.
-	minionSvc, err := minion.NewService(cfg.Minion, logger, kafkaSvc)
+	// Create minion service
+	// Prometheus exporter only talks to the minion service which
+	// issues all the requests to Kafka and wraps the interface accordingly.
+	minionSvc, err := minion.NewService(cfg.Minion, logger, kafkaSvc, cfg.Exporter.Namespace, ctx)
 	if err != nil {
 		logger.Fatal("failed to setup minion service", zap.Error(err))
 	}
-	err = minionSvc.Start(ctx)
-	if err != nil {
-		logger.Fatal("failed to start minion service", zap.Error(err))
+	if false {
+		err = minionSvc.Start(ctx)
+		if err != nil {
+			logger.Fatal("failed to start minion service", zap.Error(err))
+		}
+	}
+
+	// Create end to end testing service
+	if cfg.Minion.EndToEnd.Enabled {
+		e2eService, err := e2e.NewService(
+			cfg.Minion.EndToEnd,
+			logger,
+			kafkaSvc,
+			cfg.Exporter.Namespace,
+			ctx,
+		)
+		if err != nil {
+			logger.Fatal("failed to create end-to-end monitoring service: %w", zap.Error(err))
+		}
+
+		if err = e2eService.Start(ctx); err != nil {
+			logger.Fatal("failed to start end-to-end monitoring service: %w", zap.Error(err))
+		}
 	}
 
 	// The Prometheus exporter that implements the Prometheus collector interface
