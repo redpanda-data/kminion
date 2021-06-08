@@ -16,24 +16,30 @@
 # Env variables that expect array values can be provided by separting them using
 # a comma: KAFKA_BROKERS = "broker1:9092,broker2:9092,broker3:9092"
 #####################################################################################
+
+logger:
+  # Valid values are: debug, info, warn, error, fatal, panic
+  level: info
+
 kafka:
-  brokers: []
+  brokers: ["example.com:9094"]
   clientId: "kminion"
   rackId: ""
   tls:
-    enabled: false
+    enabled: true
     caFilepath: ""
     certFilepath: ""
     keyFilepath: ""
     passphrase: ""
     insecureSkipTlsVerify: false
+
   sasl:
     # Whether or not SASL authentication will be used for authentication
-    enabled: false
+    enabled: true
     # Username to use for PLAIN or SCRAM mechanism
-    username: ""
+    username: "kminion"
     # Password to use for PLAIN or SCRAM mechanism
-    password: ""
+    password:
     # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
     mechanism: "PLAIN"
     # GSSAPI / Kerberos config properties
@@ -49,16 +55,10 @@ kafka:
 minion:
   consumerGroups:
     # Enabled specifies whether consumer groups shall be scraped and exported or not.
-    enabled: true
+    enabled: false
     # Mode specifies whether we export consumer group offsets using the Admin API or by consuming the internal
     # __consumer_offsets topic. Both modes have their advantages and disadvantages.
-    # * adminApi:
-    #     - Useful for managed kafka clusters that do not provide access to the offsets topic.
-    # * offsetsTopic
-    #     - Enables kminion_kafka_consumer_group_offset_commits_total metrics.
-    #     - Processing the offsetsTopic requires slightly more memory and cpu than using the adminApi. The amount depends on the
-    #       size and throughput of the offsets topic.
-    scrapeMode: adminApi # Valid values: adminApi, offsetsTopic
+    scrapeMode: offsetsTopic # Valid values: adminApi, offsetsTopic
     # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
     # you aren't interested in per partition lags you could choose "topic" where all partition lags will be summed
     # and only topic lags will be exported.
@@ -85,7 +85,54 @@ minion:
   logDirs:
     # Enabled specifies whether log dirs shall be scraped and exported or not. This should be disabled for clusters prior
     # to version 1.0.0 as describing log dirs was not supported back then.
+    enabled: false
+
+  # EndToEnd Metrics
+  # When enabled, kminion creates a topic which it produces to and consumes from, to measure various advanced metrics. See docs for more info
+  endToEnd:
     enabled: true
+    probeInterval: 800ms # how often to send end-to-end test messages
+    topicManagement:
+      # You can disable topic management, without disabling the testing feature.
+      # Only makes sense if you have multiple kminion instances, and for some reason only want one of them to create/configure the topic
+      enabled: true
+
+      # Name of the topic kminion uses to send its test messages
+      # You do *not* need to change this if you are running multiple kminion instances on the same cluster.
+      # Different instances are perfectly fine with sharing the same topic!
+      name: kminion-end-to-end
+
+      # How often kminion checks its topic to validate configuration, partition count, and partition assignments
+      reconciliationInterval: 10m
+
+      # Useful for monitoring the performance of acks (best combined with 'producer.requiredAcks' set to 'all')
+      replicationFactor: 1
+
+      # Rarely makes sense to change this, but maybe if you want some sort of cheap load test?
+      # By default (1) every broker gets one partition
+      partitionsPerBroker: 1
+
+    producer:
+      # This defines:
+      # - Maximum time to wait for an ack response after producing a message
+      # - Upper bound for histogram buckets in "produce_latency_seconds"
+      ackSla: 5s
+      # Can be to "all" (default) so kafka only reports an end-to-end test message as acknowledged if
+      # the message was written to all in-sync replicas of the partition.
+      # Or can be set to "leader" to only require to have written the message to its log.
+      requiredAcks: all
+
+    consumer:
+      # Prefix kminion uses when creating its consumer groups. Current kminion instance id will be appended automatically
+      groupIdPrefix: kminion-end-to-end
+      # This defines:
+      # - Upper bound for histogram buckets in "roundtrip_latency"
+      # - Time limit beyond which a message is considered "lost" (failed the roundtrip)
+      roundtripSla: 20s
+
+      # - Upper bound for histogram buckets in "commit_latency_seconds"
+      # - Maximum time an offset commit is allowed to take before considering it failed
+      commitSla: 10s
 
 exporter:
   # Namespace is the prefix for all exported Prometheus metrics
@@ -94,7 +141,3 @@ exporter:
   host: ""
   # Port that shall be used to bind the HTTP server on
   port: 8080
-
-logger:
-  # Level is a logging priority. Higher levels are more important. Valid values are: debug, info, warn, error, fatal, panic
-  level: info
