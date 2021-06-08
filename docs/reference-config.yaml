@@ -22,7 +22,7 @@ logger:
   level: info
 
 kafka:
-  brokers: [""]
+  brokers: []
   clientId: "kminion"
   rackId: ""
   tls:
@@ -35,9 +35,9 @@ kafka:
 
   sasl:
     # Whether or not SASL authentication will be used for authentication
-    enabled: true
+    enabled: false
     # Username to use for PLAIN or SCRAM mechanism
-    username:
+    username: ""
     # Password to use for PLAIN or SCRAM mechanism
     password: ""
     # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
@@ -58,6 +58,12 @@ minion:
     enabled: true
     # Mode specifies whether we export consumer group offsets using the Admin API or by consuming the internal
     # __consumer_offsets topic. Both modes have their advantages and disadvantages.
+    # * adminApi:
+    #     - Useful for managed kafka clusters that do not provide access to the offsets topic.
+    # * offsetsTopic
+    #     - Enables kminion_kafka_consumer_group_offset_commits_total metrics.
+    #     - Processing the offsetsTopic requires slightly more memory and cpu than using the adminApi. The amount depends on the
+    #       size and throughput of the offsets topic.
     scrapeMode: adminApi # Valid values: adminApi, offsetsTopic
     # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
     # you aren't interested in per partition lags you could choose "topic" where all partition lags will be summed
@@ -66,7 +72,7 @@ minion:
     # AllowedGroups are regex strings of group ids that shall be exported
     # You can specify allowed groups by providing literals like "my-consumergroup-name" or by providing regex expressions
     # like "/internal-.*/".
-    allowedGroups: []
+    allowedGroups: [".*"]
     # IgnoredGroups are regex strings of group ids that shall be ignored/skipped when exporting metrics. Ignored groups
     # take precedence over allowed groups.
     ignoredGroups: []
@@ -77,21 +83,21 @@ minion:
     # AllowedTopics are regex strings of topic names whose topic metrics that shall be exported.
     # You can specify allowed topics by providing literals like "my-topic-name" or by providing regex expressions
     # like "/internal-.*/".
-    allowedTopics: []
-
+    allowedTopics: [".*"]
     # IgnoredTopics are regex strings of topic names that shall be ignored/skipped when exporting metrics. Ignored topics
     # take precedence over allowed topics.
     ignoredTopics: []
   logDirs:
     # Enabled specifies whether log dirs shall be scraped and exported or not. This should be disabled for clusters prior
     # to version 1.0.0 as describing log dirs was not supported back then.
-    enabled: false
+    enabled: true
 
   # EndToEnd Metrics
   # When enabled, kminion creates a topic which it produces to and consumes from, to measure various advanced metrics. See docs for more info
   endToEnd:
-    enabled: true
-    probeInterval: 800ms # how often to send end-to-end test messages
+    enabled: false
+    # How often to send end-to-end test messages
+    probeInterval: 100ms
     topicManagement:
       # You can disable topic management, without disabling the testing feature.
       # Only makes sense if you have multiple kminion instances, and for some reason only want one of them to create/configure the topic
@@ -105,7 +111,8 @@ minion:
       # How often kminion checks its topic to validate configuration, partition count, and partition assignments
       reconciliationInterval: 10m
 
-      # Useful for monitoring the performance of acks (best combined with 'producer.requiredAcks' set to 'all')
+      # Depending on the desired monitoring (e.g. you want to alert on broker failure vs. cluster that is not writable)
+      # you may choose replication factor 1 or 3 most commonly.
       replicationFactor: 1
 
       # Rarely makes sense to change this, but maybe if you want some sort of cheap load test?

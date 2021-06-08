@@ -16,6 +16,7 @@ type EndToEndTopicConfig struct {
 func (c *EndToEndTopicConfig) SetDefaults() {
 	c.Enabled = true
 	c.Name = "kminion-end-to-end"
+	c.ReplicationFactor = 1
 	c.ReconciliationInterval = 10 * time.Minute
 }
 

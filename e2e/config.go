@@ -15,7 +15,7 @@ type Config struct {
 
 func (c *Config) SetDefaults() {
 	c.Enabled = false
-	c.ProbeInterval = 2 * time.Second
+	c.ProbeInterval = 100 * time.Millisecond
 	c.TopicManagement.SetDefaults()
 	c.Producer.SetDefaults()
 	c.Consumer.SetDefaults()
