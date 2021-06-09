@@ -3,6 +3,8 @@ package minion
 import (
 	"context"
 	"fmt"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"go.uber.org/zap"
 	"strconv"
 	"time"
 
@@ -60,5 +62,41 @@ func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListO
 	req := kmsg.NewListOffsetsRequest()
 	req.Topics = topicReqs
 
-	return req.RequestWith(ctx, s.client)
+	res, err := req.RequestWith(ctx, s.client)
+	if err != nil {
+		return res, err
+	}
+
+	// Log inner errors before returning them. We do that inside of this function to avoid duplicate logging as the response
+	// are cached for each scrape anyways.
+	//
+	// Create two metrics to aggregate error logs in few messages. Logging one message per occured partition error
+	// is too much. Typical errors are LEADER_NOT_AVAILABLE etc.
+	errorCountByErrCode := make(map[int16]int)
+	errorCountByTopic := make(map[string]int)
+
+	// Iterate on all partitions
+	for _, topic := range res.Topics {
+		for _, partition := range topic.Partitions {
+			err := kerr.TypedErrorForCode(partition.ErrorCode)
+			if err != nil {
+				errorCountByErrCode[partition.ErrorCode]++
+				errorCountByTopic[topic.Topic]++
+			}
+		}
+	}
+
+	// Print log line for each error type
+	for errCode, count := range errorCountByErrCode {
+		typedErr := kerr.TypedErrorForCode(errCode)
+		s.logger.Warn("failed to list some partitions watermarks",
+			zap.Error(typedErr),
+			zap.Int("error_count", count))
+	}
+	if len(errorCountByTopic) > 0 {
+		s.logger.Warn("some topics had one or more partitions whose watermarks could not be fetched from Kafka",
+			zap.Int("topics_with_errors", len(errorCountByTopic)))
+	}
+
+	return res, nil
 }

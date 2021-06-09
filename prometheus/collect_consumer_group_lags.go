@@ -218,7 +218,7 @@ func (e *Exporter) waterMarksByTopic(lowMarks *kmsg.ListOffsetsResponse, highMar
 		for _, partition := range topic.Partitions {
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
-				e.logger.Warn("failed to get partition low water mark, inner kafka error",
+				e.logger.Debug("failed to get partition low water mark, inner kafka error",
 					zap.String("topic_name", topic.Topic),
 					zap.Int32("partition_id", partition.Partition),
 					zap.Error(err))
@@ -243,7 +243,7 @@ func (e *Exporter) waterMarksByTopic(lowMarks *kmsg.ListOffsetsResponse, highMar
 		for _, partition := range topic.Partitions {
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
-				e.logger.Warn("failed to get partition high water mark, inner kafka error",
+				e.logger.Debug("failed to get partition high water mark, inner kafka error",
 					zap.String("topic_name", topic.Topic),
 					zap.Int32("partition_id", partition.Partition),
 					zap.Error(err))

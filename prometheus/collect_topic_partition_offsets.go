@@ -25,15 +25,18 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 		return false
 	}
 
+	// Process Low Watermarks
 	for _, topic := range lowWaterMarks.Topics {
 		if !e.minionSvc.IsTopicAllowed(topic.Topic) {
 			continue
 		}
+
 		waterMarkSum := int64(0)
+		hasErrors := false
 		for _, partition := range topic.Partitions {
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
-				e.logger.Error("failed to fetch partition low water mark", zap.Error(err))
+				hasErrors = true
 				isOk = false
 				continue
 			}
@@ -50,12 +53,15 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 				strconv.Itoa(int(partition.Partition)),
 			)
 		}
-		ch <- prometheus.MustNewConstMetric(
-			e.topicLowWaterMarkSum,
-			prometheus.GaugeValue,
-			float64(waterMarkSum),
-			topic.Topic,
-		)
+		// We only want to report the sum of all partition marks if we receive watermarks from all partition
+		if !hasErrors {
+			ch <- prometheus.MustNewConstMetric(
+				e.topicLowWaterMarkSum,
+				prometheus.GaugeValue,
+				float64(waterMarkSum),
+				topic.Topic,
+			)
+		}
 	}
 
 	for _, topic := range highWaterMarks.Topics {
@@ -63,11 +69,12 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 			continue
 		}
 		waterMarkSum := int64(0)
+		hasErrors := false
 		for _, partition := range topic.Partitions {
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
-				e.logger.Error("failed to fetch partition high water mark", zap.Error(err))
-				isOk = true
+				hasErrors = true
+				isOk = false
 				continue
 			}
 			waterMarkSum += partition.Offset
@@ -83,12 +90,15 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 				strconv.Itoa(int(partition.Partition)),
 			)
 		}
-		ch <- prometheus.MustNewConstMetric(
-			e.topicHighWaterMarkSum,
-			prometheus.GaugeValue,
-			float64(waterMarkSum),
-			topic.Topic,
-		)
+		// We only want to report the sum of all partition marks if we receive watermarks from all partitions
+		if !hasErrors {
+			ch <- prometheus.MustNewConstMetric(
+				e.topicHighWaterMarkSum,
+				prometheus.GaugeValue,
+				float64(waterMarkSum),
+				topic.Topic,
+			)
+		}
 	}
 
 	return isOk
