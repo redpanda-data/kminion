@@ -16,8 +16,6 @@ import (
 // methods where they'll be decoded and further processed.
 func (s *Service) startConsumingOffsets(ctx context.Context) {
 	client := s.client
-	topic := kgo.ConsumeTopics(kgo.NewOffset().AtStart(), "__consumer_offsets")
-	client.AssignPartitions(topic)
 
 	s.logger.Info("starting to consume messages from offsets topic")
 	go s.checkIfConsumerLagIsCaughtUp(ctx)

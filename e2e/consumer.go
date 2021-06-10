@@ -12,17 +12,9 @@ import (
 
 func (s *Service) startConsumeMessages(ctx context.Context) {
 	client := s.client
-	topicName := s.config.TopicManagement.Name
-	topic := kgo.ConsumeTopics(kgo.NewOffset().AtEnd(), topicName)
-	client.AssignPartitions(topic)
-
-	// Create our own consumer group
-	client.AssignGroup(s.groupId,
-		kgo.GroupTopics(topicName),
-		kgo.Balancers(kgo.CooperativeStickyBalancer()),
-		kgo.DisableAutoCommit(),
-	)
-	s.logger.Info("Starting to consume end-to-end", zap.String("topicName", topicName), zap.String("groupId", s.groupId))
+	s.logger.Info("Starting to consume end-to-end topic",
+		zap.String("topicName", s.config.TopicManagement.Name),
+		zap.String("groupId", s.groupId))
 
 	for {
 		select {
@@ -59,7 +51,7 @@ func (s *Service) commitOffsets(ctx context.Context) {
 	}
 
 	startCommitTimestamp := time.Now()
-	client.CommitOffsets(ctx, uncommittedOffset, func(req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
+	client.CommitOffsets(ctx, uncommittedOffset, func(_ *kgo.Client, req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
 		// Got commit response
 		latency := time.Since(startCommitTimestamp)
 

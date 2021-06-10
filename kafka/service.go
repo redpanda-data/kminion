@@ -25,9 +25,9 @@ func NewService(cfg Config, logger *zap.Logger) *Service {
 	}
 }
 
-// Create a client with the services default settings
+// CreateAndTestClient creates a client with the services default settings
 // logger: will be used to log connections, errors, warnings about tls config, ...
-func (s *Service) CreateAndTestClient(logger *zap.Logger, opts []kgo.Opt, ctx context.Context) (*kgo.Client, error) {
+func (s *Service) CreateAndTestClient(ctx context.Context, logger *zap.Logger, opts []kgo.Opt) (*kgo.Client, error) {
 	// Config with default options
 	kgoOpts, err := NewKgoConfig(s.cfg, logger)
 	if err != nil {

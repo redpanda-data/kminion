@@ -42,9 +42,13 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 	// Kafka client
 	hooksChildLogger := logger.With(zap.String("source", "minion_kafka_client"))
 	minionHooks := newMinionClientHooks(hooksChildLogger, metricsNamespace)
-	kgoOpts := []kgo.Opt{kgo.WithHooks(minionHooks)}
+	kgoOpts := []kgo.Opt{
+		kgo.WithHooks(minionHooks),
+		kgo.ConsumeTopics("__consumer_offsets"),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+	}
 
-	client, err := kafkaSvc.CreateAndTestClient(logger, kgoOpts, ctx)
+	client, err := kafkaSvc.CreateAndTestClient(ctx, logger, kgoOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client: %w", err)
 	}
