@@ -22,7 +22,7 @@ logger:
   level: info
 
 kafka:
-  brokers: []
+  brokers: [ ]
   clientId: "kminion"
   rackId: ""
   tls:
@@ -72,10 +72,10 @@ minion:
     # AllowedGroups are regex strings of group ids that shall be exported
     # You can specify allowed groups by providing literals like "my-consumergroup-name" or by providing regex expressions
     # like "/internal-.*/".
-    allowedGroups: [".*"]
+    allowedGroups: [ ".*" ]
     # IgnoredGroups are regex strings of group ids that shall be ignored/skipped when exporting metrics. Ignored groups
     # take precedence over allowed groups.
-    ignoredGroups: []
+    ignoredGroups: [ ]
   topics:
     # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
     # you aren't interested in per partition metrics you could choose "topic".
@@ -83,10 +83,10 @@ minion:
     # AllowedTopics are regex strings of topic names whose topic metrics that shall be exported.
     # You can specify allowed topics by providing literals like "my-topic-name" or by providing regex expressions
     # like "/internal-.*/".
-    allowedTopics: [".*"]
+    allowedTopics: [ ".*" ]
     # IgnoredTopics are regex strings of topic names that shall be ignored/skipped when exporting metrics. Ignored topics
     # take precedence over allowed topics.
-    ignoredTopics: []
+    ignoredTopics: [ ]
   logDirs:
     # Enabled specifies whether log dirs shall be scraped and exported or not. This should be disabled for clusters prior
     # to version 1.0.0 as describing log dirs was not supported back then.
@@ -132,6 +132,11 @@ minion:
     consumer:
       # Prefix kminion uses when creating its consumer groups. Current kminion instance id will be appended automatically
       groupIdPrefix: kminion-end-to-end
+
+      # Whether KMinion should try to delete empty consumer groups with the same prefix. This can be used if you want
+      # KMinion to cleanup it's old consumer groups. It should only be used if you use a unique prefix for KMinion.
+      deleteStaleConsumerGroups: false
+
       # This defines:
       # - Upper bound for histogram buckets in "roundtrip_latency"
       # - Time limit beyond which a message is considered "lost" (failed the roundtrip)

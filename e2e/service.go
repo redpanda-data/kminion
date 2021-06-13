@@ -86,7 +86,7 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 		clientHooks: hooks,
 	}
 
-	svc.groupTracker = newGroupTracker(svc, ctx)
+	svc.groupTracker = newGroupTracker(cfg, logger, client, groupID)
 	svc.messageTracker = newMessageTracker(svc)
 
 	makeCounter := func(name string, help string) prometheus.Counter {
@@ -141,53 +141,55 @@ func (s *Service) Start(ctx context.Context) error {
 	s.partitionCount = partitions
 
 	// finally start everything else (producing, consuming, continous validation, consumer group tracking)
-	go s.initEndToEnd(ctx)
+	go s.startReconciliation(ctx)
+	go s.startConsumeMessages(ctx)
+	go s.startProducer(ctx)
+
+	// keep track of groups, delete old unused groups
+	if s.config.Consumer.DeleteStaleConsumerGroups {
+		go s.groupTracker.start(ctx)
+	}
 
 	return nil
 }
 
-func (s *Service) initEndToEnd(ctx context.Context) {
-
+func (s *Service) startReconciliation(ctx context.Context) {
 	validateTopicTicker := time.NewTicker(s.config.TopicManagement.ReconciliationInterval)
-	produceTicker := time.NewTicker(s.config.ProbeInterval)
-	commitTicker := time.NewTicker(5 * time.Second)
-	// stop tickers when context is cancelled
-	go func() {
-		<-ctx.Done()
-		produceTicker.Stop()
-		validateTopicTicker.Stop()
-		commitTicker.Stop()
-	}()
-
-	// keep checking end-to-end topic
-	go func() {
-		for range validateTopicTicker.C {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-validateTopicTicker.C:
 			err := s.validateManagementTopic(ctx)
 			if err != nil {
 				s.logger.Error("failed to validate end-to-end topic", zap.Error(err))
 			}
 		}
-	}()
+	}
+}
 
-	// keep track of groups, delete old unused groups
-	go s.groupTracker.start()
-
-	// start consuming topic
-	go s.startConsumeMessages(ctx)
-
-	// start comitting offsets
-	go func() {
-		for range commitTicker.C {
-			s.commitOffsets(ctx)
-		}
-	}()
-
-	// start producing to topic
-	go func() {
-		for range produceTicker.C {
+func (s *Service) startProducer(ctx context.Context) {
+	produceTicker := time.NewTicker(s.config.ProbeInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-produceTicker.C:
 			s.produceLatencyMessages(ctx)
 		}
-	}()
+	}
+}
+
+func (s *Service) startOffsetCommits(ctx context.Context) {
+	commitTicker := time.NewTicker(5 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-commitTicker.C:
+			s.commitOffsets(ctx)
+		}
+	}
 
 }
 

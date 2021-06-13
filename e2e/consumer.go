@@ -35,9 +35,7 @@ func (s *Service) startConsumeMessages(ctx context.Context) {
 
 			// Process messages
 			fetches.EachRecord(func(record *kgo.Record) {
-				if record != nil {
-					s.processMessage(record, receiveTimestamp)
-				}
+				s.processMessage(record, receiveTimestamp)
 			})
 		}
 	}

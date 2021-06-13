@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,75 +22,56 @@ const (
 // Whenever a kminion instance starts up it creates a consumer-group for itself in order to not "collide" with other kminion instances.
 // When an instance restarts (for whatever reason), it creates a new group again, so we'd end up with a lot of unused groups.
 type groupTracker struct {
-	svc    *Service // used to obtain stuff like logger, kafka client, ...
-	logger *zap.Logger
-	ctx    context.Context // cancellation context
-
-	client *kgo.Client // kafka client
-
+	cfg                    Config
+	logger                 *zap.Logger
+	client                 *kgo.Client          // kafka client
 	groupId                string               // our own groupId
 	potentiallyEmptyGroups map[string]time.Time // groupName -> utc timestamp when the group was first seen
-
-	isNotAuthorized bool // if we get a not authorized response while trying to delete old groups, this will be set to true, essentially disabling the tracker
 }
 
-func newGroupTracker(svc *Service, ctx context.Context) *groupTracker {
-
-	tracker := groupTracker{
-		svc:    svc,
-		logger: svc.logger.Named("groupTracker"),
-		ctx:    ctx,
-
-		client: svc.client,
-
-		groupId:                svc.groupId,
+func newGroupTracker(cfg Config, logger *zap.Logger, client *kgo.Client, groupID string) *groupTracker {
+	return &groupTracker{
+		cfg:                    cfg,
+		logger:                 logger.Named("groupTracker"),
+		client:                 client,
+		groupId:                groupID,
 		potentiallyEmptyGroups: make(map[string]time.Time),
-
-		isNotAuthorized: false,
 	}
-
-	return &tracker
 }
 
-func (g *groupTracker) start() {
+func (g *groupTracker) start(ctx context.Context) {
 	g.logger.Debug("starting group tracker")
 
 	deleteOldGroupsTicker := time.NewTicker(oldGroupCheckInterval)
-	// stop ticker when context is cancelled
-	go func() {
-		<-g.ctx.Done()
-		g.logger.Debug("stopping group tracker, context was cancelled")
-		deleteOldGroupsTicker.Stop()
-	}()
-
-	// look for old consumer groups and delete them
-	go func() {
-		for range deleteOldGroupsTicker.C {
-			err := g.checkAndDeleteOldConsumerGroups()
+	for {
+		select {
+		case <-ctx.Done():
+			g.logger.Debug("stopping group tracker, context was cancelled")
+			return
+		case <-deleteOldGroupsTicker.C:
+			childCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			err := g.checkAndDeleteOldConsumerGroups(childCtx)
 			if err != nil {
 				g.logger.Error("failed to check for old consumer groups: %w", zap.Error(err))
 			}
+			cancel()
 		}
-	}()
+	}
 }
 
-func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
-	if g.isNotAuthorized {
-		return nil
-	}
-
+func (g *groupTracker) checkAndDeleteOldConsumerGroups(ctx context.Context) error {
 	groupsRq := kmsg.NewListGroupsRequest()
 	groupsRq.StatesFilter = []string{"Empty"}
 
-	g.logger.Debug("checking for empty kminion consumer groups...")
+	g.logger.Debug("checking for stale kminion consumer groups")
 
-	shardedResponse := g.client.RequestSharded(g.ctx, &groupsRq)
+	shardedResponse := g.client.RequestSharded(ctx, &groupsRq)
 
 	// find groups that start with the kminion prefix
-	matchingGroups := make([]string, 0, 10)
+	matchingGroups := make([]string, 0)
 	for _, shard := range shardedResponse {
 		if shard.Err != nil {
-			g.logger.Error("error in response to ListGroupsRequest", zap.Error(shard.Err))
+			g.logger.Error("error in response to ListGroupsRequest", zap.Int32("broker_id", shard.Meta.NodeID), zap.Error(shard.Err))
 			continue
 		}
 
@@ -108,21 +88,20 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 				continue // skip our own consumer group
 			}
 
-			if strings.HasPrefix(name, g.svc.config.Consumer.GroupIdPrefix) {
+			if strings.HasPrefix(name, g.cfg.Consumer.GroupIdPrefix) {
 				matchingGroups = append(matchingGroups, name)
 			}
 		}
 	}
 
 	// save new (previously unseen) groups to tracker
-	g.logger.Debug(fmt.Sprintf("found %v matching kminion consumer groups", len(matchingGroups)), zap.Strings("groups", matchingGroups))
+	g.logger.Debug("checked for stale consumer groups", zap.Int("found_groups", len(matchingGroups)), zap.Strings("groups", matchingGroups))
 	for _, name := range matchingGroups {
 		_, exists := g.potentiallyEmptyGroups[name]
 		if !exists {
 			// add it with the current timestamp
-			now := time.Now()
-			g.potentiallyEmptyGroups[name] = now
-			g.logger.Debug("new empty kminion group, adding to tracker", zap.String("group", name), zap.Time("firstSeen", now))
+			g.potentiallyEmptyGroups[name] = time.Now()
+			g.logger.Debug("found new empty kminion group, adding it to the tracker", zap.String("group", name))
 		}
 	}
 
@@ -154,7 +133,7 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 
 	deleteRq := kmsg.NewDeleteGroupsRequest()
 	deleteRq.Groups = groupsToDelete
-	deleteResp := g.client.RequestSharded(g.ctx, &deleteRq)
+	deleteResp := g.client.RequestSharded(ctx, &deleteRq)
 
 	// done, now just errors
 	// if we get a not authorized error we'll disable deleting groups
@@ -190,7 +169,6 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups() error {
 
 	if foundNotAuthorizedError {
 		g.logger.Info("disabling trying to delete old kminion consumer-groups since one of the last delete results had an 'GroupAuthorizationFailed' error")
-		g.isNotAuthorized = true
 	}
 
 	return nil
