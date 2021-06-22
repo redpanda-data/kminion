@@ -28,7 +28,7 @@ type TopicConfig struct {
 type InfoMetricConfig struct {
 	// ConfigKeys configures optional topic configuration keys that should be exported
 	// as prometheus metric labels.
-	// By default "topic_name", "partition_count", "replication_factor" and "cleanup.policy" are exported
+	// By default only "cleanup.policy" is exported
 	ConfigKeys []string `koanf:"configKeys"`
 }
 
