@@ -1,6 +1,8 @@
 package minion
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	TopicGranularityTopic     string = "topic"
@@ -18,6 +20,16 @@ type TopicConfig struct {
 	// IgnoredTopics are regex strings of topic names that shall be ignored/skipped when exporting metrics. Ignored topics
 	// take precedence over allowed topics.
 	IgnoredTopics []string `koanf:"ignoredTopics"`
+
+	// InfoMetric configures how the kafka_topic_info metric is populated
+	InfoMetric InfoMetricConfig `koanf:"exporter"`
+}
+
+type InfoMetricConfig struct {
+	// ConfigKeys configures optional topic configuration keys that should be exported
+	// as prometheus metric labels.
+	// By default "topic_name", "partition_count", "replication_factor" and "cleanup.policy" are exported
+	ConfigKeys []string `koanf:"infoMetric"`
 }
 
 // Validate if provided TopicConfig is valid.
@@ -50,4 +62,5 @@ func (c *TopicConfig) Validate() error {
 func (c *TopicConfig) SetDefaults() {
 	c.Granularity = TopicGranularityPartition
 	c.AllowedTopics = []string{"/.*/"}
+	c.InfoMetric = InfoMetricConfig{ConfigKeys: []string{"cleanup.policy"}}
 }
