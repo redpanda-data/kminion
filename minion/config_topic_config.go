@@ -22,7 +22,7 @@ type TopicConfig struct {
 	IgnoredTopics []string `koanf:"ignoredTopics"`
 
 	// InfoMetric configures how the kafka_topic_info metric is populated
-	InfoMetric InfoMetricConfig `koanf:"exporter"`
+	InfoMetric InfoMetricConfig `koanf:"infoMetric"`
 }
 
 type InfoMetricConfig struct {
