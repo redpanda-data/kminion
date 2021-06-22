@@ -3,6 +3,7 @@ package prometheus
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cloudhut/kminion/v2/minion"
@@ -98,10 +99,15 @@ func (e *Exporter) InitializeMetrics() {
 
 	// Topic / Partition metrics
 	// Topic info
+	var labels = []string{"topic_name", "partition_count", "replication_factor"}
+	for _, key := range e.minionSvc.Cfg.Topics.InfoMetric.ConfigKeys {
+		// prometheus does not allow . in label keys
+		labels = append(labels, strings.ReplaceAll(key, ".", "_"))
+	}
 	e.topicInfo = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_info"),
 		"Info labels for a given topic",
-		[]string{"topic_name", "partition_count", "replication_factor", "cleanup_policy"},
+		labels,
 		nil,
 	)
 	// Partition Low Water Mark

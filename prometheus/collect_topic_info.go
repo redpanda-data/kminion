@@ -2,10 +2,11 @@ package prometheus
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
-	"strconv"
 )
 
 func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Metric) bool {
@@ -55,7 +56,7 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 			e.logger.Warn("failed to get metadata of a specific topic",
 				zap.String("topic_name", topic.Topic),
 				zap.Error(typedErr))
-			return false
+			continue
 		}
 		partitionCount := len(topic.Partitions)
 		replicationFactor := -1
@@ -64,20 +65,26 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 			replicationFactor = len(topic.Partitions[0].Replicas)
 		}
 
-		cleanupPolicy, exists := configsByTopic[topic.Topic]["cleanup.policy"]
-		if !exists {
-			cleanupPolicy = "N/A"
+		var labelsValues []string
+		labelsValues = append(labelsValues, topic.Topic)
+		labelsValues = append(labelsValues, strconv.Itoa(partitionCount))
+		labelsValues = append(labelsValues, strconv.Itoa(replicationFactor))
+		for _, key := range e.minionSvc.Cfg.Topics.InfoMetric.ConfigKeys {
+			labelsValues = append(labelsValues,  getOrDefault(configsByTopic[topic.Topic], key, "N/A"))
 		}
-
 		ch <- prometheus.MustNewConstMetric(
 			e.topicInfo,
 			prometheus.GaugeValue,
 			float64(1),
-			topic.Topic,
-			strconv.Itoa(partitionCount),
-			strconv.Itoa(replicationFactor),
-			cleanupPolicy,
+			labelsValues...,
 		)
 	}
 	return isOk
+}
+
+func getOrDefault(m map[string]string, key string, defaultValue string) string {
+	if value, exists := m[key]; exists {
+		return value
+	}
+	return defaultValue
 }

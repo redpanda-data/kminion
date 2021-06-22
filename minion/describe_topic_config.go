@@ -20,7 +20,6 @@ func (s *Service) GetTopicConfigs(ctx context.Context) (*kmsg.DescribeConfigsRes
 		resourceReq := kmsg.NewDescribeConfigsRequestResource()
 		resourceReq.ResourceType = kmsg.ConfigResourceTypeTopic
 		resourceReq.ResourceName = topic.Topic
-		resourceReq.ConfigNames = []string{"cleanup.policy"}
 		req.Resources = append(req.Resources, resourceReq)
 	}
 
