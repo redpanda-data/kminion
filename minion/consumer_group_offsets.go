@@ -18,7 +18,7 @@ func (s *Service) ListAllConsumerGroupOffsetsInternal() map[string]map[string]ma
 
 // ListAllConsumerGroupOffsetsAdminAPI return all consumer group offsets using Kafka's Admin API.
 func (s *Service) ListAllConsumerGroupOffsetsAdminAPI(ctx context.Context) (map[string]*kmsg.OffsetFetchResponse, error) {
-	groupsRes, err := s.listConsumerGroups(ctx)
+	groupsRes, err := s.listConsumerGroupsCached(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list groupsRes: %w", err)
 	}
