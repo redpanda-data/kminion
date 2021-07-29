@@ -118,6 +118,9 @@ func (s *Service) HandleIsReady() http.HandlerFunc {
 	}
 }
 
+// ensureCompatibility checks whether the options as configured are available in the connected cluster. For example
+// we will check if the target Kafka's API version support the LogDirs request. If that's not the case we will
+// disable the option and print a warning message.
 func (s *Service) ensureCompatibility(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
