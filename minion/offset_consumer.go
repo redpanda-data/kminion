@@ -102,7 +102,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		}
 
 		// 3. Check if high watermarks have been consumed. To avoid a race condition here we will wait some time before
-		// comparing, so that the consumer has enough time to pass the new high watermarks we just fetched.
+		// comparing, so that the consumer has enough time to catch up to the new high watermarks we just fetched.
 		time.Sleep(3 * time.Second)
 		consumedOffsets := s.storage.getConsumedOffsets()
 		topicRes := highMarksRes.Topics[0]

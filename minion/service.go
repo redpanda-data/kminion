@@ -2,7 +2,9 @@ package minion
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"sync"
 	"time"
@@ -90,6 +92,30 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *Service) isReady() bool {
+	if s.Cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeAdminAPI {
+		return true
+	}
+
+	return s.storage.isReady()
+}
+
+func (s *Service) HandleIsReady() http.HandlerFunc {
+	type response struct {
+		StatusCode int `json:"statusCode"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		if !s.isReady() {
+			status = http.StatusServiceUnavailable
+		}
+		res := response{StatusCode: status}
+		resJson, _ := json.Marshal(res)
+		w.WriteHeader(status)
+		w.Write(resJson)
+	}
 }
 
 func (s *Service) ensureCompatibility(ctx context.Context) error {
