@@ -30,7 +30,7 @@ func (s *Service) produceLatencyMessages(ctx context.Context) {
 		err := s.produceSingleMessage(ctx, i)
 		if err != nil {
 			s.logger.Error("failed to produce to end-to-end topic",
-				zap.String("topicName", s.config.TopicManagement.Name),
+				zap.String("topic_name", s.config.TopicManagement.Name),
 				zap.Int("partition", i),
 				zap.Error(err))
 		}
@@ -97,7 +97,7 @@ func createEndToEndRecord(minionID string, topicName string, partition int) (*kg
 
 	record := &kgo.Record{
 		Topic:     topicName,
-		Value:     []byte(mjson),
+		Value:     mjson,
 		Partition: int32(partition), // we set partition for producing so our customPartitioner can make use of it
 	}
 

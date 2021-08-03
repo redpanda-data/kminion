@@ -32,7 +32,7 @@ type groupTracker struct {
 func newGroupTracker(cfg Config, logger *zap.Logger, client *kgo.Client, groupID string) *groupTracker {
 	return &groupTracker{
 		cfg:                    cfg,
-		logger:                 logger.Named("groupTracker"),
+		logger:                 logger.Named("group_tracker"),
 		client:                 client,
 		groupId:                groupID,
 		potentiallyEmptyGroups: make(map[string]time.Time),
@@ -147,7 +147,7 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups(ctx context.Context) erro
 
 		resp, ok := shard.Resp.(*kmsg.DeleteGroupsResponse)
 		if !ok {
-			g.logger.Error("failed to cast shard response to DeleteGroupsResponse while handling an error for deleting groups", zap.String("shardHost", shard.Meta.Host), zap.Int32("broker_id", shard.Meta.NodeID), zap.NamedError("shardError", shard.Err))
+			g.logger.Error("failed to cast shard response to DeleteGroupsResponse while handling an error for deleting groups", zap.String("shard_host", shard.Meta.Host), zap.Int32("broker_id", shard.Meta.NodeID), zap.Error(shard.Err))
 			continue
 		}
 
@@ -165,7 +165,7 @@ func (g *groupTracker) checkAndDeleteOldConsumerGroups(ctx context.Context) erro
 			}
 		}
 	}
-	g.logger.Info("deleted old consumer groups", zap.Strings("deletedGroups", deletedGroups))
+	g.logger.Info("deleted old consumer groups", zap.Strings("deleted_groups", deletedGroups))
 
 	if foundNotAuthorizedError {
 		g.logger.Info("disabling trying to delete old kminion consumer-groups since one of the last delete results had an 'GroupAuthorizationFailed' error")

@@ -13,8 +13,8 @@ import (
 func (s *Service) startConsumeMessages(ctx context.Context) {
 	client := s.client
 	s.logger.Info("Starting to consume end-to-end topic",
-		zap.String("topicName", s.config.TopicManagement.Name),
-		zap.String("groupId", s.groupId))
+		zap.String("topic_name", s.config.TopicManagement.Name),
+		zap.String("group_id", s.groupId))
 
 	for {
 		select {

@@ -10,20 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// create histogram buckets for metrics reported by 'end-to-end'
-// todo:
-/*
-- custom, much simpler, exponential buckets
-  we know:
-  	- we want to go from 5ms to 'max'
-	- we want to double each time
-	- doubling 5ms might not get us to 'max' exactly
-  questions:
-	- can we slightly adjust the factor so we hit 'max' exactly?
-	- or can we adjust 'max'?
-		(and if so, better to overshoot or undershoot?)
-	- or should we just set the last bucket to 'max' exactly?
-*/
+// createHistogramBuckets creates the buckets for the histogram based on the number of desired buckets (10) and the
+// upper bucket size.
 func createHistogramBuckets(maxLatency time.Duration) []float64 {
 	// Since this is an exponential bucket we need to take Log base2 or binary as the upper bound
 	// Divide by 10 for the argument because the base is counted as 20ms and we want to normalize it as base 2 instead of 20
@@ -59,7 +47,7 @@ func (s *Service) logCommitErrors(r *kmsg.OffsetCommitResponse, err error) int {
 			if err != nil {
 				s.logger.Error("error committing partition offset",
 					zap.String("topic", t.Topic),
-					zap.Int32("partitionId", p.Partition),
+					zap.Int32("partition_id", p.Partition),
 					zap.Error(err),
 				)
 				errCount++

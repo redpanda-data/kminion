@@ -189,11 +189,11 @@ func (s *Service) ensureEnoughPartitions(ctx context.Context, meta *kmsg.Metadat
 
 	partitionsToAdd := expectedPartitions - len(meta.Topics[0].Partitions)
 	s.logger.Warn("e2e test topic does not have enough partitions, partitionCount is less than brokerCount * partitionsPerBroker. will add partitions to the topic...",
-		zap.Int("expectedPartitionCount", expectedPartitions),
-		zap.Int("actualPartitionCount", len(meta.Topics[0].Partitions)),
-		zap.Int("brokerCount", len(meta.Brokers)),
-		zap.Int("config.partitionsPerBroker", s.config.TopicManagement.PartitionsPerBroker),
-		zap.Int("partitionsToAdd", partitionsToAdd),
+		zap.Int("expected_partition_count", expectedPartitions),
+		zap.Int("actual_partition_count", len(meta.Topics[0].Partitions)),
+		zap.Int("broker_count", len(meta.Brokers)),
+		zap.Int("config_partitions_per_broker", s.config.TopicManagement.PartitionsPerBroker),
+		zap.Int("partitions_to_add", partitionsToAdd),
 	)
 
 	topic := kmsg.NewCreatePartitionsRequestTopic()
@@ -224,8 +224,7 @@ func (s *Service) ensureEnoughPartitions(ctx context.Context, meta *kmsg.Metadat
 		if tErr != nil || (topicResponse.ErrorMessage != nil && *topicResponse.ErrorMessage != "") {
 			s.logger.Error("error in createPartitionsResponse",
 				zap.String("topic", topicResponse.Topic),
-				zap.Stringp("errorMessage", topicResponse.ErrorMessage),
-				zap.NamedError("topicError", tErr),
+				zap.Error(tErr),
 			)
 			nestedErrors++
 		}
@@ -243,11 +242,11 @@ func (s *Service) createManagementTopic(ctx context.Context, allMeta *kmsg.Metad
 	totalPartitions := brokerCount * topicCfg.PartitionsPerBroker
 
 	s.logger.Info("e2e topic does not exist, creating it...",
-		zap.String("topicName", topicCfg.Name),
-		zap.Int("partitionsPerBroker", topicCfg.PartitionsPerBroker),
-		zap.Int("replicationFactor", topicCfg.ReplicationFactor),
-		zap.Int("brokerCount", brokerCount),
-		zap.Int("totalPartitions", totalPartitions),
+		zap.String("topic_name", topicCfg.Name),
+		zap.Int("partitions_per_broker", topicCfg.PartitionsPerBroker),
+		zap.Int("replication_factor", topicCfg.ReplicationFactor),
+		zap.Int("broker_count", brokerCount),
+		zap.Int("total_partitions", totalPartitions),
 	)
 
 	topic := kmsg.NewCreateTopicsRequestTopic()

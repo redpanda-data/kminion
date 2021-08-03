@@ -21,7 +21,7 @@ type clientHooks struct {
 func newEndToEndClientHooks(logger *zap.Logger) *clientHooks {
 
 	return &clientHooks{
-		logger:             logger.Named("e2e-hooks"),
+		logger:             logger.Named("e2e_hooks"),
 		currentCoordinator: &atomic.Value{},
 	}
 }
@@ -33,7 +33,7 @@ func (c *clientHooks) OnConnect(meta kgo.BrokerMetadata, dialDur time.Duration, 
 	}
 	c.logger.Debug("kafka connection succeeded",
 		zap.String("host", meta.Host), zap.Int32("broker_id", meta.NodeID),
-		zap.Duration("dial_duration", dialDur))
+		zap.Int64("dial_duration_ms", dialDur.Milliseconds()))
 }
 
 func (c *clientHooks) OnDisconnect(meta kgo.BrokerMetadata, _ net.Conn) {

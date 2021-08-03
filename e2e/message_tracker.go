@@ -37,7 +37,7 @@ func newMessageTracker(svc *Service) *messageTracker {
 
 	t := &messageTracker{
 		svc:    svc,
-		logger: svc.logger.Named("message-tracker"),
+		logger: svc.logger.Named("message_tracker"),
 		cache:  goCache.New(defaultExpirationTime, cleanupInterval),
 	}
 
@@ -97,8 +97,8 @@ func (t *messageTracker) onMessageExpired(key string, msg *EndToEndMessage) {
 	age := time.Since(created)
 
 	t.logger.Debug("message lost/expired",
-		zap.Int64("ageMilliseconds", age.Milliseconds()),
+		zap.Int64("age_ms", age.Milliseconds()),
 		zap.Int("partition", msg.partition),
-		zap.String("messageId", msg.MessageID),
+		zap.String("message_id", msg.MessageID),
 	)
 }
