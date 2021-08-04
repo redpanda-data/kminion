@@ -121,8 +121,9 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 			highWaterMark := partition.Offset - 1
 			consumedOffset := consumedOffsets[partition.Partition]
 			partitionLag := highWaterMark - consumedOffset
-			if partitionLag < 0 {
+			if partitionLag < 0 || consumedOffset == 0 {
 				partitionLag = 0
+				continue
 			}
 
 			if partitionLag > 0 {
