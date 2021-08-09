@@ -5,9 +5,6 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kminion.labels" . | nindent 4}}
-    {{- if .Values.customLabels}}
-    {{toYaml .Values.customLabels | nindent 4}}
-    {{- end}}
 spec:
   {{- if not .Values.autoscaling.enabled}}
   replicas: {{.Values.replicaCount}}
