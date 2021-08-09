@@ -3,8 +3,20 @@ entries:
   kminion:
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.212367376Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.63241023Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
+    digest: d3eb64d05535e136802538662eef7e9fdfdb3f0b93b6a42dfdcc93ee7deeadbd
+    name: kminion
+    type: application
+    urls:
+    - kminion-0.5.0.tgz
+    version: 0.5.0
+  - apiVersion: v2
+    appVersion: v2.0.0
+    created: "2021-08-09T09:12:13.631794627Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: 6b4209352d1dffd7873791ee1573dc325eb08d67656b01b430729f45dea4c09a
     name: kminion
     type: application
@@ -13,8 +25,9 @@ entries:
     version: 0.4.0
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.211730048Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.631209823Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: c51e3b45791e9fd51f33036916b0d36f7ac695e2fa916a9e99882ea83914ed97
     name: kminion
     type: application
@@ -23,8 +36,9 @@ entries:
     version: 0.3.1
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.21107842Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.630050317Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: a2be2dd8a02dc5222ec7386195a0e25b2682a39bbdcf52b60793c171acac7653
     name: kminion
     type: application
@@ -33,8 +47,9 @@ entries:
     version: 0.3.0
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.210417792Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.629435813Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: 321b6d5ff95ce310d2a3257b3d55f9ced51de99af6519d6d91723d7bdb6456fa
     name: kminion
     type: application
@@ -43,8 +58,9 @@ entries:
     version: 0.2.2
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.209779665Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.628823109Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: ed57df27158521a1eb33d215731fcc3248c71b3f36a4a029eb2d3a7b617ca519
     name: kminion
     type: application
@@ -53,8 +69,9 @@ entries:
     version: 0.2.1
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.209130137Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.628175206Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: 025661ee7cc574ad8dde7a68093a3b614fc92e26dd5dd398fc89d0b5308010e1
     name: kminion
     type: application
@@ -63,8 +80,9 @@ entries:
     version: 0.2.0
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.207271257Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.627549202Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: e277e976d864b4bd2e505038dd865a9300486ae8c4323d3f0be40b84df75732b
     name: kminion
     type: application
@@ -73,8 +91,9 @@ entries:
     version: 0.1.3
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.206678232Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.626975899Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: 562937d3613624c55984e51adbc6765e7898d1cf8cc2d7d241b6d671bbc12303
     name: kminion
     type: application
@@ -83,8 +102,9 @@ entries:
     version: 0.1.2
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.206050905Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.626397095Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: 25e83d7c7cc92a63268d76b13ecc13077758b48be093490f281498a4f55ad3ca
     name: kminion
     type: application
@@ -93,12 +113,13 @@ entries:
     version: 0.1.1
   - apiVersion: v2
     appVersion: v2.0.0
-    created: "2021-04-23T15:32:12.205436578Z"
-    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache Kafka
+    created: "2021-08-09T09:12:13.625775191Z"
+    description: A Helm chart to deploy KMinion - a Prometheus Exporter for Apache
+      Kafka
     digest: 7c10e9d9957e9752bc6f4b4a1fffb742d88cd57be06bf4f26ff7b5031645ccbd
     name: kminion
     type: application
     urls:
     - kminion-0.1.0.tgz
     version: 0.1.0
-generated: "2021-04-23T15:32:12.204641244Z"
+generated: "2021-08-09T09:12:13.624994687Z"
