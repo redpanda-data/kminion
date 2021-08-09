@@ -29,6 +29,12 @@ podSecurityContext:
   runAsUser: 99
   fsGroup: 99
 
+## See `kubectl explain poddisruptionbudget.spec` for more
+## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+podDisruptionBudget:
+  maxUnavailable: 1
+  # minAvailable: 1
+
 securityContext: {}
 # capabilities:
 #   drop:
