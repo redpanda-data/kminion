@@ -30,10 +30,11 @@ type Service struct {
 	partitionCount int             // number of partitions of our test topic, used to send messages to all partitions
 
 	// Metrics
-	endToEndMessagesProduced prometheus.Counter
-	endToEndMessagesAcked    prometheus.Counter
-	endToEndMessagesReceived prometheus.Counter
-	endToEndCommits          prometheus.Counter
+	endToEndMessagesProducedInFlight prometheus.Gauge
+	endToEndMessagesProducedTotal    prometheus.Counter
+	endToEndMessagesProducedFailed   prometheus.Counter
+	endToEndMessagesReceived         prometheus.Counter
+	endToEndCommits                  prometheus.Counter
 
 	endToEndAckLatency       *prometheus.HistogramVec
 	endToEndRoundtripLatency *prometheus.HistogramVec
@@ -41,7 +42,7 @@ type Service struct {
 }
 
 // NewService creates a new instance of the e2e moinitoring service (wow)
-func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string, ctx context.Context) (*Service, error) {
+func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricNamespace string) (*Service, error) {
 	minionID := uuid.NewString()
 	groupID := fmt.Sprintf("%v-%v", cfg.Consumer.GroupIdPrefix, minionID)
 
@@ -97,6 +98,14 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 			Help:      help,
 		})
 	}
+	makeGauge := func(name string, help string) prometheus.Gauge {
+		return promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: metricNamespace,
+			Subsystem: "end_to_end",
+			Name:      name,
+			Help:      help,
+		})
+	}
 	makeHistogramVec := func(name string, maxLatency time.Duration, labelNames []string, help string) *prometheus.HistogramVec {
 		return promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: metricNamespace,
@@ -109,17 +118,18 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricN
 
 	// Low-level info
 	// Users can construct alerts like "can't produce messages" themselves from those
-	svc.endToEndMessagesProduced = makeCounter("messages_produced_total", "Number of messages that kminion's end-to-end test has tried to send to kafka")
-	svc.endToEndMessagesAcked = makeCounter("messages_acked_total", "Number of messages kafka acknowledged as produced")
+	svc.endToEndMessagesProducedInFlight = makeGauge("messages_produced_in_flight", "Number of messages that kminion's end-to-end test produced but has not received an answer for yet")
+	svc.endToEndMessagesProducedTotal = makeCounter("messages_produced_total", "Number of all messages produced to Kafka. This counter will be incremented when we receive a response (failure/timeout or success) from Kafka")
+	svc.endToEndMessagesProducedFailed = makeCounter("messages_produced_failed_total", "Number of messages failed to produce to Kafka because of a timeout or failure")
 	svc.endToEndMessagesReceived = makeCounter("messages_received_total", "Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)")
 	svc.endToEndCommits = makeCounter("commits_total", "Counts how many times kminions end-to-end test has committed messages")
 
 	// Latency Histograms
 	// More detailed info about how long stuff took
 	// Since histograms also have an 'infinite' bucket, they can be used to detect small hickups "lost" messages
-	svc.endToEndAckLatency = makeHistogramVec("produce_latency_seconds", cfg.Producer.AckSla, []string{"partitionId"}, "Time until we received an ack for a produced message")
-	svc.endToEndRoundtripLatency = makeHistogramVec("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, []string{"partitionId"}, "Time it took between sending (producing) and receiving (consuming) a message")
-	svc.endToEndCommitLatency = makeHistogramVec("commit_latency_seconds", cfg.Consumer.CommitSla, []string{"groupCoordinatorBrokerId"}, "Time kafka took to respond to kminion's offset commit")
+	svc.endToEndAckLatency = makeHistogramVec("produce_latency_seconds", cfg.Producer.AckSla, []string{"partition_id"}, "Time until we received an ack for a produced message")
+	svc.endToEndRoundtripLatency = makeHistogramVec("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, []string{"partition_id"}, "Time it took between sending (producing) and receiving (consuming) a message")
+	svc.endToEndCommitLatency = makeHistogramVec("commit_latency_seconds", cfg.Consumer.CommitSla, []string{"group_coordinator_broker_id"}, "Time kafka took to respond to kminion's offset commit")
 
 	return svc, nil
 }
@@ -191,12 +201,6 @@ func (s *Service) startOffsetCommits(ctx context.Context) {
 		}
 	}
 
-}
-
-// called from e2e when a message is acknowledged
-func (s *Service) onAck(partitionId int32, duration time.Duration) {
-	s.endToEndMessagesAcked.Inc()
-	s.endToEndAckLatency.WithLabelValues(fmt.Sprintf("%v", partitionId)).Observe(duration.Seconds())
 }
 
 // called from e2e when a message completes a roundtrip (send to kafka, receive msg from kafka again)

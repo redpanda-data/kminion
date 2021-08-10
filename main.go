@@ -73,11 +73,11 @@ func main() {
 	// Create end to end testing service
 	if cfg.Minion.EndToEnd.Enabled {
 		e2eService, err := e2e.NewService(
+			ctx,
 			cfg.Minion.EndToEnd,
 			logger,
 			kafkaSvc,
 			cfg.Exporter.Namespace,
-			ctx,
 		)
 		if err != nil {
 			logger.Fatal("failed to create end-to-end monitoring service: %w", zap.Error(err))

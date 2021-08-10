@@ -12,7 +12,7 @@ import (
 // When we successfully send a mesasge, it will be added to this tracker.
 // Later, when we receive the message back in the consumer, the message is marked as completed and removed from the tracker.
 // If the message does not arrive within the configured `consumer.roundtripSla`, it is counted as lost.
-// A lost message is reported in the `roundtrip_latency_seconds` metric with infinite duration,
+// A lost message is reported in the `roundtrip_latency_seconds` metric with i00000000000000nfinite duration,
 // but it would probably be a good idea to also have a metric that reports the number of lost messages.
 //
 // When we fail to send a message, it isn't tracked.
@@ -85,8 +85,7 @@ func (t *messageTracker) onMessageArrived(arrivedMessage *EndToEndMessage) {
 	t.cache.Delete(msg.MessageID)
 }
 
-func (t *messageTracker) onMessageExpired(key string, msg *EndToEndMessage) {
-
+func (t *messageTracker) onMessageExpired(_ string, msg *EndToEndMessage) {
 	if msg.hasArrived {
 		// message did, in fact, arrive (doesn't matter here if soon enough of barely expired)
 		// don't log anything

@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,61 +26,50 @@ func (m *EndToEndMessage) creationTime() time.Time {
 
 // Sends a EndToEndMessage to every partition
 func (s *Service) produceLatencyMessages(ctx context.Context) {
-
 	for i := 0; i < s.partitionCount; i++ {
 		err := s.produceSingleMessage(ctx, i)
 		if err != nil {
-			s.logger.Error("failed to produce to end-to-end topic",
+			s.logger.Error("failed to produce message to end-to-end topic",
 				zap.String("topic_name", s.config.TopicManagement.Name),
 				zap.Int("partition", i),
 				zap.Error(err))
 		}
 	}
-
 }
 
 func (s *Service) produceSingleMessage(ctx context.Context, partition int) error {
-
 	topicName := s.config.TopicManagement.Name
 	record, msg := createEndToEndRecord(s.minionID, topicName, partition)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			startTime := time.Now()
-			s.endToEndMessagesProduced.Inc()
+	startTime := time.Now()
 
-			errCh := make(chan error)
-			s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
-				ackDuration := time.Since(startTime)
+	errCh := make(chan error)
+	s.endToEndMessagesProducedInFlight.Inc()
+	s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
+		ackDuration := time.Since(startTime)
+		s.endToEndMessagesProducedInFlight.Dec()
+		s.endToEndMessagesProducedTotal.Inc()
 
-				errCh <- err
+		errCh <- err
 
-				// only notify ack if it is successful
-				if err == nil {
-					// notify service about ack
-					s.onAck(r.Partition, ackDuration)
-
-					// add to tracker
-					s.messageTracker.addToTracker(msg)
-				}
-			})
-
-			err := <-errCh
-			if err != nil {
-				s.logger.Error("error producing record", zap.Error(err))
-				return err
-			}
-			return nil
+		if err == nil {
+			s.endToEndAckLatency.WithLabelValues(strconv.Itoa(int(r.Partition))).Observe(ackDuration.Seconds())
+			s.messageTracker.addToTracker(msg)
+		} else {
+			s.endToEndMessagesProducedFailed.Inc()
 		}
+	})
+
+	err := <-errCh
+	if err != nil {
+		s.logger.Error("error producing record", zap.Error(err))
+		return err
 	}
+	return nil
 
 }
 
 func createEndToEndRecord(minionID string, topicName string, partition int) (*kgo.Record, *EndToEndMessage) {
-
 	message := &EndToEndMessage{
 		MinionID:  minionID,
 		MessageID: uuid.NewString(),
