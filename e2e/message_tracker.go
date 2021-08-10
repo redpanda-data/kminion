@@ -7,23 +7,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// messageTracker keeps track of messages (wow)
+// messageTracker keeps track of messages
 //
 // When we successfully send a mesasge, it will be added to this tracker.
 // Later, when we receive the message back in the consumer, the message is marked as completed and removed from the tracker.
 // If the message does not arrive within the configured `consumer.roundtripSla`, it is counted as lost.
-// A lost message is reported in the `roundtrip_latency_seconds` metric with i00000000000000nfinite duration,
-// but it would probably be a good idea to also have a metric that reports the number of lost messages.
+// A lost message is reported in the `roundtrip_latency_seconds` metric with infinite duration.
+// We use a dedicated counter to track messages that couldn't be
+// produced to Kafka.
 //
 // When we fail to send a message, it isn't tracked.
-//
-// todo: We should probably report that in the roundtrip metric as infinite duration.
-//       since, if one broker is offline, we can't produce to the partition it leads,
-//		 but we are still able to produce to other partitions led by other brokers.
-//       This should add at least a little protection against people who only alert on messages_produced and messages_received.
-//
-//		 Alternatively, maybe some sort of "failed count" metric could be a good idea?
-//
 type messageTracker struct {
 	svc    *Service
 	logger *zap.Logger
