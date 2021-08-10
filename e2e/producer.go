@@ -11,62 +11,40 @@ import (
 	"go.uber.org/zap"
 )
 
-type EndToEndMessage struct {
-	MinionID  string `json:"minionID"`     // unique for each running kminion instance
-	MessageID string `json:"messageID"`    // unique for each message
-	Timestamp int64  `json:"createdUtcNs"` // when the message was created, unix nanoseconds
-
-	partition  int  // used in message tracker
-	hasArrived bool // used in tracker
-}
-
-func (m *EndToEndMessage) creationTime() time.Time {
-	return time.Unix(0, m.Timestamp)
-}
-
-// Sends a EndToEndMessage to every partition
-func (s *Service) produceLatencyMessages(ctx context.Context) {
+// produceMessagesToAllPartitions sends an EndToEndMessage to every partition on the given topic
+func (s *Service) produceMessagesToAllPartitions(ctx context.Context) {
 	for i := 0; i < s.partitionCount; i++ {
-		err := s.produceSingleMessage(ctx, i)
-		if err != nil {
-			s.logger.Error("failed to produce message to end-to-end topic",
-				zap.String("topic_name", s.config.TopicManagement.Name),
-				zap.Int("partition", i),
-				zap.Error(err))
-		}
+		s.produceMessage(ctx, i)
 	}
 }
 
-func (s *Service) produceSingleMessage(ctx context.Context, partition int) error {
+// produceMessage produces an end to end record to a single given partition. If it succeeds producing the record
+// it will add it to the message tracker. If producing fails a message will be logged and the respective metrics
+// will be incremented.
+func (s *Service) produceMessage(ctx context.Context, partition int) {
 	topicName := s.config.TopicManagement.Name
 	record, msg := createEndToEndRecord(s.minionID, topicName, partition)
 
 	startTime := time.Now()
 
-	errCh := make(chan error)
 	s.endToEndMessagesProducedInFlight.Inc()
 	s.client.Produce(ctx, record, func(r *kgo.Record, err error) {
 		ackDuration := time.Since(startTime)
 		s.endToEndMessagesProducedInFlight.Dec()
 		s.endToEndMessagesProducedTotal.Inc()
 
-		errCh <- err
-
-		if err == nil {
-			s.endToEndAckLatency.WithLabelValues(strconv.Itoa(int(r.Partition))).Observe(ackDuration.Seconds())
-			s.messageTracker.addToTracker(msg)
-		} else {
+		if err != nil {
 			s.endToEndMessagesProducedFailed.Inc()
+			s.logger.Info("failed to produce message to end-to-end topic",
+				zap.String("topic_name", r.Topic),
+				zap.Int32("partition", r.Partition),
+				zap.Error(err))
+			return
 		}
+
+		s.endToEndAckLatency.WithLabelValues(strconv.Itoa(int(r.Partition))).Observe(ackDuration.Seconds())
+		s.messageTracker.addToTracker(msg)
 	})
-
-	err := <-errCh
-	if err != nil {
-		s.logger.Error("error producing record", zap.Error(err))
-		return err
-	}
-	return nil
-
 }
 
 func createEndToEndRecord(minionID string, topicName string, partition int) (*kgo.Record, *EndToEndMessage) {
