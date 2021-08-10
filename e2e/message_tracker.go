@@ -79,14 +79,9 @@ func (t *messageTracker) onMessageArrived(arrivedMessage *EndToEndMessage) {
 }
 
 func (t *messageTracker) onMessageExpired(_ string, msg *EndToEndMessage) {
-	if msg.hasArrived {
-		// message did, in fact, arrive (doesn't matter here if soon enough of barely expired)
-		// don't log anything
-		return
-	}
-
 	created := msg.creationTime()
 	age := time.Since(created)
+	t.svc.lostMessages.Inc()
 
 	t.logger.Debug("message lost/expired",
 		zap.Int64("age_ms", age.Milliseconds()),
