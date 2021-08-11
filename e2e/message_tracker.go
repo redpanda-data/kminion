@@ -79,6 +79,12 @@ func (t *messageTracker) onMessageArrived(arrivedMessage *EndToEndMessage) {
 }
 
 func (t *messageTracker) onMessageExpired(_ string, msg *EndToEndMessage) {
+	// Because `t.cache.Delete` will invoke the onEvicted method we have to expect some calls to this function
+	// even though messages have arrived. Thus, we quit early if we receive such a method.
+	if msg.hasArrived {
+		return
+	}
+
 	created := msg.creationTime()
 	age := time.Since(created)
 	t.svc.lostMessages.Inc()
