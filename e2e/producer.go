@@ -31,15 +31,18 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 	// the SLA for producers.
 	childCtx, cancel := context.WithTimeout(ctx, s.config.Producer.AckSla)
 
-	s.messagesProducedInFlight.Inc()
+	pID := strconv.Itoa(partition)
+	s.messagesProducedInFlight.WithLabelValues(pID).Inc()
 	s.client.Produce(childCtx, record, func(r *kgo.Record, err error) {
 		defer cancel()
 		ackDuration := time.Since(startTime)
-		s.messagesProducedInFlight.Dec()
-		s.messagesProducedTotal.Inc()
+		s.messagesProducedInFlight.WithLabelValues(pID).Dec()
+		s.messagesProducedTotal.WithLabelValues(pID).Inc()
+		// We add 0 in order to ensure that the "failed" metric series for that partition id is initialized as well.
+		s.messagesProducedFailed.WithLabelValues(pID).Add(0)
 
 		if err != nil {
-			s.messagesProducedFailed.Inc()
+			s.messagesProducedFailed.WithLabelValues(pID).Inc()
 			s.logger.Info("failed to produce message to end-to-end topic",
 				zap.String("topic_name", r.Topic),
 				zap.Int32("partition", r.Partition),
@@ -47,7 +50,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 			return
 		}
 
-		s.endToEndAckLatency.WithLabelValues(strconv.Itoa(int(r.Partition))).Observe(ackDuration.Seconds())
+		s.endToEndAckLatency.WithLabelValues(pID).Observe(ackDuration.Seconds())
 		s.messageTracker.addToTracker(msg)
 	})
 }
