@@ -31,15 +31,15 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 	// the SLA for producers.
 	childCtx, cancel := context.WithTimeout(ctx, s.config.Producer.AckSla)
 
-	s.endToEndMessagesProducedInFlight.Inc()
+	s.messagesProducedInFlight.Inc()
 	s.client.Produce(childCtx, record, func(r *kgo.Record, err error) {
 		defer cancel()
 		ackDuration := time.Since(startTime)
-		s.endToEndMessagesProducedInFlight.Dec()
-		s.endToEndMessagesProducedTotal.Inc()
+		s.messagesProducedInFlight.Dec()
+		s.messagesProducedTotal.Inc()
 
 		if err != nil {
-			s.endToEndMessagesProducedFailed.Inc()
+			s.messagesProducedFailed.Inc()
 			s.logger.Info("failed to produce message to end-to-end topic",
 				zap.String("topic_name", r.Topic),
 				zap.Int32("partition", r.Partition),
