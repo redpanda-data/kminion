@@ -163,7 +163,14 @@ func (s *Service) Start(ctx context.Context) error {
 
 	// finally start everything else (producing, consuming, continous validation, consumer group tracking)
 	go s.startReconciliation(ctx)
-	go s.startConsumeMessages(ctx)
+
+	// Start consumer and wait until we've received a response for the first poll which would indicate that the
+	// consumer is ready. Only if the consumer is ready we want to start the producer to ensure that we will not
+	// miss messages because the consumer wasn't ready.
+	initCh := make(chan bool)
+	go s.startConsumeMessages(ctx, initCh)
+	<-initCh
+
 	go s.startProducer(ctx)
 
 	// keep track of groups, delete old unused groups
