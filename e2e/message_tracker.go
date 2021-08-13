@@ -73,8 +73,9 @@ func (t *messageTracker) onMessageArrived(arrivedMessage *EndToEndMessage) {
 	}
 
 	// message arrived early enough
-	t.svc.messagesReceived.Inc()
-	t.svc.endToEndRoundtripLatency.WithLabelValues(strconv.Itoa(msg.partition)).Observe(latency.Seconds())
+	pID := strconv.Itoa(msg.partition)
+	t.svc.messagesReceived.WithLabelValues(pID).Inc()
+	t.svc.endToEndRoundtripLatency.WithLabelValues(pID).Observe(latency.Seconds())
 
 	// We mark the message as arrived so that we won't mark the message as lost and overwrite that modified message
 	// into the cache.
@@ -92,7 +93,7 @@ func (t *messageTracker) onMessageExpired(_ string, msg *EndToEndMessage) {
 
 	created := msg.creationTime()
 	age := time.Since(created)
-	t.svc.lostMessages.Inc()
+	t.svc.lostMessages.WithLabelValues(strconv.Itoa(msg.partition)).Inc()
 
 	t.logger.Info("message lost/expired",
 		zap.Int64("age_ms", age.Milliseconds()),
