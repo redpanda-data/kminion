@@ -33,6 +33,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 
 	pID := strconv.Itoa(partition)
 	s.messagesProducedInFlight.WithLabelValues(pID).Inc()
+	s.messageTracker.addToTracker(msg)
 	s.client.Produce(childCtx, record, func(r *kgo.Record, err error) {
 		defer cancel()
 		ackDuration := time.Since(startTime)
@@ -43,6 +44,14 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 
 		if err != nil {
 			s.messagesProducedFailed.WithLabelValues(pID).Inc()
+
+			// Mark message as failed and then remove from the tracker. Overwriting it into the cache is necessary,
+			// because we can't delete messages from the tracker without triggering the OnEvicted hook, which checks
+			// for lost messages.
+			msg.failedToProduce = true
+			s.messageTracker.addToTracker(msg)
+			s.messageTracker.removeFromTracker(msg.MessageID)
+
 			s.logger.Info("failed to produce message to end-to-end topic",
 				zap.String("topic_name", r.Topic),
 				zap.Int32("partition", r.Partition),
@@ -51,7 +60,6 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 		}
 
 		s.endToEndAckLatency.WithLabelValues(pID).Observe(ackDuration.Seconds())
-		s.messageTracker.addToTracker(msg)
 	})
 }
 

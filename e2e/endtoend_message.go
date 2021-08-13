@@ -7,8 +7,10 @@ type EndToEndMessage struct {
 	MessageID string `json:"messageID"`    // unique for each message
 	Timestamp int64  `json:"createdUtcNs"` // when the message was created, unix nanoseconds
 
-	partition  int  // used in message tracker
-	hasArrived bool // used in tracker
+	// The following properties are only used within the message tracker
+	partition       int
+	hasArrived      bool
+	failedToProduce bool
 }
 
 func (m *EndToEndMessage) creationTime() time.Time {
