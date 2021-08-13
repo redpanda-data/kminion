@@ -169,7 +169,26 @@ func (s *Service) Start(ctx context.Context) error {
 	// miss messages because the consumer wasn't ready.
 	initCh := make(chan bool)
 	go s.startConsumeMessages(ctx, initCh)
-	<-initCh
+
+	// Produce an init message until the consumer received at least one fetch
+	initTicker := time.NewTicker(500 * time.Millisecond)
+	isInitialized := false
+	for !isInitialized {
+		select {
+		case <-initTicker.C:
+			s.client.Produce(ctx, &kgo.Record{
+				Key:   []byte("init-message"),
+				Value: nil,
+				Topic: s.config.TopicManagement.Name,
+			}, nil)
+		case <-initCh:
+			isInitialized = true
+			s.logger.Info("consumer has been successfully initialized")
+			break
+		case <-ctx.Done():
+			return nil
+		}
+	}
 
 	go s.startProducer(ctx)
 
