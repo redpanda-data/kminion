@@ -182,6 +182,10 @@ func (s *Service) Start(ctx context.Context) error {
 }
 
 func (s *Service) startReconciliation(ctx context.Context) {
+	if !s.config.TopicManagement.Enabled {
+		return
+	}
+
 	validateTopicTicker := time.NewTicker(s.config.TopicManagement.ReconciliationInterval)
 	for {
 		select {
