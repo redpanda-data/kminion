@@ -16,7 +16,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/common v0.24.0 // indirect
-	github.com/twmb/franz-go v0.9.1-0.20210811053959-aecaf27e7ffa
+	github.com/twmb/franz-go v0.9.1
 	github.com/twmb/franz-go/pkg/kmsg v0.0.0-20210726202344-c376dbc9081f
 	go.uber.org/atomic v1.7.0
 	go.uber.org/multierr v1.7.0 // indirect
