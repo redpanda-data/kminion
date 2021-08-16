@@ -155,7 +155,7 @@ func (s *Service) Start(ctx context.Context) error {
 	partitions := len(topicMetadata.Topics[0].Partitions)
 	s.partitionCount = partitions
 
-	// finally start everything else (producing, consuming, continous validation, consumer group tracking)
+	// finally start everything else (producing, consuming, continuous validation, consumer group tracking)
 	go s.startReconciliation(ctx)
 
 	// Start consumer and wait until we've received a response for the first poll which would indicate that the

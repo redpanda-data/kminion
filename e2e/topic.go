@@ -27,7 +27,13 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	}
 
 	// Create topic if it doesn't exist
-	if len(meta.Topics) == 0 {
+	topicExists := len(meta.Topics) == 1
+	if !topicExists {
+		if !s.config.TopicManagement.Enabled {
+			return fmt.Errorf("the configured end to end topic does not exist. The topic will not be created " +
+				"because topic management is disabled")
+		}
+
 		if err = s.createManagementTopic(ctx, meta); err != nil {
 			return err
 		}
@@ -47,6 +53,10 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 }
 
 func (s *Service) validatePartitionAssignments(ctx context.Context, meta *kmsg.MetadataResponse) error {
+	if !s.config.TopicManagement.Enabled {
+		return nil
+	}
+
 	// We use a very simple strategy to distribute all partitions and its replicas to the brokers
 	//
 	// For example if we had:
@@ -188,13 +198,17 @@ func (s *Service) ensureEnoughPartitions(ctx context.Context, meta *kmsg.Metadat
 	}
 
 	partitionsToAdd := expectedPartitions - len(meta.Topics[0].Partitions)
-	s.logger.Warn("e2e test topic does not have enough partitions, partitionCount is less than brokerCount * partitionsPerBroker. will add partitions to the topic...",
+	s.logger.Warn("e2e probe topic does not have enough partitions, partitionCount is less than brokerCount * partitionsPerBroker. will add partitions to the topic...",
 		zap.Int("expected_partition_count", expectedPartitions),
 		zap.Int("actual_partition_count", len(meta.Topics[0].Partitions)),
 		zap.Int("broker_count", len(meta.Brokers)),
 		zap.Int("config_partitions_per_broker", s.config.TopicManagement.PartitionsPerBroker),
 		zap.Int("partitions_to_add", partitionsToAdd),
 	)
+
+	if !s.config.TopicManagement.Enabled {
+		return fmt.Errorf("the e2e probe topic does not have enough partitions and topic management is disabled")
+	}
 
 	topic := kmsg.NewCreatePartitionsRequestTopic()
 	topic.Topic = s.config.TopicManagement.Name
