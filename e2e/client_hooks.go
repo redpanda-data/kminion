@@ -69,15 +69,11 @@ func (c *clientHooks) OnBrokerWrite(meta kgo.BrokerMetadata, key int16, bytesWri
 // OnRead is called after a read from a broker.
 // OnRead(meta BrokerMetadata, key int16, bytesRead int, readWait, timeToRead time.Duration, err error)
 func (c *clientHooks) OnBrokerRead(meta kgo.BrokerMetadata, key int16, bytesRead int, readWait, timeToRead time.Duration, err error) {
-	offsetCommitRes := kmsg.NewOffsetCommitResponse()
-	joinGroupRes := kmsg.NewJoinGroupResponse()
-	heartbeatRes := kmsg.NewHeartbeatResponse()
-	syncGroupRes := kmsg.NewSyncGroupResponse()
 	consumerGroupMsgKeys := []int16{
-		offsetCommitRes.Key(),
-		joinGroupRes.Key(),
-		heartbeatRes.Key(),
-		syncGroupRes.Key(),
+		(&kmsg.OffsetCommitResponse{}).Key(),
+		(&kmsg.JoinGroupResponse{}).Key(),
+		(&kmsg.HeartbeatResponse{}).Key(),
+		(&kmsg.SyncGroupResponse{}).Key(),
 	}
 
 	isMessageFromGroupCoordinator := isInArray(key, consumerGroupMsgKeys)
