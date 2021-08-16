@@ -59,7 +59,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 			return
 		}
 
-		s.endToEndAckLatency.WithLabelValues(pID).Observe(ackDuration.Seconds())
+		s.produceLatency.WithLabelValues(pID).Observe(ackDuration.Seconds())
 	})
 }
 

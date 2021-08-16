@@ -34,12 +34,13 @@ type Service struct {
 	messagesProducedTotal    *prometheus.CounterVec
 	messagesProducedFailed   *prometheus.CounterVec
 	messagesReceived         *prometheus.CounterVec
-	offsetCommits            prometheus.Counter
+	offsetCommitsTotal       *prometheus.CounterVec
+	offsetCommitsFailedTotal *prometheus.CounterVec
 	lostMessages             *prometheus.CounterVec
 
-	endToEndAckLatency       *prometheus.HistogramVec
-	endToEndRoundtripLatency *prometheus.HistogramVec
-	endToEndCommitLatency    *prometheus.HistogramVec
+	produceLatency      *prometheus.HistogramVec
+	roundtripLatency    *prometheus.HistogramVec
+	offsetCommitLatency *prometheus.HistogramVec
 }
 
 // NewService creates a new instance of the e2e moinitoring service (wow)
@@ -92,14 +93,6 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 	svc.groupTracker = newGroupTracker(cfg, logger, client, groupID)
 	svc.messageTracker = newMessageTracker(svc)
 
-	makeCounter := func(name string, help string) prometheus.Counter {
-		return promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: metricNamespace,
-			Subsystem: "end_to_end",
-			Name:      name,
-			Help:      help,
-		})
-	}
 	makeCounterVec := func(name string, labelNames []string, help string) *prometheus.CounterVec {
 		return promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: metricNamespace,
@@ -132,15 +125,16 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 	svc.messagesProducedTotal = makeCounterVec("messages_produced_total", []string{"partition_id"}, "Number of all messages produced to Kafka. This counter will be incremented when we receive a response (failure/timeout or success) from Kafka")
 	svc.messagesProducedFailed = makeCounterVec("messages_produced_failed_total", []string{"partition_id"}, "Number of messages failed to produce to Kafka because of a timeout or failure")
 	svc.messagesReceived = makeCounterVec("messages_received_total", []string{"partition_id"}, "Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)")
-	svc.offsetCommits = makeCounter("offset_commits_total", "Counts how many times kminions end-to-end test has committed offsets")
+	svc.offsetCommitsTotal = makeCounterVec("offset_commits_total", []string{"coordinator_id"}, "Counts how many times kminions end-to-end test has committed offsets")
+	svc.offsetCommitsFailedTotal = makeCounterVec("offset_commits_failed_total", []string{"coordinator_id", "reason"}, "Number of offset commits that returned an error or timed out")
 	svc.lostMessages = makeCounterVec("messages_lost_total", []string{"partition_id"}, "Number of messages that have been produced successfully but not received within the configured SLA duration")
 
 	// Latency Histograms
 	// More detailed info about how long stuff took
 	// Since histograms also have an 'infinite' bucket, they can be used to detect small hickups "lost" messages
-	svc.endToEndAckLatency = makeHistogramVec("produce_latency_seconds", cfg.Producer.AckSla, []string{"partition_id"}, "Time until we received an ack for a produced message")
-	svc.endToEndRoundtripLatency = makeHistogramVec("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, []string{"partition_id"}, "Time it took between sending (producing) and receiving (consuming) a message")
-	svc.endToEndCommitLatency = makeHistogramVec("commit_latency_seconds", cfg.Consumer.CommitSla, []string{"group_coordinator_broker_id"}, "Time kafka took to respond to kminion's offset commit")
+	svc.produceLatency = makeHistogramVec("produce_latency_seconds", cfg.Producer.AckSla, []string{"partition_id"}, "Time until we received an ack for a produced message")
+	svc.roundtripLatency = makeHistogramVec("roundtrip_latency_seconds", cfg.Consumer.RoundtripSla, []string{"partition_id"}, "Time it took between sending (producing) and receiving (consuming) a message")
+	svc.offsetCommitLatency = makeHistogramVec("offset_commit_latency_seconds", cfg.Consumer.CommitSla, []string{"coordinator_id"}, "Time kafka took to respond to kminion's offset commit")
 
 	return svc, nil
 }
@@ -191,7 +185,7 @@ func (s *Service) Start(ctx context.Context) error {
 			return nil
 		}
 	}
-
+	go s.startOffsetCommits(ctx)
 	go s.startProducer(ctx)
 
 	// keep track of groups, delete old unused groups
@@ -243,22 +237,4 @@ func (s *Service) startOffsetCommits(ctx context.Context) {
 			s.commitOffsets(ctx)
 		}
 	}
-
-}
-
-// called from e2e when an offset commit is confirmed
-func (s *Service) onOffsetCommit(brokerId int32, duration time.Duration) {
-
-	// todo:
-	// if the commit took too long, don't count it in 'commits' but add it to the histogram?
-	// and how do we want to handle cases where we get an error??
-	// should we have another metric that tells us about failed commits? or a label on the counter?
-	brokerIdStr := fmt.Sprintf("%v", brokerId)
-	s.endToEndCommitLatency.WithLabelValues(brokerIdStr).Observe(duration.Seconds())
-
-	if duration > s.config.Consumer.CommitSla {
-		return
-	}
-
-	s.offsetCommits.Inc()
 }

@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -46,18 +47,25 @@ func (s *Service) commitOffsets(ctx context.Context) {
 	}
 
 	startCommitTimestamp := time.Now()
-	client.CommitOffsets(ctx, uncommittedOffset, func(_ *kgo.Client, req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
-		// Got commit response
+
+	childCtx, cancel := context.WithTimeout(ctx, s.config.Consumer.CommitSla)
+	client.CommitOffsets(childCtx, uncommittedOffset, func(_ *kgo.Client, req *kmsg.OffsetCommitRequest, r *kmsg.OffsetCommitResponse, err error) {
+		cancel()
+
+		coordinator := s.clientHooks.currentCoordinator.Load().(kgo.BrokerMetadata)
+		coordinatorID := strconv.Itoa(int(coordinator.NodeID))
+
 		latency := time.Since(startCommitTimestamp)
+		s.offsetCommitLatency.WithLabelValues(coordinatorID).Observe(latency.Seconds())
+		s.offsetCommitsTotal.WithLabelValues(coordinatorID).Inc()
+		// We do this to ensure that a series with that coordinator id is initialized
+		s.offsetCommitsTotal.WithLabelValues(coordinatorID).Add(0)
 
-		if s.logCommitErrors(r, err) > 0 {
+		// If we have at least one error in our commit response we want to report it as an error with an appropriate
+		// reason as label.
+		if errCode := s.logCommitErrors(r, err); errCode != "" {
+			s.offsetCommitsFailedTotal.WithLabelValues(coordinatorID, errCode).Inc()
 			return
-		}
-
-		// only report commit latency if the coordinator wasn't set too long ago
-		if time.Since(s.clientHooks.lastCoordinatorUpdate) < 10*time.Second {
-			coordinator := s.clientHooks.currentCoordinator.Load().(kgo.BrokerMetadata)
-			s.onOffsetCommit(coordinator.NodeID, latency)
 		}
 	})
 }

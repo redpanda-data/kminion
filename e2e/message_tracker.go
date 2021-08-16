@@ -75,7 +75,7 @@ func (t *messageTracker) onMessageArrived(arrivedMessage *EndToEndMessage) {
 	// message arrived early enough
 	pID := strconv.Itoa(msg.partition)
 	t.svc.messagesReceived.WithLabelValues(pID).Inc()
-	t.svc.endToEndRoundtripLatency.WithLabelValues(pID).Observe(latency.Seconds())
+	t.svc.roundtripLatency.WithLabelValues(pID).Observe(latency.Seconds())
 
 	// We mark the message as arrived so that we won't mark the message as lost and overwrite that modified message
 	// into the cache.

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"math"
 	"time"
 
@@ -33,29 +34,36 @@ func containsStr(ar []string, x string) (bool, int) {
 	return false, -1
 }
 
-// logs all errors, returns number of errors
-func (s *Service) logCommitErrors(r *kmsg.OffsetCommitResponse, err error) int {
+// logCommitErrors logs all errors in commit response and returns a well formatted error code if there was one
+func (s *Service) logCommitErrors(r *kmsg.OffsetCommitResponse, err error) string {
 	if err != nil {
-		s.logger.Error("offset commit failed", zap.Error(err))
-		return 1
+		if err == context.DeadlineExceeded {
+			s.logger.Warn("offset commit failed because SLA has been exceeded")
+			return "OFFSET_COMMIT_SLA_EXCEEDED"
+		}
+
+		s.logger.Warn("offset commit failed", zap.Error(err))
+		return "RESPONSE_ERROR"
 	}
 
-	errCount := 0
+	lastErrCode := ""
 	for _, t := range r.Topics {
 		for _, p := range t.Partitions {
-			err := kerr.ErrorForCode(p.ErrorCode)
-			if err != nil {
-				s.logger.Error("error committing partition offset",
-					zap.String("topic", t.Topic),
-					zap.Int32("partition_id", p.Partition),
-					zap.Error(err),
-				)
-				errCount++
+			typedErr := kerr.TypedErrorForCode(p.ErrorCode)
+			if typedErr == nil {
+				continue
 			}
+
+			s.logger.Warn("error committing partition offset",
+				zap.String("topic", t.Topic),
+				zap.Int32("partition_id", p.Partition),
+				zap.Error(typedErr),
+			)
+			lastErrCode = typedErr.Message
 		}
 	}
 
-	return errCount
+	return lastErrCode
 }
 
 func safeUnwrap(err error) string {
@@ -63,4 +71,13 @@ func safeUnwrap(err error) string {
 		return "<nil>"
 	}
 	return err.Error()
+}
+
+func isInArray(num int16, arr []int16) bool {
+	for _, n := range arr {
+		if num == n {
+			return true
+		}
+	}
+	return false
 }
