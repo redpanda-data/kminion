@@ -44,7 +44,7 @@ type OffsetCommit struct {
 
 func newStorage(logger *zap.Logger) (*Storage, error) {
 	return &Storage{
-		logger:          logger,
+		logger:          logger.Named("storage"),
 		offsetCommits:   cmap.New(),
 		progressTracker: cmap.New(),
 		isReadyBool:     atomic.NewBool(false),

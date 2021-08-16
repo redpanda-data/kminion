@@ -42,8 +42,7 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 	}
 
 	// Kafka client
-	hooksChildLogger := logger.With(zap.String("source", "minion_kafka_client"))
-	minionHooks := newMinionClientHooks(hooksChildLogger, metricsNamespace)
+	minionHooks := newMinionClientHooks(logger.Named("kafka_hooks"), metricsNamespace)
 	kgoOpts := []kgo.Opt{
 		kgo.WithHooks(minionHooks),
 		kgo.ConsumeTopics("__consumer_offsets"),
@@ -63,7 +62,7 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 
 	service := &Service{
 		Cfg:    cfg,
-		logger: logger,
+		logger: logger.Named("minion_service"),
 
 		requestGroup: &singleflight.Group{},
 		cache:        make(map[string]interface{}),

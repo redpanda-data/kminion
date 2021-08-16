@@ -30,7 +30,7 @@ func main() {
 		startupLogger.Fatal("failed to parse config", zap.Error(err))
 	}
 
-	logger := logging.NewLogger(cfg.Logger, cfg.Exporter.Namespace)
+	logger := logging.NewLogger(cfg.Logger, cfg.Exporter.Namespace).Named("main")
 	if err != nil {
 		startupLogger.Fatal("failed to create new logger", zap.Error(err))
 	}

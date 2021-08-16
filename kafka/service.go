@@ -21,13 +21,14 @@ type Service struct {
 func NewService(cfg Config, logger *zap.Logger) *Service {
 	return &Service{
 		cfg:    cfg,
-		logger: logger.Named("kafka-service"),
+		logger: logger.Named("kafka_service"),
 	}
 }
 
 // CreateAndTestClient creates a client with the services default settings
 // logger: will be used to log connections, errors, warnings about tls config, ...
-func (s *Service) CreateAndTestClient(ctx context.Context, logger *zap.Logger, opts []kgo.Opt) (*kgo.Client, error) {
+func (s *Service) CreateAndTestClient(ctx context.Context, l *zap.Logger, opts []kgo.Opt) (*kgo.Client, error) {
+	logger := l.Named("kgo_client")
 	// Config with default options
 	kgoOpts, err := NewKgoConfig(s.cfg, logger)
 	if err != nil {

@@ -47,7 +47,7 @@ type Exporter struct {
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
-	return &Exporter{cfg: cfg, logger: logger, minionSvc: minionSvc}, nil
+	return &Exporter{cfg: cfg, logger: logger.Named("prometheus"), minionSvc: minionSvc}, nil
 }
 
 func (e *Exporter) InitializeMetrics() {
