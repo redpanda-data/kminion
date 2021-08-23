@@ -84,7 +84,7 @@ func main() {
 		}
 
 		if err = e2eService.Start(ctx); err != nil {
-			logger.Fatal("failed to start end-to-end monitoring service: %w", zap.Error(err))
+			logger.Fatal("failed to start end-to-end monitoring service", zap.Error(err))
 		}
 	}
 
