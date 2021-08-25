@@ -29,7 +29,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 
 	// This childCtx will ensure that we will abort our efforts to produce (including retries) when we exceed
 	// the SLA for producers.
-	childCtx, cancel := context.WithTimeout(ctx, s.config.Producer.AckSla)
+	childCtx, cancel := context.WithTimeout(ctx, s.config.Producer.AckSla+2*time.Second)
 
 	pID := strconv.Itoa(partition)
 	s.messagesProducedInFlight.WithLabelValues(pID).Inc()
@@ -44,12 +44,6 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 
 		if err != nil {
 			s.messagesProducedFailed.WithLabelValues(pID).Inc()
-
-			// Mark message as failed and then remove from the tracker. Overwriting it into the cache is necessary,
-			// because we can't delete messages from the tracker without triggering the OnEvicted hook, which checks
-			// for lost messages.
-			msg.failedToProduce = true
-			s.messageTracker.addToTracker(msg)
 			s.messageTracker.removeFromTracker(msg.MessageID)
 
 			s.logger.Info("failed to produce message to end-to-end topic",
@@ -57,6 +51,14 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 				zap.Int32("partition", r.Partition),
 				zap.Error(err))
 			return
+		} else {
+			// Update the message's state. If this message expires and is marked as successfully produced we will
+			// report this as a lost message, which would indicate that the producer was told that the message got
+			// produced successfully, but it got lost somewhere.
+			// We need to use updateItemIfExists() because it's possible that the message has already been consumed
+			// before we have received the message here (because we were awaiting the produce ack).
+			msg.state = EndToEndeMessageStateProducedSuccessfully
+			s.messageTracker.updateItemIfExists(msg)
 		}
 
 		s.produceLatency.WithLabelValues(pID).Observe(ackDuration.Seconds())
@@ -70,6 +72,7 @@ func createEndToEndRecord(minionID string, topicName string, partition int) (*kg
 		Timestamp: time.Now().UnixNano(),
 
 		partition: partition,
+		state:     EndToEndeMessageStateCreated,
 	}
 
 	mjson, err := json.Marshal(message)
