@@ -9,6 +9,8 @@ type EndToEndConsumerConfig struct {
 	GroupIdPrefix             string `koanf:"groupIdPrefix"`
 	DeleteStaleConsumerGroups bool   `koanf:"deleteStaleConsumerGroups"`
 
+	// RoundtripSLA is the time duration from the moment where we try to produce until the moment where we consumed
+	// the message. Therefore this should always be higher than the produceTimeout / SLA.
 	RoundtripSla time.Duration `koanf:"roundtripSla"`
 	CommitSla    time.Duration `koanf:"commitSla"`
 }
@@ -17,7 +19,7 @@ func (c *EndToEndConsumerConfig) SetDefaults() {
 	c.GroupIdPrefix = "kminion-end-to-end"
 	c.DeleteStaleConsumerGroups = false
 	c.RoundtripSla = 20 * time.Second
-	c.CommitSla = 10 * time.Second // no idea what to use as a good default value
+	c.CommitSla = 5 * time.Second
 }
 
 func (c *EndToEndConsumerConfig) Validate() error {
