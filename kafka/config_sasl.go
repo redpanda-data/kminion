@@ -25,6 +25,7 @@ type SASLConfig struct {
 func (c *SASLConfig) SetDefaults() {
 	c.Enabled = false
 	c.Mechanism = SASLMechanismPlain
+	c.GSSAPI.SetDefaults()
 }
 
 // Validate SASL config input

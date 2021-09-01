@@ -51,6 +51,7 @@ kafka:
       username: ""
       password: ""
       realm: ""
+      enableFast: true
 
 minion:
   consumerGroups:
@@ -90,7 +91,7 @@ minion:
     # infoMetric is a configuration object for the kminion_kafka_topic_info metric
     infoMetric:
       # ConfigKeys are set of strings of Topic configs that you want to have exported as part of the metric
-      configKeys: ["cleanup.policy"]
+      configKeys: [ "cleanup.policy" ]
   logDirs:
     # Enabled specifies whether log dirs shall be scraped and exported or not. This should be disabled for clusters prior
     # to version 1.0.0 as describing log dirs was not supported back then.

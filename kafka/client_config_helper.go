@@ -74,18 +74,21 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 
 		// Kerberos
 		if cfg.SASL.Mechanism == "GSSAPI" {
+			var krbClient *client.Client
+
 			kerbCfg, err := krbconfig.Load(cfg.SASL.GSSAPI.KerberosConfigPath)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create kerberos config from specified config filepath: %w", err)
 			}
-			var krbClient *client.Client
+
 			switch cfg.SASL.GSSAPI.AuthType {
 			case "USER_AUTH:":
 				krbClient = client.NewWithPassword(
 					cfg.SASL.GSSAPI.Username,
 					cfg.SASL.GSSAPI.Realm,
 					cfg.SASL.GSSAPI.Password,
-					kerbCfg)
+					kerbCfg,
+					client.DisablePAFXFAST(!cfg.SASL.GSSAPI.EnableFast))
 			case "KEYTAB_AUTH":
 				ktb, err := keytab.Load(cfg.SASL.GSSAPI.KeyTabPath)
 				if err != nil {
@@ -95,7 +98,8 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 					cfg.SASL.GSSAPI.Username,
 					cfg.SASL.GSSAPI.Realm,
 					ktb,
-					kerbCfg)
+					kerbCfg,
+					client.DisablePAFXFAST(!cfg.SASL.GSSAPI.EnableFast))
 			}
 			kerberosMechanism := kerberos.Auth{
 				Client:           krbClient,
