@@ -166,7 +166,7 @@ func (s *Service) Start(ctx context.Context) error {
 	go s.startConsumeMessages(ctx, initCh)
 
 	// Produce an init message until the consumer received at least one fetch
-	initTicker := time.NewTicker(1000 * time.Second)
+	initTicker := time.NewTicker(1 * time.Second)
 	isInitialized := false
 
 	for !isInitialized {
