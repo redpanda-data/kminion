@@ -153,24 +153,21 @@ func (e *Exporter) InitializeMetrics() {
 	// Group Empty Memmbers
 	e.consumerGroupMembersEmpty = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_empty_members"),
-		"Consumer Group Empty Members. "+
-			"It will report the number of members in the consumer group with no partition assigned",
+		"It will report the number of members in the consumer group with no partition assigned",
 		[]string{"group_id"},
 		nil,
 	)
 	// Group Topic Members
 	e.consumerGroupTopicMembers = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_members"),
-		"Consumer Group topic member count metrics. "+
-			"It will report the number of members in the consumer group assigned on a given topic",
+		"It will report the number of members in the consumer group assigned on a given topic",
 		[]string{"group_id", "topic_name"},
 		nil,
 	)
 	// Group Topic Assigned Partitions
 	e.consumerGroupAssignedTopicPartitions = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_assigned_partitions"),
-		"Consumer Group topic partitions count metrics. "+
-			"It will report the number of partitions assigned in the consumer group for a given topic",
+		"It will report the number of partitions assigned in the consumer group for a given topic",
 		[]string{"group_id", "topic_name"},
 		nil,
 	)

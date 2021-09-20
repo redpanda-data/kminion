@@ -58,7 +58,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			topicConsumers := make(map[string]int)
 			topicPartitionsAssigned := make(map[string]int)
 			membersWithEmptyAssignment := 0
-			failedAssignmentsDecode := int64(0)
+			failedAssignmentsDecode := 0
 			for _, member := range group.Members {
 				kassignment := kmsg.NewGroupMemberAssignment()
 				if err := kassignment.ReadFrom(member.MemberAssignment); err != nil {
@@ -84,7 +84,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 				e.logger.Error("failed to decode consumer group member assignment, internal kafka error",
 					zap.Error(err),
 					zap.String("group_id", group.Group),
-					zap.Int64("assignment_decode_failures", failedAssignmentsDecode),
+					zap.Int("assignment_decode_failures", failedAssignmentsDecode),
 				)
 			}
 			// number of members with no assignment in a stable consumer group
