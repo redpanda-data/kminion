@@ -97,7 +97,8 @@ serviceMonitor:
   honorLabels: false
 
 # For DaemonSet mode you may set daemonset to "true" and replicaCount to 0.
-daemonset: false
+daemonset:
+  enabled: false
 
 deployment:
   volumes:
