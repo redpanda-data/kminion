@@ -95,6 +95,8 @@ serviceMonitor:
   create: false
   additionalLabels: {}
   honorLabels: false
+  scrapeTimeout: 10s
+  interval: 15s
 
 deployment:
   volumes:

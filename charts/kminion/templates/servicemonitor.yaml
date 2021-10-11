@@ -17,6 +17,8 @@ spec:
     - port: metrics
       path: /metrics
       honorLabels: {{ .Values.serviceMonitor.honorLabels }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      interval: {{ .Values.serviceMonitor.interval }}
   {{- if .Values.serviceMonitor.targetLabels}}
   targetLabels:
     {{- toYaml .Values.serviceMonitor.targetLabels | nindent 4}}
