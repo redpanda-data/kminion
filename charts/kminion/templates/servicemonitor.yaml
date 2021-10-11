@@ -19,6 +19,6 @@ spec:
       honorLabels: {{ .Values.serviceMonitor.honorLabels }}
   {{- if .Values.serviceMonitor.targetLabels}}
   targetLabels:
-    {{toYaml .Values.serviceMonitor.targetLabels | nindent 4}}
+    {{- toYaml .Values.serviceMonitor.targetLabels | nindent 4}}
   {{- end}}
  {{- end }}
