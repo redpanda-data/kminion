@@ -17,4 +17,8 @@ spec:
     - port: metrics
       path: /metrics
       honorLabels: {{ .Values.serviceMonitor.honorLabels }}
-{{- end }}
+  {{- if .Values.serviceMonitor.targetLabels}}
+  targetLabels:
+    {{- toYaml .Values.serviceMonitor.targetLabels | nindent 4}}
+  {{- end}}
+ {{- end }}
