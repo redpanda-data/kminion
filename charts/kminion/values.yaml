@@ -98,6 +98,10 @@ serviceMonitor:
   scrapeTimeout: 10s
   interval: 15s
 
+# For DaemonSet mode you may set daemonset to "true" and replicaCount to 0.
+daemonset:
+  enabled: false
+
 deployment:
   volumes:
     # Mount files from Kubernetes secrets into the container
