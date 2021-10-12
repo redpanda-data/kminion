@@ -45,11 +45,18 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 				prometheus.GaugeValue,
 				float64(state),
 				group.Group,
-				strconv.Itoa(len(group.Members)),
 				group.Protocol,
 				group.ProtocolType,
 				group.State,
 				strconv.FormatInt(int64(coordinator), 10),
+			)
+
+			// total number of members in consumer groups
+			ch <- prometheus.MustNewConstMetric(
+				e.consumerGroupMembers,
+				prometheus.GaugeValue,
+				float64(len(group.Members)),
+				group.Group,
 			)
 
 			// iterate all members and build two maps:
