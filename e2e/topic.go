@@ -28,7 +28,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	}
 
 	// Create topic if it doesn't exist
-	topicExists := len(meta.Topics) == 1
+	topicExists := len(meta.Topics) == 1 && meta.Topics[0].ErrorCode == 0
 	if !topicExists {
 		if !s.config.TopicManagement.Enabled {
 			return fmt.Errorf("the configured end to end topic does not exist. The topic will not be created " +
