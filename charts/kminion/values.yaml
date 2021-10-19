@@ -97,6 +97,13 @@ serviceMonitor:
   honorLabels: false
   scrapeTimeout: 10s
   interval: 15s
+  relabelings: []
+  # - sourceLabels: [__meta_kubernetes_pod_label_my_label]
+  #   separator: ;
+  #   regex: (.*)
+  #   targetLabel: my_label
+  #   replacement: $1
+  #   action: replace
 
 # For DaemonSet mode you may set daemonset to "true" and replicaCount to 0.
 daemonset:
