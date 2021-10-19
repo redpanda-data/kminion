@@ -19,6 +19,10 @@ spec:
       honorLabels: {{ .Values.serviceMonitor.honorLabels }}
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
       interval: {{ .Values.serviceMonitor.interval }}
+      {{- if .Values.serviceMonitor.relabelings }}
+      relabelings:
+      {{ toYaml .Values.serviceMonitor.relabelings | nindent 6 }}
+      {{- end }}
   {{- if .Values.serviceMonitor.targetLabels}}
   targetLabels:
     {{- toYaml .Values.serviceMonitor.targetLabels | nindent 4}}
