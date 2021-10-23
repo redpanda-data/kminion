@@ -108,7 +108,7 @@ func (s *Storage) getNumberOfConsumedRecords() float64 {
 	return s.consumedRecords.Load()
 }
 
-func (s *Storage) getGroupOffsets() map[string]map[string]map[int32]OffsetCommit {
+func (s *Storage) getGroupOffsets(isAllowed func(groupName string) bool) map[string]map[string]map[int32]OffsetCommit {
 	// Offsets by group, topic, partition
 	offsetsByGroup := make(map[string]map[string]map[int32]OffsetCommit)
 
@@ -120,6 +120,10 @@ func (s *Storage) getGroupOffsets() map[string]map[string]map[int32]OffsetCommit
 	offsets := s.offsetCommits.Items()
 	for _, offset := range offsets {
 		val := offset.(OffsetCommit)
+
+		if !isAllowed(val.Key.Group) {
+			continue
+		}
 
 		// Initialize inner maps as necessary
 		if _, exists := offsetsByGroup[val.Key.Group]; !exists {

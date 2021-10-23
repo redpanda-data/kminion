@@ -13,7 +13,7 @@ import (
 // ListAllConsumerGroupOffsetsInternal returns a map from the in memory storage. The map value is the offset commit
 // value and is grouped by group id, topic, partition id as keys of the nested maps.
 func (s *Service) ListAllConsumerGroupOffsetsInternal() map[string]map[string]map[int32]OffsetCommit {
-	return s.storage.getGroupOffsets()
+	return s.storage.getGroupOffsets(s.IsGroupAllowed)
 }
 
 // ListAllConsumerGroupOffsetsAdminAPI return all consumer group offsets using Kafka's Admin API.

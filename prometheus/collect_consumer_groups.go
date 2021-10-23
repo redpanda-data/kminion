@@ -33,9 +33,6 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 				)
 				continue
 			}
-			if !e.minionSvc.IsGroupAllowed(group.Group) {
-				continue
-			}
 			state := 0
 			if group.State == "Stable" {
 				state = 1

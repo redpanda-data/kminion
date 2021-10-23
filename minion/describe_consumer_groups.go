@@ -28,6 +28,13 @@ func (s *Service) listConsumerGroupsCached(ctx context.Context) (*kmsg.ListGroup
 		if err != nil {
 			return nil, err
 		}
+		allowedGroups := make([]kmsg.ListGroupsResponseGroup, 0)
+		for i := range res.Groups {
+			if s.IsGroupAllowed(res.Groups[i].Group) {
+				allowedGroups = append(allowedGroups, res.Groups[i])
+			}
+		}
+		res.Groups = allowedGroups
 		s.setCachedItem(key, res, 120*time.Second)
 
 		return res, nil

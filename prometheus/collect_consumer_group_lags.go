@@ -2,13 +2,14 @@ package prometheus
 
 import (
 	"context"
+	"math"
+	"strconv"
+
 	"github.com/cloudhut/kminion/v2/minion"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
-	"math"
-	"strconv"
 )
 
 type waterMark struct {
@@ -46,9 +47,6 @@ func (e *Exporter) collectConsumerGroupLags(ctx context.Context, ch chan<- prome
 func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch chan<- prometheus.Metric, marks map[string]map[int32]waterMark) bool {
 	offsets := e.minionSvc.ListAllConsumerGroupOffsetsInternal()
 	for groupName, group := range offsets {
-		if !e.minionSvc.IsGroupAllowed(groupName) {
-			continue
-		}
 		offsetCommits := 0
 
 		for topicName, topic := range group {
@@ -124,9 +122,6 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 
 	groupOffsets, err := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
 	for groupName, offsetRes := range groupOffsets {
-		if !e.minionSvc.IsGroupAllowed(groupName) {
-			continue
-		}
 
 		err = kerr.ErrorForCode(offsetRes.ErrorCode)
 		if err != nil {
