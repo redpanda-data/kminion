@@ -27,4 +27,8 @@ spec:
   targetLabels:
     {{- toYaml .Values.serviceMonitor.targetLabels | nindent 4}}
   {{- end}}
+  {{- if .Values.customLabels }}
+  podTargetLabels:
+    {{- (keys .Values.customLabels | sortAlpha) | toYaml | nindent 4 }}
+  {{- end}}
  {{- end }}
