@@ -76,7 +76,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		topicReqs := make([]kmsg.ListOffsetsRequestTopic, len(res.Topics))
 		for i, topic := range res.Topics {
 			req := kmsg.NewListOffsetsRequestTopic()
-			req.Topic = topic.Topic
+			req.Topic = *topic.Topic
 
 			partitionReqs := make([]kmsg.ListOffsetsRequestTopicPartition, len(topic.Partitions))
 			for j, partition := range topic.Partitions {

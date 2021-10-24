@@ -190,7 +190,7 @@ func (s *Service) calculatePartitionReassignments(meta *kmsg.MetadataResponse) (
 		r := kmsg.NewAlterPartitionAssignmentsRequest()
 		reassignmentTopicReq := kmsg.NewAlterPartitionAssignmentsRequestTopic()
 		reassignmentTopicReq.Partitions = partitionReassignments
-		reassignmentTopicReq.Topic = topicMeta.Topic
+		reassignmentTopicReq.Topic = *topicMeta.Topic
 		r.Topics = []kmsg.AlterPartitionAssignmentsRequestTopic{reassignmentTopicReq}
 		reassignmentReq = &r
 	}

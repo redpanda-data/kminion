@@ -3,7 +3,7 @@ module github.com/cloudhut/kminion/v2
 go 1.15
 
 require (
-	github.com/ReneKroon/ttlcache/v2 v2.8.0 // indirect
+	github.com/ReneKroon/ttlcache/v2 v2.8.0
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/jcmturner/gokrb5/v8 v8.4.2
@@ -12,14 +12,13 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc
-	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pelletier/go-toml v1.9.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/common v0.24.0 // indirect
 	github.com/stretchr/testify v1.7.0
-	github.com/twmb/franz-go v0.10.2
-	github.com/twmb/franz-go/pkg/kmsg v0.0.0-20210823212011-0d01f7456b4d
+	github.com/twmb/franz-go v1.2.0
+	github.com/twmb/franz-go/pkg/kmsg v0.0.0-20210914042331-106aef61b693
 	go.uber.org/atomic v1.7.0
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.16.0

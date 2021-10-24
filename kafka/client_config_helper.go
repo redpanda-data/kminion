@@ -31,7 +31,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 		kgo.MaxVersions(kversion.V2_7_0()),
 		kgo.ClientID(cfg.ClientID),
 		kgo.FetchMaxBytes(5 * 1000 * 1000), // 5MB
-		kgo.AllowedConcurrentFetches(10),
+		kgo.MaxConcurrentFetches(10),
 	}
 
 	// Create Logger
