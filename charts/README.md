@@ -11,5 +11,5 @@ All available input is documented inside of the [values.yaml](./kminion/values.y
 ```shell
 helm repo add kminion https://raw.githubusercontent.com/cloudhut/kminion/master/charts/archives
 helm repo update
-helm install -f values.yaml --name=kminion kminion/kminion
+helm install -f values.yaml kminion kminion/kminion
 ```
