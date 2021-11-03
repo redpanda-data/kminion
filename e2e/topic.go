@@ -27,14 +27,15 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		return fmt.Errorf("validateManagementTopic cannot get metadata of e2e topic: %w", err)
 	}
 
-	topicExists := false
-	if len(meta.Topics) == 1 {
-		err := kerr.ErrorForCode(meta.Topics[0].ErrorCode)
-		if err != nil {
-			return fmt.Errorf("failed to get metadata for end-to-end topic: %w", err)
-		}
+	// Error code 3 is UnknownTopicOrPartition, meaning that the topic does not exist.
+	// If the topic exists, but there's an error, then this should result in a fail
+	// When the topic doesn't exist, continue to create it
+	err_code := meta.Topics[0].ErrorCode
+	topicExists := err_code != 3
 
-		topicExists = true
+	if err_code != 0 && topicExists {
+		err := kerr.ErrorForCode(err_code)
+		return fmt.Errorf("failed to get metadata for end-to-end topic: %w", err)
 	}
 
 	// Create topic if it doesn't exist
