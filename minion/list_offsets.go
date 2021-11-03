@@ -46,7 +46,7 @@ func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListO
 	topicReqs := make([]kmsg.ListOffsetsRequestTopic, len(metadata.Topics))
 	for i, topic := range metadata.Topics {
 		req := kmsg.NewListOffsetsRequestTopic()
-		req.Topic = topic.Topic
+		req.Topic = *topic.Topic
 
 		partitionReqs := make([]kmsg.ListOffsetsRequestTopicPartition, len(topic.Partitions))
 		for j, partition := range topic.Partitions {

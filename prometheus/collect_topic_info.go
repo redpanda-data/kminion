@@ -47,14 +47,15 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 	}
 
 	for _, topic := range metadata.Topics {
-		if !e.minionSvc.IsTopicAllowed(topic.Topic) {
+		topicName := *topic.Topic
+		if !e.minionSvc.IsTopicAllowed(topicName) {
 			continue
 		}
 		typedErr := kerr.TypedErrorForCode(topic.ErrorCode)
 		if typedErr != nil {
 			isOk = false
 			e.logger.Warn("failed to get metadata of a specific topic",
-				zap.String("topic_name", topic.Topic),
+				zap.String("topic_name", topicName),
 				zap.Error(typedErr))
 			continue
 		}
@@ -66,11 +67,11 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 		}
 
 		var labelsValues []string
-		labelsValues = append(labelsValues, topic.Topic)
+		labelsValues = append(labelsValues, topicName)
 		labelsValues = append(labelsValues, strconv.Itoa(partitionCount))
 		labelsValues = append(labelsValues, strconv.Itoa(replicationFactor))
 		for _, key := range e.minionSvc.Cfg.Topics.InfoMetric.ConfigKeys {
-			labelsValues = append(labelsValues,  getOrDefault(configsByTopic[topic.Topic], key, "N/A"))
+			labelsValues = append(labelsValues, getOrDefault(configsByTopic[topicName], key, "N/A"))
 		}
 		ch <- prometheus.MustNewConstMetric(
 			e.topicInfo,

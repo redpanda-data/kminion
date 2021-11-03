@@ -56,18 +56,18 @@ func (s *Service) startConsumingOffsets(ctx context.Context) {
 func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 	for {
 		time.Sleep(12 * time.Second)
-		s.logger.Debug("checking if lag in consumer offsets topic is caught up")
+		s.logger.Debug("checking if lag in consumer offsets metadataReqTopic is caught up")
 
-		// 1. Get topic high watermarks for __consumer_offsets topic
-		req := kmsg.NewMetadataRequest()
-		topic := kmsg.NewMetadataRequestTopic()
+		// 1. Get metadataReqTopic high watermarks for __consumer_offsets metadataReqTopic
+		metadataReq := kmsg.NewMetadataRequest()
+		metadataReqTopic := kmsg.NewMetadataRequestTopic()
 		topicName := "__consumer_offsets"
-		topic.Topic = &topicName
-		req.Topics = []kmsg.MetadataRequestTopic{topic}
+		metadataReqTopic.Topic = &topicName
+		metadataReq.Topics = []kmsg.MetadataRequestTopic{metadataReqTopic}
 
-		res, err := req.RequestWith(ctx, s.client)
+		res, err := metadataReq.RequestWith(ctx, s.client)
 		if err != nil {
-			s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because metadata request failed",
+			s.logger.Warn("failed to check if consumer lag on offsets metadataReqTopic is caught up because metadata request failed",
 				zap.Error(err))
 			continue
 		}
@@ -76,7 +76,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		topicReqs := make([]kmsg.ListOffsetsRequestTopic, len(res.Topics))
 		for i, topic := range res.Topics {
 			req := kmsg.NewListOffsetsRequestTopic()
-			req.Topic = topic.Topic
+			req.Topic = *topic.Topic
 
 			partitionReqs := make([]kmsg.ListOffsetsRequestTopicPartition, len(topic.Partitions))
 			for j, partition := range topic.Partitions {
@@ -92,12 +92,12 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		offsetReq.Topics = topicReqs
 		highMarksRes, err := offsetReq.RequestWith(ctx, s.client)
 		if err != nil {
-			s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because high watermark request failed",
+			s.logger.Warn("failed to check if consumer lag on offsets metadataReqTopic is caught up because high watermark request failed",
 				zap.Error(err))
 			continue
 		}
 		if len(highMarksRes.Topics) != 1 {
-			s.logger.Error("expected exactly one topic response for high water mark request")
+			s.logger.Error("expected exactly one metadataReqTopic response for high water mark request")
 			continue
 		}
 
@@ -118,7 +118,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 		for _, partition := range topicRes.Partitions {
 			err := kerr.ErrorForCode(partition.ErrorCode)
 			if err != nil {
-				s.logger.Warn("failed to check if consumer lag on offsets topic is caught up because high "+
+				s.logger.Warn("failed to check if consumer lag on offsets metadataReqTopic is caught up because high "+
 					"watermark request failed, with an inner error",
 					zap.Error(err))
 			}
@@ -137,7 +137,7 @@ func (s *Service) checkIfConsumerLagIsCaughtUp(ctx context.Context) {
 					Lag:  partitionLag,
 				})
 				totalLag += partitionLag
-				s.logger.Debug("consumer_offsets topic lag has not been caught up yet",
+				s.logger.Debug("consumer_offsets metadataReqTopic lag has not been caught up yet",
 					zap.Int32("partition_id", partition.Partition),
 					zap.Int64("high_water_mark", highWaterMark),
 					zap.Int64("consumed_offset", consumedOffset),

@@ -19,7 +19,7 @@ func (s *Service) GetTopicConfigs(ctx context.Context) (*kmsg.DescribeConfigsRes
 	for _, topic := range metadata.Topics {
 		resourceReq := kmsg.NewDescribeConfigsRequestResource()
 		resourceReq.ResourceType = kmsg.ConfigResourceTypeTopic
-		resourceReq.ResourceName = topic.Topic
+		resourceReq.ResourceName = *topic.Topic
 		req.Resources = append(req.Resources, resourceReq)
 	}
 
