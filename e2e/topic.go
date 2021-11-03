@@ -31,7 +31,6 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	// If the topic exists, but there's an error, then this should result in a fail
 	// When the topic doesn't exist, continue to create it
 	typedErr := kerr.TypedErrorForCode(meta.Topics[0].ErrorCode)
-
 	topicExists := true
 	switch typedErr {
 	case nil:
