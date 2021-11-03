@@ -27,8 +27,17 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		return fmt.Errorf("validateManagementTopic cannot get metadata of e2e topic: %w", err)
 	}
 
+	topicExists := false
+	if len(meta.Topics) == 1 {
+		err := kerr.ErrorForCode(meta.Topics[0].ErrorCode)
+		if err != nil {
+			return fmt.Errorf("failed to get metadata for end-to-end topic: %w", err)
+		}
+
+		topicExists = true
+	}
+
 	// Create topic if it doesn't exist
-	topicExists := len(meta.Topics) == 1
 	if !topicExists {
 		if !s.config.TopicManagement.Enabled {
 			return fmt.Errorf("the configured end to end topic does not exist. The topic will not be created " +
