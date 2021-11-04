@@ -57,7 +57,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 			// produced successfully, but it got lost somewhere.
 			// We need to use updateItemIfExists() because it's possible that the message has already been consumed
 			// before we have received the message here (because we were awaiting the produce ack).
-			msg.state = EndToEndeMessageStateProducedSuccessfully
+			msg.state = EndToEndMessageStateProducedSuccessfully
 			s.messageTracker.updateItemIfExists(msg)
 		}
 
@@ -72,7 +72,7 @@ func createEndToEndRecord(minionID string, topicName string, partition int) (*kg
 		Timestamp: time.Now().UnixNano(),
 
 		partition: partition,
-		state:     EndToEndeMessageStateCreated,
+		state:     EndToEndMessageStateCreated,
 	}
 
 	mjson, err := json.Marshal(message)

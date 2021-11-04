@@ -4,8 +4,8 @@ import "time"
 
 const (
 	_ = iota
-	EndToEndeMessageStateCreated
-	EndToEndeMessageStateProducedSuccessfully
+	EndToEndMessageStateCreated
+	EndToEndMessageStateProducedSuccessfully
 )
 
 type EndToEndMessage struct {

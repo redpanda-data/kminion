@@ -128,6 +128,6 @@ func (t *messageTracker) onMessageExpired(_ string, reason ttlcache.EvictionReas
 		zap.Int64("age_ms", age.Milliseconds()),
 		zap.Int("partition", msg.partition),
 		zap.String("message_id", msg.MessageID),
-		zap.Bool("successfully_produced", msg.state == EndToEndeMessageStateProducedSuccessfully),
+		zap.Bool("successfully_produced", msg.state == EndToEndMessageStateProducedSuccessfully),
 	)
 }
