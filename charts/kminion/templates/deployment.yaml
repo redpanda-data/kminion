@@ -84,7 +84,7 @@ spec:
             httpGet:
               path: /ready
               port: {{.Values.service.port}}
-              initialDelaySeconds: 10
+            initialDelaySeconds: 10
       {{- with .Values.nodeSelector}}
       nodeSelector:
         {{- toYaml . | nindent 8}}
