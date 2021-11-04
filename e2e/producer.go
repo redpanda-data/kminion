@@ -39,8 +39,9 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 		ackDuration := time.Since(startTime)
 		s.messagesProducedInFlight.WithLabelValues(pID).Dec()
 		s.messagesProducedTotal.WithLabelValues(pID).Inc()
-		// We add 0 in order to ensure that the "failed" metric series for that partition id is initialized as well.
+		// We add 0 in order to ensure that the "failed" metric series for that partition id are initialized as well.
 		s.messagesProducedFailed.WithLabelValues(pID).Add(0)
+		s.lostMessages.WithLabelValues(pID).Add(0)
 
 		if err != nil {
 			s.messagesProducedFailed.WithLabelValues(pID).Inc()
