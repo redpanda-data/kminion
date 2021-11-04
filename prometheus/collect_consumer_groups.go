@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -67,8 +68,8 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			membersWithEmptyAssignment := 0
 			failedAssignmentsDecode := 0
 			for _, member := range group.Members {
-				kassignment := kmsg.NewGroupMemberAssignment()
-				if err := kassignment.ReadFrom(member.MemberAssignment); err != nil {
+				kassignment, err := decodeMemberAssignments(group.ProtocolType, member)
+				if err != nil {
 					e.logger.Debug("failed to decode consumer group member assignment, internal kafka error",
 						zap.Error(err),
 						zap.String("group_id", group.Group),
@@ -79,6 +80,11 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 					failedAssignmentsDecode++
 					continue
 				}
+				if kassignment == nil {
+					// This is expected in the case of protocolTypes that don't provide valuable information
+					continue
+				}
+
 				if len(kassignment.Topics) == 0 {
 					membersWithEmptyAssignment++
 				}
@@ -87,6 +93,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 					topicPartitionsAssigned[topic.Topic] += len(topic.Partitions)
 				}
 			}
+
 			if failedAssignmentsDecode > 0 {
 				e.logger.Error("failed to decode consumer group member assignment, internal kafka error",
 					zap.Error(err),
@@ -94,6 +101,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 					zap.Int("assignment_decode_failures", failedAssignmentsDecode),
 				)
 			}
+
 			// number of members with no assignment in a stable consumer group
 			if membersWithEmptyAssignment > 0 {
 				ch <- prometheus.MustNewConstMetric(
@@ -126,4 +134,19 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		}
 	}
 	return true
+}
+
+func decodeMemberAssignments(protocolType string, member kmsg.DescribeGroupsResponseGroupMember) (*kmsg.ConsumerMemberAssignment, error) {
+	switch protocolType {
+	case "consumer":
+		a := kmsg.NewConsumerMemberAssignment()
+		if err := a.ReadFrom(member.MemberAssignment); err != nil {
+			return nil, fmt.Errorf("failed to decode member assignment: %w", err)
+		}
+		return &a, nil
+	case "connect":
+		return nil, nil
+	default:
+		return nil, nil
+	}
 }
