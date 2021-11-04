@@ -2,48 +2,48 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{include "kminion.fullname" .}}
-  namespace: { { .Release.Namespace | quote } }
+  namespace: {{ .Release.Namespace | quote }}
   labels:
-    { { - include "kminion.labels" . | nindent 4 } }
+    {{- include "kminion.labels" . | nindent 4}}
 spec:
-  { { - if not .Values.autoscaling.enabled } }
+  {{- if not .Values.autoscaling.enabled}}
   replicas: {{.Values.replicaCount}}
-  { { - end } }
+  {{- end}}
   selector:
     matchLabels:
-      { { - include "kminion.selectorLabels" . | nindent 6 } }
+      {{- include "kminion.selectorLabels" . | nindent 6}}
   template:
     metadata:
-      { { - with .Values.podAnnotations } }
+      {{- with .Values.podAnnotations}}
       annotations:
-        { { - toYaml . | nindent 8 } }
-      { { - end } }
+        {{- toYaml . | nindent 8}}
+      {{- end}}
       labels:
-        { { - include "kminion.selectorLabels" . | nindent 8 } }
-          { { - if .Values.customLabels } }
-          {{toYaml .Values.customLabels | nindent 8}}
-          { { - end } }
+        {{- include "kminion.selectorLabels" . | nindent 8}}
+        {{- if .Values.customLabels}}
+        {{toYaml .Values.customLabels | nindent 8}}
+        {{- end}}
     spec:
-      { { - with .Values.imagePullSecrets } }
+      {{- with .Values.imagePullSecrets}}
       imagePullSecrets:
-        { { - toYaml . | nindent 8 } }
-      { { - end } }
+        {{- toYaml . | nindent 8}}
+      {{- end}}
       serviceAccountName: {{include "kminion.serviceAccountName" .}}
       securityContext:
-        { { - toYaml .Values.podSecurityContext | nindent 8 } }
+        {{- toYaml .Values.podSecurityContext | nindent 8}}
       volumes:
         - name: config
           configMap:
             name: {{include "kminion.fullname" .}}
-        { { - range .Values.deployment.volumes.secrets } }
+        {{- range .Values.deployment.volumes.secrets}}
         - name: {{.secretName}}
           secret:
             secretName: {{.secretName}}
-        { { - end } }
+        {{- end}}
       containers:
         - name: {{.Chart.Name}}
           securityContext:
-            { { - toYaml .Values.securityContext | nindent 12 } }
+            {{- toYaml .Values.securityContext | nindent 12}}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{.Values.image.pullPolicy}}
           ports:
@@ -53,47 +53,47 @@ spec:
           env:
             - name: CONFIG_FILEPATH
               value: /etc/kminion/config.yaml
-            { { - range .Values.deployment.env.values } }
+            {{- range .Values.deployment.env.values}}
             - name: {{.name}}
               value: {{.value | quote}}
-            { { - end } }
-            { { - range .Values.deployment.env.secretKeyRefs } }
+            {{- end}}
+            {{- range .Values.deployment.env.secretKeyRefs}}
             - name: {{.name}}
               valueFrom:
                 secretKeyRef:
                   name: {{.secretName}}
                   key: {{.secretKey}}
-            { { - end } }
-            { { - range .Values.deployment.env.configMapKeyRefs } }
+            {{- end}}
+            {{- range .Values.deployment.env.configMapKeyRefs}}
             - name: {{.name}}
               valueFrom:
                 configMapKeyRef:
                   name: {{.configMapName}}
                   key: {{.configMapKey}}
-            { { - end } }
+            {{- end}}
           volumeMounts:
             - name: config
               mountPath: /etc/kminion
-            { { - range .Values.deployment.volumes.secrets } }
+            {{- range .Values.deployment.volumes.secrets}}
             - name: {{.secretName}}
               mountPath: {{.mountPath}}
-            { { - end } }
+            {{- end}}
           resources:
-            { { - toYaml .Values.resources | nindent 12 } }
+            {{- toYaml .Values.resources | nindent 12}}
           readinessProbe:
             httpGet:
               path: /ready
               port: {{.Values.service.port}}
-              initialDelaySeconds: 5
-      { { - with .Values.nodeSelector } }
+              initialDelaySeconds: 10
+      {{- with .Values.nodeSelector}}
       nodeSelector:
-        { { - toYaml . | nindent 8 } }
-      { { - end } }
-      { { - with .Values.affinity } }
+        {{- toYaml . | nindent 8}}
+      {{- end}}
+      {{- with .Values.affinity}}
       affinity:
-        { { - toYaml . | nindent 8 } }
-      { { - end } }
-      { { - with .Values.tolerations } }
+        {{- toYaml . | nindent 8}}
+      {{- end}}
+      {{- with .Values.tolerations}}
       tolerations:
-        { { - toYaml . | nindent 8 } }
-      { { - end } }
+        {{- toYaml . | nindent 8}}
+      {{- end}}
