@@ -58,7 +58,12 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 			// We need to use updateItemIfExists() because it's possible that the message has already been consumed
 			// before we have received the message here (because we were awaiting the produce ack).
 			msg.state = EndToEndMessageStateProducedSuccessfully
-			s.messageTracker.updateItemIfExists(msg)
+			msg.produceLatency = ackDuration.Seconds()
+
+			// TODO: Enable again as soon as https://github.com/ReneKroon/ttlcache/issues/60 is fixed
+			// Because we cannot update cache items in an atomic fashion we currently can't use this method
+			// as this would cause a race condition which ends up in records being reported as lost/expired.
+			// s.messageTracker.updateItemIfExists(msg)
 		}
 
 		s.produceLatency.WithLabelValues(pID).Observe(ackDuration.Seconds())

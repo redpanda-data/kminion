@@ -66,7 +66,11 @@ func (t *messageTracker) updateItemIfExists(msg *EndToEndMessage) error {
 		return ttlcache.ErrNotFound
 	}
 
-	t.cache.SetWithTTL(msg.MessageID, msg, remainingTTL)
+	err = t.cache.SetWithTTL(msg.MessageID, msg, remainingTTL)
+	if err != nil {
+		panic(err)
+	}
+
 	return nil
 }
 
@@ -129,5 +133,6 @@ func (t *messageTracker) onMessageExpired(_ string, reason ttlcache.EvictionReas
 		zap.Int("partition", msg.partition),
 		zap.String("message_id", msg.MessageID),
 		zap.Bool("successfully_produced", msg.state == EndToEndMessageStateProducedSuccessfully),
+		zap.Float64("produce_latency_seconds", msg.produceLatency),
 	)
 }

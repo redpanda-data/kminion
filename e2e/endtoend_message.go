@@ -14,8 +14,9 @@ type EndToEndMessage struct {
 	Timestamp int64  `json:"createdUtcNs"` // when the message was created, unix nanoseconds
 
 	// The following properties are only used within the message tracker
-	partition int
-	state     int
+	partition      int
+	state          int
+	produceLatency float64
 }
 
 func (m *EndToEndMessage) creationTime() time.Time {
