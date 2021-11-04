@@ -56,7 +56,7 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 		kgoOpts = append(kgoOpts, kgo.RequiredAcks(kgo.LeaderAck()))
 		kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
 	}
-	kgoOpts = append(kgoOpts, kgo.ProduceRequestTimeout(cfg.Producer.AckSla))
+	kgoOpts = append(kgoOpts, kgo.ProduceRequestTimeout(3*time.Second))
 
 	// Consumer configs
 	kgoOpts = append(kgoOpts,
@@ -166,7 +166,7 @@ func (s *Service) Start(ctx context.Context) error {
 	go s.startConsumeMessages(ctx, initCh)
 
 	// Produce an init message until the consumer received at least one fetch
-	initTicker := time.NewTicker(1000 * time.Second)
+	initTicker := time.NewTicker(1 * time.Second)
 	isInitialized := false
 	// send first init message immediately
 	sendInitMessage(ctx, s.client, s.config.TopicManagement.Name)
