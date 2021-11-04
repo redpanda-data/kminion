@@ -45,8 +45,11 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 	minionHooks := newMinionClientHooks(logger.Named("kafka_hooks"), metricsNamespace)
 	kgoOpts := []kgo.Opt{
 		kgo.WithHooks(minionHooks),
-		kgo.ConsumeTopics("__consumer_offsets"),
-		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+	}
+	if cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
+		kgoOpts = append(kgoOpts,
+			kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+			kgo.ConsumeTopics("__consumer_offsets"))
 	}
 
 	client, err := kafkaSvc.CreateAndTestClient(ctx, logger, kgoOpts)
