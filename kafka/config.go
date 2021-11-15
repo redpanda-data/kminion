@@ -20,6 +20,10 @@ func (c *Config) SetDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if len(c.Brokers) == 0 {
+		return fmt.Errorf("no seed brokers specified, at least one must be configured")
+	}
+
 	err := c.TLS.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate TLS config: %w", err)
