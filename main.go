@@ -54,6 +54,8 @@ func main() {
 		}
 	}()
 
+	wrappedRegisterer := promclient.WrapRegistererWithPrefix(cfg.Exporter.Namespace+"_", promclient.DefaultRegisterer)
+
 	// Create kafka service
 	kafkaSvc := kafka.NewService(cfg.Kafka, logger)
 
@@ -77,7 +79,7 @@ func main() {
 			cfg.Minion.EndToEnd,
 			logger,
 			kafkaSvc,
-			cfg.Exporter.Namespace,
+			wrappedRegisterer,
 		)
 		if err != nil {
 			logger.Fatal("failed to create end-to-end monitoring service: %w", zap.Error(err))
