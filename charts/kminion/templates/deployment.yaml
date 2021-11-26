@@ -82,7 +82,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12}}
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /metrics
               port: {{.Values.service.port}}
             initialDelaySeconds: 10
       {{- with .Values.nodeSelector}}
