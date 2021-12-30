@@ -24,7 +24,9 @@ serviceAccount:
   name: ""
 
 podAnnotations: {}
-
+#  prometheus.io/scrape: "true"
+#  prometheus.io/port: "8080"
+#  prometheus.io/path: "/metrics"
 podSecurityContext:
   runAsUser: 99
   fsGroup: 99
@@ -87,9 +89,6 @@ tolerations: []
 affinity: {}
 
 customLabels: {}
-#  prometheus.io/scrape: "true"
-#  prometheus.io/port: "8080"
-#  prometheus.io/path: "/metrics"
 
 serviceMonitor:
   create: false
