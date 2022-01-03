@@ -15,17 +15,22 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 	if !e.minionSvc.Cfg.ConsumerGroups.Enabled {
 		return true
 	}
-	groups, err := e.minionSvc.DescribeConsumerGroups(ctx)
+	responseShards, err := e.minionSvc.DescribeConsumerGroups(ctx)
 	if err != nil {
-		e.logger.Error("failed to collect consumer groups, because Kafka request failed", zap.Error(err))
+		e.logger.Error("failed to collect consumer responseShards, because Kafka request failed", zap.Error(err))
 		return false
 	}
+	e.logger.Info("described consumer group shards", zap.Int("shard_count", len(responseShards)))
 
-	// The list of groups may be incomplete due to group coordinators that might fail to respond. We do log an error
-	// message in that case (in the kafka request method) and groups will not be included in this list.
-	for _, grp := range groups {
-		coordinator := grp.BrokerMetadata.NodeID
-		for _, group := range grp.Groups.Groups {
+	// The list of responseShards may be incomplete due to group coordinators that might fail to respond. We do log an error
+	// message in that case (in the kafka request method) and responseShards will not be included in this list.
+	for shardIndex, shard := range responseShards {
+		e.logger.Info("described consumer responseShards on shard",
+			zap.Int("shard_index", shardIndex),
+			zap.Int32("coordinator_id", shard.BrokerMetadata.NodeID),
+			zap.Int("group_count", len(shard.Groups.Groups)))
+		coordinator := shard.BrokerMetadata.NodeID
+		for _, group := range shard.Groups.Groups {
 			err := kerr.ErrorForCode(group.ErrorCode)
 			if err != nil {
 				e.logger.Warn("failed to describe consumer group, internal kafka error",
@@ -41,6 +46,14 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			if group.State == "Stable" {
 				state = 1
 			}
+
+			e.logger.Info("iterated on described consumer responseShards",
+				zap.String("group", group.Group),
+				zap.String("protoocl", group.Protocol),
+				zap.String("state", group.State),
+				zap.Int("members", len(group.Members)),
+				zap.Int("shard_index", shardIndex),
+			)
 			ch <- prometheus.MustNewConstMetric(
 				e.consumerGroupInfo,
 				prometheus.GaugeValue,
@@ -52,7 +65,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 				strconv.FormatInt(int64(coordinator), 10),
 			)
 
-			// total number of members in consumer groups
+			// total number of members in consumer responseShards
 			ch <- prometheus.MustNewConstMetric(
 				e.consumerGroupMembers,
 				prometheus.GaugeValue,
@@ -111,7 +124,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 					group.Group,
 				)
 			}
-			// number of members in consumer groups for each topic
+			// number of members in consumer responseShards for each topic
 			for topicName, consumers := range topicConsumers {
 				ch <- prometheus.MustNewConstMetric(
 					e.consumerGroupTopicMembers,
@@ -121,7 +134,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 					topicName,
 				)
 			}
-			// number of partitions assigned in consumer groups for each topic
+			// number of partitions assigned in consumer responseShards for each topic
 			for topicName, partitions := range topicPartitionsAssigned {
 				ch <- prometheus.MustNewConstMetric(
 					e.consumerGroupAssignedTopicPartitions,
