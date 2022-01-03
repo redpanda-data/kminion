@@ -50,6 +50,8 @@ func (s *Service) listConsumerGroups(ctx context.Context) (*kmsg.ListGroupsRespo
 		return nil, fmt.Errorf("failed to list consumer groups. inner kafka error: %w", err)
 	}
 
+	s.logger.Info("list groups", zap.Any("groups", res.Groups), zap.Int("group_count", len(res.Groups)))
+
 	return res, nil
 }
 
@@ -59,8 +61,10 @@ func (s *Service) DescribeConsumerGroups(ctx context.Context) ([]DescribeConsume
 		return nil, err
 	}
 
+	s.logger.Info("list groups cached", zap.Int("group_count", len(listRes.Groups)))
 	groupIDs := make([]string, len(listRes.Groups))
 	for i, group := range listRes.Groups {
+		s.logger.Info("list groups cached", zap.String("group_id", group.Group))
 		groupIDs[i] = group.Group
 	}
 
