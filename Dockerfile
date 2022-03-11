@@ -1,7 +1,7 @@
 ############################################################
 # Build image
 ############################################################
-FROM golang:1.16-alpine as builder
+FROM --platform=$BUILDPLATFORM golang:1.17-alpine as builder
 RUN apk update && apk add --no-cache git ca-certificates && update-ca-certificates
 
 WORKDIR /app
@@ -12,12 +12,13 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o ./bin/kminion
+ARG TARGETOS TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 go build -o ./bin/kminion
 
 ############################################################
 # Runtime Image
 ############################################################
-FROM alpine:3
+FROM --platform=$TARGETPLATFORM alpine:3
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/bin/kminion /app/kminion
 
