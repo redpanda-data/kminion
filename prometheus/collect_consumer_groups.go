@@ -68,6 +68,11 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			membersWithEmptyAssignment := 0
 			failedAssignmentsDecode := 0
 			for _, member := range group.Members {
+				if len(member.MemberAssignment) == 0 {
+					membersWithEmptyAssignment++
+					continue
+				}
+
 				kassignment, err := decodeMemberAssignments(group.ProtocolType, member)
 				if err != nil {
 					e.logger.Debug("failed to decode consumer group member assignment, internal kafka error",
