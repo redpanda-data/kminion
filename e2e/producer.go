@@ -61,7 +61,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 			msg.state = EndToEndMessageStateProducedSuccessfully
 			msg.produceLatency = ackDuration.Seconds()
 
-			// TODO: Enable again as soon as https://github.com/ReneKroon/ttlcache/issues/60 is fixed
+			// TODO: Enable again as soon as https://github.com/jellydatora/ttlcache/issues/60 is fixed
 			// Because we cannot update cache items in an atomic fashion we currently can't use this method
 			// as this would cause a race condition which ends up in records being reported as lost/expired.
 			// s.messageTracker.updateItemIfExists(msg)

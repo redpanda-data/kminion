@@ -2,9 +2,10 @@ package e2e
 
 import (
 	"fmt"
-	"github.com/ReneKroon/ttlcache/v2"
 	"strconv"
 	"time"
+
+	"github.com/jellydator/ttlcache/v2"
 
 	"go.uber.org/zap"
 )
