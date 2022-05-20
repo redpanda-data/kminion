@@ -14,15 +14,26 @@ import (
 )
 
 type Service struct {
-	cfg    Config
+	cfg    InMemoryConfig
 	logger *zap.Logger
 }
 
-func NewService(cfg Config, logger *zap.Logger) *Service {
+func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
+	inMemoryCfg, err := FromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{
+		cfg:    inMemoryCfg,
+		logger: logger.Named("kafka_service"),
+	}, nil
+}
+
+func NewServiceFromConfig(cfg InMemoryConfig, logger *zap.Logger) (*Service, error) {
 	return &Service{
 		cfg:    cfg,
 		logger: logger.Named("kafka_service"),
-	}
+	}, nil
 }
 
 // CreateAndTestClient creates a client with the services default settings

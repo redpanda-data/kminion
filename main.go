@@ -57,7 +57,10 @@ func main() {
 	wrappedRegisterer := promclient.WrapRegistererWithPrefix(cfg.Exporter.Namespace+"_", promclient.DefaultRegisterer)
 
 	// Create kafka service
-	kafkaSvc := kafka.NewService(cfg.Kafka, logger)
+	kafkaSvc, err := kafka.NewService(cfg.Kafka, logger)
+	if err != nil {
+		logger.Fatal("failed to setup kafka service", zap.Error(err))
+	}
 
 	// Create minion service
 	// Prometheus exporter only talks to the minion service which

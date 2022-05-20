@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"time"
 
@@ -25,7 +24,7 @@ import (
 // NewKgoConfig creates a new Config for the Kafka Client as exposed by the franz-go library.
 // If TLS certificates can't be read an error will be returned.
 // logger is only used to print warnings about TLS.
-func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
+func NewKgoConfig(cfg InMemoryConfig, logger *zap.Logger) ([]kgo.Opt, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(cfg.Brokers...),
 		kgo.MaxVersions(kversion.V2_7_0()),
@@ -114,13 +113,9 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 	var caCertPool *x509.CertPool
 	if cfg.TLS.Enabled {
 		// Root CA
-		if cfg.TLS.CaFilepath != "" {
-			ca, err := ioutil.ReadFile(cfg.TLS.CaFilepath)
-			if err != nil {
-				return nil, err
-			}
+		if len(cfg.TLS.Ca) > 0 {
 			caCertPool = x509.NewCertPool()
-			isSuccessful := caCertPool.AppendCertsFromPEM(ca)
+			isSuccessful := caCertPool.AppendCertsFromPEM(cfg.TLS.Ca)
 			if !isSuccessful {
 				logger.Warn("failed to append ca file to cert pool, is this a valid PEM format?")
 			}
@@ -128,19 +123,9 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 
 		// If configured load TLS cert & key - Mutual TLS
 		var certificates []tls.Certificate
-		if cfg.TLS.CertFilepath != "" && cfg.TLS.KeyFilepath != "" {
-			// 1. Read certificates
-			cert, err := ioutil.ReadFile(cfg.TLS.CertFilepath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to TLS certificate: %w", err)
-			}
-
-			privateKey, err := ioutil.ReadFile(cfg.TLS.KeyFilepath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read TLS key: %w", err)
-			}
-
-			// 2. Check if private key needs to be decrypted. Decrypt it if passphrase is given, otherwise return error
+		if len(cfg.TLS.Cert) > 0 && len(cfg.TLS.Key) > 0 {
+			// Check if private key needs to be decrypted. Decrypt it if passphrase is given, otherwise return error
+			privateKey := cfg.TLS.Key
 			pemBlock, _ := pem.Decode(privateKey)
 			if pemBlock == nil {
 				return nil, fmt.Errorf("no valid private key found")
@@ -154,7 +139,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 				// If private key was encrypted we can overwrite the original contents now with the decrypted version
 				privateKey = pem.EncodeToMemory(&pem.Block{Type: pemBlock.Type, Bytes: decryptedKey})
 			}
-			tlsCert, err := tls.X509KeyPair(cert, privateKey)
+			tlsCert, err := tls.X509KeyPair(cfg.TLS.Cert, privateKey)
 			if err != nil {
 				return nil, fmt.Errorf("cannot parse pem: %s", err)
 			}
