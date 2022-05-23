@@ -30,6 +30,12 @@ kafka:
     caFilepath: ""
     certFilepath: ""
     keyFilepath: ""
+    # base64 encoded tls CA, cannot be set if 'caFilepath' is set
+    ca: ""
+    # base64 encoded tls cert, cannot be set if 'certFilepath' is set
+    cert: ""
+    # base64 encoded tls key, cannot be set if 'keyFilepath' is set
+    key: ""
     passphrase: ""
     insecureSkipTlsVerify: false
 

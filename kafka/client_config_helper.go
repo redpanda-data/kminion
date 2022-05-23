@@ -114,10 +114,14 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 	var caCertPool *x509.CertPool
 	if cfg.TLS.Enabled {
 		// Root CA
-		if cfg.TLS.CaFilepath != "" {
-			ca, err := ioutil.ReadFile(cfg.TLS.CaFilepath)
-			if err != nil {
-				return nil, err
+		if cfg.TLS.CaFilepath != "" || len(cfg.TLS.Ca) > 0 {
+			ca := cfg.TLS.Ca
+			if cfg.TLS.CaFilepath != "" {
+				caBytes, err := ioutil.ReadFile(cfg.TLS.CaFilepath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load ca cert: %w", err)
+				}
+				ca = caBytes
 			}
 			caCertPool = x509.NewCertPool()
 			isSuccessful := caCertPool.AppendCertsFromPEM(ca)
@@ -128,16 +132,26 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 
 		// If configured load TLS cert & key - Mutual TLS
 		var certificates []tls.Certificate
-		if cfg.TLS.CertFilepath != "" && cfg.TLS.KeyFilepath != "" {
+		hasCertFile := cfg.TLS.CertFilepath != "" || len(cfg.TLS.Cert) > 0
+		hasKeyFile := cfg.TLS.KeyFilepath != "" || len(cfg.TLS.Key) > 0
+		if hasCertFile || hasKeyFile {
+			cert := cfg.TLS.Cert
+			privateKey := cfg.TLS.Key
 			// 1. Read certificates
-			cert, err := ioutil.ReadFile(cfg.TLS.CertFilepath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to TLS certificate: %w", err)
+			if cfg.TLS.CertFilepath != "" {
+				certBytes, err := ioutil.ReadFile(cfg.TLS.CertFilepath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to TLS certificate: %w", err)
+				}
+				cert = certBytes
 			}
 
-			privateKey, err := ioutil.ReadFile(cfg.TLS.KeyFilepath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read TLS key: %w", err)
+			if cfg.TLS.KeyFilepath != "" {
+				keyBytes, err := ioutil.ReadFile(cfg.TLS.KeyFilepath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read TLS key: %w", err)
+				}
+				privateKey = keyBytes
 			}
 
 			// 2. Check if private key needs to be decrypted. Decrypt it if passphrase is given, otherwise return error
