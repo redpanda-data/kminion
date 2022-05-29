@@ -19,6 +19,19 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	// ------------------------------------------------------------------------
+	// Below parameters are set at build time using ldflags.
+	// ------------------------------------------------------------------------
+
+	// version is KMinion's SemVer version (for example: v1.0.0).
+	version = "development"
+	// builtAt is a string that represent a human-readable date when the binary was built.
+	builtAt = "N/A"
+	// commit is a string that represents the last git commit for this build.
+	commit = "N/A"
+)
+
 func main() {
 	startupLogger, err := zap.NewProduction()
 	if err != nil {
@@ -35,7 +48,7 @@ func main() {
 		startupLogger.Fatal("failed to create new logger", zap.Error(err))
 	}
 
-	logger.Info("started kminion", zap.String("version", cfg.Version))
+	logger.Info("started kminion", zap.String("version", version), zap.String("built_at", builtAt))
 
 	// Setup context that cancels when the application receives an interrupt signal
 	ctx, cancel := context.WithCancel(context.Background())
