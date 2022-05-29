@@ -48,7 +48,7 @@ func (s *Service) CreateAndTestClient(ctx context.Context, l *zap.Logger, opts [
 	defer cancel()
 	err = s.testConnection(client, connectCtx)
 	if err != nil {
-		logger.Fatal("failed to test connectivity to Kafka cluster", zap.Error(err))
+		return nil, fmt.Errorf("failed to test connectivity to Kafka cluster %w", err)
 	}
 
 	return client, nil
