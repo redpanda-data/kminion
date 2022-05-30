@@ -77,6 +77,7 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client for e2e: %w", err)
 	}
+	logger.Info("successfully connected to kafka cluster")
 
 	svc := &Service{
 		config:   cfg,

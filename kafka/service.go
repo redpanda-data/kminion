@@ -80,7 +80,7 @@ func (s *Service) testConnection(client *kgo.Client, ctx context.Context) error 
 	}
 	versions := kversion.FromApiVersionsResponse(versionsRes)
 
-	s.logger.Info("successfully connected to kafka cluster",
+	s.logger.Debug("successfully connected to kafka cluster",
 		zap.Int("advertised_broker_count", len(res.Brokers)),
 		zap.Int("topic_count", len(res.Topics)),
 		zap.Int32("controller_id", res.ControllerID),
