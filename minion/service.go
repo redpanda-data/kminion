@@ -56,6 +56,7 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client: %w", err)
 	}
+	logger.Info("successfully connected to kafka cluster")
 
 	// Compile regexes. We can ignore the errors because valid compilation has been validated already
 	allowedGroupIDsExpr, _ := compileRegexes(cfg.ConsumerGroups.AllowedGroupIDs)
