@@ -6,7 +6,7 @@ release:
     ## Docker Image
     Use the following command to pull this release's Docker image:
     ```sh
-    docker pull vectorizedio/kminion:{{ .Tag }}
+    docker pull vectorized/kminion:{{ .Tag }}
     ```
 changelog:
   skip: false
@@ -28,7 +28,9 @@ builds:
       - darwin
       - linux
       - windows
-    goarch: amd64
+    goarch:
+      - amd64
+      - arm64
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.builtAt={{.Date}} -X main.commit={{.Commit}}
 
