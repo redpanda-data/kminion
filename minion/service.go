@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,6 +52,9 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 			kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 			kgo.ConsumeTopics("__consumer_offsets"))
 	}
+
+	logger.Info("connecting to Kafka seed brokers, trying to fetch cluster metadata",
+		zap.String("seed_brokers", strings.Join(kafkaSvc.Brokers(), ",")))
 
 	client, err := kafkaSvc.CreateAndTestClient(ctx, logger, kgoOpts)
 	if err != nil {

@@ -54,12 +54,14 @@ func (s *Service) CreateAndTestClient(ctx context.Context, l *zap.Logger, opts [
 	return client, nil
 }
 
+// Brokers returns list of brokers this service is connecting to
+func (s *Service) Brokers() []string {
+	return s.cfg.Brokers
+}
+
 // testConnection tries to fetch Broker metadata and prints some information if connection succeeds. An error will be
 // returned if connecting fails.
 func (s *Service) testConnection(client *kgo.Client, ctx context.Context) error {
-	s.logger.Info("connecting to Kafka seed brokers, trying to fetch cluster metadata",
-		zap.String("seed_brokers", strings.Join(s.cfg.Brokers, ",")))
-
 	req := kmsg.MetadataRequest{
 		Topics: nil,
 	}
