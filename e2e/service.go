@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudhut/kminion/v2/kafka"
@@ -73,6 +74,8 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 	kgoOpts = append(kgoOpts, kgo.RecordPartitioner(kgo.ManualPartitioner()))
 
 	// Create kafka service and check if client can successfully connect to Kafka cluster
+	logger.Info("connecting to Kafka seed brokers, trying to fetch cluster metadata",
+		zap.String("seed_brokers", strings.Join(kafkaSvc.Brokers(), ",")))
 	client, err := kafkaSvc.CreateAndTestClient(ctx, logger, kgoOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client for e2e: %w", err)
@@ -144,7 +147,6 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 
 // Start starts the service (wow)
 func (s *Service) Start(ctx context.Context) error {
-
 	// Ensure topic exists and is configured correctly
 	if err := s.validateManagementTopic(ctx); err != nil {
 		return fmt.Errorf("could not validate end-to-end topic: %w", err)
