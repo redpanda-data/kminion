@@ -3,7 +3,6 @@ package kafka
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
