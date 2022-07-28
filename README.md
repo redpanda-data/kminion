@@ -73,8 +73,8 @@ docker-compose up
 
 ## Chat with us
 
-We use Discord to communicate. If you are looking for more interactive discussions or support, you are invited to join
-our Discord server: https://discord.gg/KQj7P6v
+We use Slack to communicate. If you are looking for more interactive discussions or support, you are invited to join
+our Slack server: https://redpanda.com/slack
 
 ## License
 
