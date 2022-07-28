@@ -109,6 +109,8 @@ daemonset:
   enabled: false
 
 deployment:
+  # Annotations to add to the Deployment resource
+  annotations: {}
   volumes:
     # Mount files from Kubernetes secrets into the container
     secrets: []
