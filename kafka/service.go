@@ -43,11 +43,18 @@ func (s *Service) CreateAndTestClient(ctx context.Context, l *zap.Logger, opts [
 	}
 
 	// Test connection
-	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	err = s.testConnection(client, connectCtx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to test connectivity to Kafka cluster %w", err)
+	for {
+		err = s.testConnection(client, ctx)
+		if err == nil {
+			break
+		}
+
+		if !s.cfg.RetryInitConnection {
+			return nil, fmt.Errorf("failed to test connectivity to Kafka cluster %w", err)
+		}
+
+		logger.Warn("failed to test connectivity to Kafka cluster, retrying in 5 seconds", zap.Error(err))
+		time.Sleep(time.Second * 5)
 	}
 
 	return client, nil
@@ -61,17 +68,20 @@ func (s *Service) Brokers() []string {
 // testConnection tries to fetch Broker metadata and prints some information if connection succeeds. An error will be
 // returned if connecting fails.
 func (s *Service) testConnection(client *kgo.Client, ctx context.Context) error {
+	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
 	req := kmsg.MetadataRequest{
 		Topics: nil,
 	}
-	res, err := req.RequestWith(ctx, client)
+	res, err := req.RequestWith(connectCtx, client)
 	if err != nil {
 		return fmt.Errorf("failed to request metadata: %w", err)
 	}
 
 	// Request versions in order to guess Kafka Cluster version
 	versionsReq := kmsg.NewApiVersionsRequest()
-	versionsRes, err := versionsReq.RequestWith(ctx, client)
+	versionsRes, err := versionsReq.RequestWith(connectCtx, client)
 	if err != nil {
 		return fmt.Errorf("failed to request api versions: %w", err)
 	}

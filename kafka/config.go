@@ -10,6 +10,8 @@ type Config struct {
 
 	TLS  TLSConfig  `koanf:"tls"`
 	SASL SASLConfig `koanf:"sasl"`
+
+	RetryInitConnection bool `koanf:"retryInitConnection"`
 }
 
 func (c *Config) SetDefaults() {
