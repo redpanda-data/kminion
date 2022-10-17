@@ -116,8 +116,9 @@ deployment:
     secrets: []
     # - secretName: vault-tls
     #   mountPath: /vault/tls
-    emptyDir: []
+    extra: []
     # - name: example
+    #   emptyDir: {}
 
   # If you want to provide specifc config settings like sensitive Kafka credentials via environment variables you can
   # do so by making them available here. See the kminion reference config to figure out the expected variable names.
