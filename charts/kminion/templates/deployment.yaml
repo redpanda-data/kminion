@@ -44,10 +44,9 @@ spec:
           secret:
             secretName: {{.secretName}}
         {{- end}}
-        {{- range .Values.deployment.volumes.emptyDir}}
-        - name: {{.name}}
-          emptyDir: {}
-        {{- end}}
+        {{- with .Values.deployment.volumes.extra }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       initContainers:
       {{- with .Values.deployment.initContainers }}
       {{- toYaml . | nindent 8 }}
