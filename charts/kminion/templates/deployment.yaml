@@ -46,7 +46,7 @@ spec:
         {{- end}}
         {{- range .Values.deployment.volumes.emptyDir}}
         - name: {{.name}}
-          emptydir: {}
+          emptyDir: {}
         {{- end}}
       initContainers:
       {{- with .Values.deployment.initContainers }}
