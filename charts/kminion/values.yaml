@@ -116,6 +116,8 @@ deployment:
     secrets: []
     # - secretName: vault-tls
     #   mountPath: /vault/tls
+    emptyDir: []
+    # - name: example
 
   # If you want to provide specifc config settings like sensitive Kafka credentials via environment variables you can
   # do so by making them available here. See the kminion reference config to figure out the expected variable names.
@@ -136,6 +138,11 @@ deployment:
     # - name: KAFKA_SASL_PASSWORD
     #   secretName: kafka-credentials-team-xy
     #   secretKey: password
+
+  # Add additional containers, e. g. for oauth2-proxy
+  extraContainers: {}
+  # Add additional init containers, e. g. for oauth2-proxy
+  initContainers: {}
 
 kminion:
   # KMinion can be configured using environment variables and/or a YAML config. The yaml contents under config will
