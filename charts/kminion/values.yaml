@@ -27,6 +27,9 @@ podAnnotations: {}
 #  prometheus.io/scrape: "true"
 #  prometheus.io/port: "8080"
 #  prometheus.io/path: "/metrics"
+
+podLabels: {}
+
 podSecurityContext:
   runAsUser: 99
   fsGroup: 99
@@ -88,7 +91,7 @@ tolerations: []
 
 affinity: {}
 
-customLabels: {}
+
 
 serviceMonitor:
   create: false
@@ -109,6 +112,7 @@ daemonset:
   enabled: false
 
 deployment:
+  labels: {}
   # Annotations to add to the Deployment resource
   annotations: {}
   volumes:

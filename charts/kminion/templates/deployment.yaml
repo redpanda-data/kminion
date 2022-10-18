@@ -5,6 +5,9 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kminion.labels" . | nindent 4}}
+    {{- with .Values.deployment.labels}}
+    {{- toYaml . | nindent 4}}
+    {{- end}}
   {{- with .Values.deployment.annotations}}
   annotations:
     {{- toYaml . | nindent 4}}
@@ -24,8 +27,8 @@ spec:
       {{- end}}
       labels:
         {{- include "kminion.selectorLabels" . | nindent 8}}
-        {{- if .Values.customLabels -}}
-        {{toYaml .Values.customLabels | nindent 8}}
+        {{- if .Values.podLabels -}}
+        {{toYaml .Values.podLabels | nindent 8}}
         {{- end}}
     spec:
       {{- with .Values.imagePullSecrets}}
