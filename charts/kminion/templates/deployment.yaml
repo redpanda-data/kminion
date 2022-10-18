@@ -8,8 +8,8 @@ metadata:
     {{- with .Values.deployment.labels}}
     {{- toYaml . | nindent 4}}
     {{- end}}
-  annotations:
   {{- with .Values.deployment.annotations}}
+  annotations:
     {{- toYaml . | nindent 4}}
   {{- end}}
 spec:
