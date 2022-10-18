@@ -8,8 +8,8 @@ metadata:
     {{- with .Values.deployment.labels}}
     {{- toYaml . | nindent 4}}
     {{- end}}
-  {{- with .Values.deployment.annotations}}
   annotations:
+  {{- with .Values.deployment.annotations}}
     {{- toYaml . | nindent 4}}
   {{- end}}
 spec:
@@ -27,8 +27,8 @@ spec:
       {{- end}}
       labels:
         {{- include "kminion.selectorLabels" . | nindent 8}}
-        {{- if .Values.podLabels -}}
-        {{toYaml .Values.podLabels | nindent 8}}
+        {{- if .Values.customLabels -}}
+        {{toYaml .Values.customLabels | nindent 8}}
         {{- end}}
     spec:
       {{- with .Values.imagePullSecrets}}

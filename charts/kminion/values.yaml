@@ -28,8 +28,6 @@ podAnnotations: {}
 #  prometheus.io/port: "8080"
 #  prometheus.io/path: "/metrics"
 
-podLabels: {}
-
 podSecurityContext:
   runAsUser: 99
   fsGroup: 99
@@ -91,7 +89,7 @@ tolerations: []
 
 affinity: {}
 
-
+customLabels: {}
 
 serviceMonitor:
   create: false
