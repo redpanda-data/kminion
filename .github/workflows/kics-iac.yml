@@ -1,7 +1,7 @@
 name: kics scanning
 on:
   push:
-    branches: dev
+    branches: master
 jobs:
   kics:
     runs-on: ubuntu-latest
