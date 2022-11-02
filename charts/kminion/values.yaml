@@ -110,6 +110,9 @@ daemonset:
   enabled: false
 
 deployment:
+  readinessProbe:
+    enabled: true
+
   labels: {}
   # Annotations to add to the Deployment resource
   annotations: {}

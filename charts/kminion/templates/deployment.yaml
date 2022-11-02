@@ -94,11 +94,13 @@ spec:
             {{- end}}
           resources:
             {{- toYaml .Values.resources | nindent 12}}
+          {{- if .Values.deployment.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
               path: /ready
               port: {{.Values.service.port}}
             initialDelaySeconds: 10
+          {{- end }}
         {{- with .Values.deployment.extraContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
