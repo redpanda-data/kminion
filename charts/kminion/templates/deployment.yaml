@@ -5,6 +5,9 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kminion.labels" . | nindent 4}}
+    {{- with .Values.deployment.labels}}
+    {{- toYaml . | nindent 4}}
+    {{- end}}
   {{- with .Values.deployment.annotations}}
   annotations:
     {{- toYaml . | nindent 4}}
@@ -44,6 +47,13 @@ spec:
           secret:
             secretName: {{.secretName}}
         {{- end}}
+        {{- with .Values.deployment.volumes.extra }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      initContainers:
+      {{- with .Values.deployment.initContainers }}
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{.Chart.Name}}
           securityContext:
@@ -84,11 +94,16 @@ spec:
             {{- end}}
           resources:
             {{- toYaml .Values.resources | nindent 12}}
+          {{- if .Values.deployment.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
               path: /ready
               port: {{.Values.service.port}}
             initialDelaySeconds: 10
+          {{- end }}
+        {{- with .Values.deployment.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector}}
       nodeSelector:
         {{- toYaml . | nindent 8}}
