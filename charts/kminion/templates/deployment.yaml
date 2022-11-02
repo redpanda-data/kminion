@@ -27,7 +27,7 @@ spec:
       {{- end}}
       labels:
         {{- include "kminion.selectorLabels" . | nindent 8}}
-        {{- if .Values.customLabels -}}
+        {{- if .Values.customLabels}}
         {{toYaml .Values.customLabels | nindent 8}}
         {{- end}}
     spec:
