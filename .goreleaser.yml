@@ -14,12 +14,12 @@ changelog:
   filters:
     # Commit messages matching the regexp listed here will be removed from the changelog
     exclude:
-      - - '^docs:'
-        - '^test:'
-        - '^npm:'
-        - '^go.mod:'
-        - '^.github:'
-        - 'Merge branch'
+      - '^docs:'
+      - '^test:'
+      - '^npm:'
+      - '^go.mod:'
+      - '^.github:'
+      - 'Merge branch'
 
 builds:
   - id: kminion
