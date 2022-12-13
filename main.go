@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -124,8 +125,16 @@ func main() {
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
+	srv := &http.Server{Addr: address}
+	go func() {
+		<-ctx.Done()
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Error("error stopping HTTP server", zap.Error(err))
+			os.Exit(1)
+		}
+	}()
 	logger.Info("listening on address", zap.String("listen_address", address))
-	if err := http.ListenAndServe(address, nil); err != nil {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("error starting HTTP server", zap.Error(err))
 		os.Exit(1)
 	}
