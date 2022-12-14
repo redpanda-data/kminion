@@ -51,22 +51,9 @@ func main() {
 
 	logger.Info("started kminion", zap.String("version", version), zap.String("built_at", builtAt))
 
-	// Setup context that cancels when the application receives an interrupt signal
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-c:
-			logger.Info("received a signal, going to shut down KMinion")
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	// Setup context that stops when the application receives an interrupt signal
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
 	wrappedRegisterer := promclient.WrapRegistererWithPrefix(cfg.Exporter.Namespace+"_", promclient.DefaultRegisterer)
 
@@ -138,4 +125,6 @@ func main() {
 		logger.Error("error starting HTTP server", zap.Error(err))
 		os.Exit(1)
 	}
+
+	logger.Info("kminion stopped")
 }
