@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,22 +51,9 @@ func main() {
 
 	logger.Info("started kminion", zap.String("version", version), zap.String("built_at", builtAt))
 
-	// Setup context that cancels when the application receives an interrupt signal
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-c:
-			logger.Info("received a signal, going to shut down KMinion")
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	// Setup context that stops when the application receives an interrupt signal
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
 	wrappedRegisterer := promclient.WrapRegistererWithPrefix(cfg.Exporter.Namespace+"_", promclient.DefaultRegisterer)
 
@@ -124,9 +112,19 @@ func main() {
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
+	srv := &http.Server{Addr: address}
+	go func() {
+		<-ctx.Done()
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Error("error stopping HTTP server", zap.Error(err))
+			os.Exit(1)
+		}
+	}()
 	logger.Info("listening on address", zap.String("listen_address", address))
-	if err := http.ListenAndServe(address, nil); err != nil {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("error starting HTTP server", zap.Error(err))
 		os.Exit(1)
 	}
+
+	logger.Info("kminion stopped")
 }
