@@ -16,5 +16,8 @@ spec:
       targetPort: metrics
       protocol: TCP
       name: metrics
+  {{- if .Values.service.extraPorts }}
+    {{- toYaml .Values.service.extraPorts | nindent 4 }}
+  {{- end }}
   selector:
     {{- include "kminion.selectorLabels" . | nindent 4 }}
