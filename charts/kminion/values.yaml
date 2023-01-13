@@ -50,6 +50,13 @@ service:
   type: ClusterIP
   port: 8080 # This port is also used as exposed container port
   annotations: {} # # Annotations to add to the service
+  extraPorts: [] # when []extraContainers expose additional metrics, make
+                 # discoverable for servicemontors
+    # - port: 8443
+    #   targetPort: 8443
+    #   protocol: TCP
+    #   name: expose-x509-for-ttl-checks
+
 
 ingress:
   enabled: false
