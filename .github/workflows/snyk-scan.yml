@@ -3,6 +3,8 @@ name: snyk scanning
 on:
   push:
     branches: ["master", "v2*"]
+	schedule:
+		- cron: "0 0 * * *"
 
   workflow_dispatch:
 
