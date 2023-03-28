@@ -8,9 +8,9 @@ type TLSConfig struct {
 	CaFilepath            string `koanf:"caFilepath"`
 	CertFilepath          string `koanf:"certFilepath"`
 	KeyFilepath           string `koanf:"keyFilepath"`
-	Ca                    []byte `koanf:"ca"`
-	Cert                  []byte `koanf:"cert"`
-	Key                   []byte `koanf:"key"`
+	Ca                    string `koanf:"ca"`
+	Cert                  string `koanf:"cert"`
+	Key                   string `koanf:"key"`
 	Passphrase            string `koanf:"passphrase"`
 	InsecureSkipTLSVerify bool   `koanf:"insecureSkipTlsVerify"`
 }
