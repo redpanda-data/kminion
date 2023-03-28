@@ -115,7 +115,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 	if cfg.TLS.Enabled {
 		// Root CA
 		if cfg.TLS.CaFilepath != "" || len(cfg.TLS.Ca) > 0 {
-			ca := cfg.TLS.Ca
+			ca := []byte(cfg.TLS.Ca)
 			if cfg.TLS.CaFilepath != "" {
 				caBytes, err := ioutil.ReadFile(cfg.TLS.CaFilepath)
 				if err != nil {
@@ -135,8 +135,8 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 		hasCertFile := cfg.TLS.CertFilepath != "" || len(cfg.TLS.Cert) > 0
 		hasKeyFile := cfg.TLS.KeyFilepath != "" || len(cfg.TLS.Key) > 0
 		if hasCertFile || hasKeyFile {
-			cert := cfg.TLS.Cert
-			privateKey := cfg.TLS.Key
+			cert := []byte(cfg.TLS.Cert)
+			privateKey := []byte(cfg.TLS.Key)
 			// 1. Read certificates
 			if cfg.TLS.CertFilepath != "" {
 				certBytes, err := ioutil.ReadFile(cfg.TLS.CertFilepath)
