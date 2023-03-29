@@ -95,3 +95,14 @@ Return if ingress supports pathType.
 {{- define "kminion.ingress.supportsPathType" -}}
 {{- or (eq (include "kminion.ingress.isStable" .) "true") (and (eq (include "kminion.ingress.apiVersion" .) "networking.k8s.io/v1beta1") (semverCompare ">= 1.18-0" .Capabilities.KubeVersion.Version)) }}
 {{- end }}
+
+{{/*
+Return the appropriate apiVersion for podDisruptionBudget.
+*/}}
+{{- define "kminion.podDisruptionBudget.apiVersion" -}}
+{{- if $.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
+{{- print "policy/v1" }}
+{{- else }}
+{{- print "policy/v1beta1" }}
+{{- end }}
+{{- end }}
