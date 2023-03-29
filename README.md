@@ -25,10 +25,10 @@ You can find a list of all exported metrics here: [/docs/metrics.md](/docs/metri
 ### 🐳 Docker image
 
 All images will be built on each push to master or for every new release. You can find an overview of all available tags
-in our [DockerHub repository](https://hub.docker.com/r/vectorized/kminion/tags).
+in our [DockerHub repository](https://hub.docker.com/r/redpandadata/kminion/tags).
 
 ```shell
-docker pull docker pull vectorized/kminion:v2.2.1
+docker pull docker pull redpandadata/kminion:v2.2.3
 ```
 
 ### ☸ Helm chart

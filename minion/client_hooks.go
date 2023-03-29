@@ -54,7 +54,7 @@ func newMinionClientHooks(logger *zap.Logger, metricsNamespace string) *clientHo
 	}
 }
 
-func (c clientHooks) OnConnect(meta kgo.BrokerMetadata, dialDur time.Duration, _ net.Conn, err error) {
+func (c clientHooks) OnBrokerConnect(meta kgo.BrokerMetadata, dialDur time.Duration, _ net.Conn, err error) {
 	if err != nil {
 		c.logger.Debug("kafka connection failed", zap.String("broker_host", meta.Host), zap.Error(err))
 		return
@@ -64,31 +64,31 @@ func (c clientHooks) OnConnect(meta kgo.BrokerMetadata, dialDur time.Duration, _
 		zap.Duration("dial_duration", dialDur))
 }
 
-func (c clientHooks) OnDisconnect(meta kgo.BrokerMetadata, _ net.Conn) {
+func (c clientHooks) OnBrokerDisconnect(meta kgo.BrokerMetadata, _ net.Conn) {
 	c.logger.Debug("kafka broker disconnected",
 		zap.String("host", meta.Host))
 }
 
-// OnRead is passed the broker metadata, the key for the response that
+// OnBrokerRead is passed the broker metadata, the key for the response that
 // was read, the number of bytes read, how long the Client waited
 // before reading the response, how long it took to read the response,
 // and any error.
 //
 // The bytes written does not count any tls overhead.
 // OnRead is called after a read from a broker.
-func (c clientHooks) OnRead(_ kgo.BrokerMetadata, _ int16, bytesRead int, _, _ time.Duration, _ error) {
+func (c clientHooks) OnBrokerRead(_ kgo.BrokerMetadata, _ int16, bytesRead int, _, _ time.Duration, _ error) {
 	c.requestsReceivedCount.Inc()
 	c.bytesReceived.Add(float64(bytesRead))
 }
 
-// OnWrite is passed the broker metadata, the key for the request that
+// OnBrokerWrite is passed the broker metadata, the key for the request that
 // was written, the number of bytes written, how long the request
 // waited before being written, how long it took to write the request,
 // and any error.
 //
 // The bytes written does not count any tls overhead.
 // OnWrite is called after a write to a broker.
-func (c clientHooks) OnWrite(_ kgo.BrokerMetadata, _ int16, bytesWritten int, _, _ time.Duration, _ error) {
+func (c clientHooks) OnBrokerWrite(_ kgo.BrokerMetadata, _ int16, bytesWritten int, _, _ time.Duration, _ error) {
 	c.requestSentCount.Inc()
 	c.bytesSent.Add(float64(bytesWritten))
 }
