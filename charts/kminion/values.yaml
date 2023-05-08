@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: quay.io/cloudhut/kminion
+  repository: redpandadata/kminion
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
