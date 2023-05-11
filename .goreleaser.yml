@@ -6,7 +6,7 @@ release:
     ## Docker Image
     Use the following command to pull this release's Docker image:
     ```sh
-    docker pull vectorized/kminion:{{ .Tag }}
+    docker pull redpandadata/kminion:{{ .Tag }}
     ```
 changelog:
   skip: false
