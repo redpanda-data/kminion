@@ -111,13 +111,9 @@ kminion_kafka_consumer_group_offset_commits_total{group_id="bigquery-sink"} 1098
 # TYPE kminion_end_to_end_messages_produced_total counter
 kminion_end_to_end_messages_produced_total 384
 
-# HELP kminion_end_to_end_commits_total Counts how many times kminions end-to-end test has committed messages
-# TYPE kminion_end_to_end_commits_total counter
-kminion_end_to_end_commits_total 18
-
-# HELP kminion_end_to_end_messages_acked_total Number of messages kafka acknowledged as produced
-# TYPE kminion_end_to_end_messages_acked_total counter
-kminion_end_to_end_messages_acked_total 383
+# HELP kminion_end_to_end_offset_commits_total Counts how many times kminions end-to-end test has committed messages
+# TYPE kminion_end_to_end_offset_commits_total counter
+kminion_end_to_end_offset_commits_total 18
 
 # HELP kminion_end_to_end_messages_received_total Number of *matching* messages kminion received. Every roundtrip message has a minionID (randomly generated on startup) and a timestamp. Kminion only considers a message a match if it it arrives within the configured roundtrip SLA (and it matches the minionID)
 # TYPE kminion_end_to_end_messages_received_total counter
@@ -127,11 +123,23 @@ kminion_end_to_end_messages_received_total 383
 # TYPE kminion_end_to_end_produce_latency_seconds histogram
 kminion_end_to_end_produce_latency_seconds_bucket{partitionId="0",le="0.005"} 0
 
-# HELP kminion_end_to_end_commit_latency_seconds Time kafka took to respond to kminion's offset commit
-# TYPE kminion_end_to_end_commit_latency_seconds histogram
-kminion_end_to_end_commit_latency_seconds_bucket{groupCoordinatorBrokerId="0",le="0.005"} 0
+# HELP kminion_end_to_end_offset_commit_latency_seconds Time kafka took to respond to kminion's offset commit
+# TYPE kminion_end_to_end_offset_commit_latency_seconds histogram
+kminion_end_to_end_offset_commit_latency_seconds_bucket{groupCoordinatorBrokerId="0",le="0.005"} 0
 
 # HELP kminion_end_to_end_roundtrip_latency_seconds Time it took between sending (producing) and receiving (consuming) a message
 # TYPE kminion_end_to_end_roundtrip_latency_seconds histogram
 kminion_end_to_end_roundtrip_latency_seconds_bucket{partitionId="0",le="0.005"} 0
+
+# HELP kminion_end_to_end_messages_lost_total Number of messages that have been produced successfully but not received within the configured SLA duration
+# TYPE kminion_end_to_end_messages_lost_total counter
+kminion_end_to_end_messages_lost_total{partition_id="0"} 0
+
+# HELP kminion_end_to_end_messages_produced_failed_total Number of messages failed to produce to Kafka because of a timeout or failure
+# TYPE kminion_end_to_end_messages_produced_failed_total counter
+kminion_end_to_end_messages_produced_failed_total{partition_id="0"} 0
+
+# HELP kminion_end_to_end_messages_produced_in_flight Number of messages that kminion's end-to-end test produced but has not received an answer for yet
+# TYPE kminion_end_to_end_messages_produced_in_flight gauge
+kminion_end_to_end_messages_produced_in_flight{partition_id="0"} 0
 ```
