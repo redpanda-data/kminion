@@ -1,7 +1,7 @@
 ############################################################
 # Build image
 ############################################################
-FROM golang:1.20-alpine as builder
+FROM golang:1.20-alpine3.18 as builder
 
 ARG VERSION
 ARG BUILT_AT
@@ -27,7 +27,7 @@ RUN CGO_ENABLED=0 go build \
 ############################################################
 # Runtime Image
 ############################################################
-FROM alpine:3.17
+FROM alpine:3.18
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/bin/kminion /app/kminion
 RUN addgroup -S redpanda \
