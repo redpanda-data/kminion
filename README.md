@@ -28,7 +28,7 @@ All images will be built on each push to master or for every new release. You ca
 in our [DockerHub repository](https://hub.docker.com/r/redpandadata/kminion/tags).
 
 ```shell
-docker pull docker pull redpandadata/kminion:v2.2.3
+docker pull redpandadata/kminion:v2.2.3
 ```
 
 ### ☸ Helm chart
