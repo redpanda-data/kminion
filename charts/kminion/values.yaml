@@ -38,7 +38,8 @@ podDisruptionBudget:
   maxUnavailable: 1
   # minAvailable: 1
 
-securityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
 # capabilities:
 #   drop:
 #   - ALL
