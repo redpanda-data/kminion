@@ -58,7 +58,7 @@ kafka:
       password: ""
       realm: ""
       enableFast: true
-    oauthbearer:
+    oauth:
       tokenEndpoint: ""
       clientId: ""
       clientSecret: ""

@@ -19,7 +19,7 @@ type SASLConfig struct {
 
 	// SASL Mechanisms that require more configuration than username & password
 	GSSAPI      SASLGSSAPIConfig  `koanf:"gssapi"`
-	OAuthBearer OAuthBearerConfig `koanf:"oauthbearer"`
+	OAuthBearer OAuthBearerConfig `koanf:"oauth"`
 }
 
 // SetDefaults for SASL Config
