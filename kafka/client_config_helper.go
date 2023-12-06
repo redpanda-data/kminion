@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -15,6 +16,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kversion"
 	"github.com/twmb/franz-go/pkg/sasl"
 	"github.com/twmb/franz-go/pkg/sasl/kerberos"
+	"github.com/twmb/franz-go/pkg/sasl/oauth"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 	"go.uber.org/zap"
@@ -107,6 +109,18 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 				PersistAfterAuth: true,
 			}.AsMechanism()
 			opts = append(opts, kgo.SASL(kerberosMechanism))
+		}
+
+		// OAuthBearer
+		if cfg.SASL.Mechanism == "OAUTHBEARER" {
+			mechanism := oauth.Oauth(func(ctx context.Context) (oauth.Auth, error) {
+				token, err := cfg.SASL.OAuthBearer.getToken(ctx)
+				return oauth.Auth{
+					Zid:   cfg.SASL.OAuthBearer.ClientID,
+					Token: token,
+				}, err
+			})
+			opts = append(opts, kgo.SASL(mechanism))
 		}
 	}
 
