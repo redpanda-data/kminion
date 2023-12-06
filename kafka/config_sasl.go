@@ -18,7 +18,8 @@ type SASLConfig struct {
 	Mechanism string `koanf:"mechanism"`
 
 	// SASL Mechanisms that require more configuration than username & password
-	GSSAPI SASLGSSAPIConfig `koanf:"gssapi"`
+	GSSAPI      SASLGSSAPIConfig  `koanf:"gssapi"`
+	OAuthBearer OAuthBearerConfig `koanf:"oauth"`
 }
 
 // SetDefaults for SASL Config
@@ -38,7 +39,7 @@ func (c *SASLConfig) Validate() error {
 	case SASLMechanismPlain, SASLMechanismScramSHA256, SASLMechanismScramSHA512, SASLMechanismGSSAPI:
 		// Valid and supported
 	case SASLMechanismOAuthBearer:
-		return fmt.Errorf("sasl mechanism '%v' is valid but not yet supported. Please submit an issue if you need it", c.Mechanism)
+		return c.OAuthBearer.Validate()
 	default:
 		return fmt.Errorf("given sasl mechanism '%v' is invalid", c.Mechanism)
 	}

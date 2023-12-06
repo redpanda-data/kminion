@@ -46,7 +46,7 @@ kafka:
     username: ""
     # Password to use for PLAIN or SCRAM mechanism
     password: ""
-    # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
+    # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI, OAUTHBEARER
     mechanism: "PLAIN"
     # GSSAPI / Kerberos config properties
     gssapi:
@@ -58,6 +58,12 @@ kafka:
       password: ""
       realm: ""
       enableFast: true
+    # OAUTHBEARER config properties
+    oauth:
+      tokenEndpoint: ""
+      clientId: ""
+      clientSecret: ""
+      scope: ""
 
 minion:
   consumerGroups:
