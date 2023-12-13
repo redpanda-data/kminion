@@ -61,7 +61,10 @@ func newConfig(logger *zap.Logger) (Config, error) {
 	if configFilepath == "" {
 		logger.Info("the env variable '" + envKey + "' is not set, therefore no YAML config will be loaded")
 	} else {
-		err := k.Load(file.Provider(configFilepath), yaml.Parser())
+		err := k.Load(file.Provider(configFilepath), yaml.Parser(), koanf.WithMergeFunc(func(src, dest map[string]interface{}) error {
+			dest = src
+			return nil
+		}))
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to parse YAML config: %w", err)
 		}
