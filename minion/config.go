@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	ClusterInfo    ClusterInfoConfig   `koanf:"clusterInfo"`
+	BrokerInfo     BrokerInfoConfig    `koanf:"brokerInfo"`
 	ConsumerGroups ConsumerGroupConfig `koanf:"consumerGroups"`
 	Topics         TopicConfig         `koanf:"topics"`
 	LogDirs        LogDirsConfig       `koanf:"logDirs"`
@@ -21,7 +23,17 @@ func (c *Config) SetDefaults() {
 }
 
 func (c *Config) Validate() error {
-	err := c.ConsumerGroups.Validate()
+	err := c.ClusterInfo.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to cluster info config: %w", err)
+	}
+
+	err = c.BrokerInfo.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to broker info config: %w", err)
+	}
+
+	err = c.ConsumerGroups.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to consumer group config: %w", err)
 	}

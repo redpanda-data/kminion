@@ -2,12 +2,17 @@ package prometheus
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"strconv"
 )
 
 func (e *Exporter) collectClusterInfo(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	if !e.minionSvc.Cfg.ClusterInfo.Enabled {
+		return true
+	}
+
 	version, err := e.minionSvc.GetClusterVersion(ctx)
 	if err != nil {
 		e.logger.Error("failed to get kafka cluster version", zap.Error(err))

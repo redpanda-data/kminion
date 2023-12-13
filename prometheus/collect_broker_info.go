@@ -2,12 +2,17 @@ package prometheus
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"strconv"
 )
 
 func (e *Exporter) collectBrokerInfo(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	if !e.minionSvc.Cfg.BrokerInfo.Enabled {
+		return true
+	}
+
 	metadata, err := e.minionSvc.GetMetadataCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to get kafka metadata", zap.Error(err))

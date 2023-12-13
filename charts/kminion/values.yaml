@@ -223,6 +223,12 @@ kminion:
 #      retryInitConnection: false
 #
 #    minion:
+#      clusterInfo:
+#        # Enabled specifies whether cluster information shall be scraped and exported or not.
+#        enabled: true
+#      brokerInfo:
+#        # Enabled specifies whether broker information shall be scraped and exported or not.
+#        enabled: true
 #      consumerGroups:
 #        # Enabled specifies whether consumer groups shall be scraped and exported or not.
 #        enabled: true
@@ -241,6 +247,8 @@ kminion:
 #        # take precedence over allowed groups.
 #        ignoredGroups: [ ]
 #      topics:
+#        # Enabled specifies whether topics shall be scraped and exported or not.
+#        enabled: true
 #        # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
 #        # you aren't interested in per partition metrics you could choose "topic".
 #        granularity: partition
