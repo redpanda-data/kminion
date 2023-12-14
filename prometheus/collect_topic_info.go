@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"fmt"
 	"context"
 	"strconv"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	var retentionBytesValue float64
 	metadata, err := e.minionSvc.GetMetadataCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to get metadata", zap.Error(err))
@@ -65,19 +67,50 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 			// It should never be possible to skip this, but just to be safe we'll check this so that we don't cause panics
 			replicationFactor = len(topic.Partitions[0].Replicas)
 		}
-
 		var labelsValues []string
 		labelsValues = append(labelsValues, topicName)
 		labelsValues = append(labelsValues, strconv.Itoa(partitionCount))
 		labelsValues = append(labelsValues, strconv.Itoa(replicationFactor))
 		for _, key := range e.minionSvc.Cfg.Topics.InfoMetric.ConfigKeys {
 			labelsValues = append(labelsValues, getOrDefault(configsByTopic[topicName], key, "N/A"))
+			for k, v := range configsByTopic[topicName] {
+                if k == "retention.bytes" {
+                    // Convert string to float64
+                    var err error
+                    retentionBytesValue, err = strconv.ParseFloat(v, 64)
+                    if err != nil {
+                        e.logger.Error("Error converting string to float64:", zap.Error(err))
+                        // Handle the error as needed, e.g., log it or return from the function
+                        return false
+                    }
+
+                    // Convert float64 to string for logging
+                    retentionBytesStr := fmt.Sprintf("%f", retentionBytesValue)
+
+                    // Log the float64 value as a string
+                    e.logger.Debug("Converted float64:", zap.String("retentionBytesValue", retentionBytesStr))
+                }
+            }
+
 		}
 		ch <- prometheus.MustNewConstMetric(
 			e.topicInfo,
 			prometheus.GaugeValue,
 			float64(1),
 			labelsValues...,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			e.topicRetentionBytes,
+			prometheus.GaugeValue,
+			float64(retentionBytesValue),
+			topicName,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			e.topicPartitions,
+			prometheus.GaugeValue,
+			float64(partitionCount),
+			topicName,
 		)
 	}
 	return isOk

@@ -37,6 +37,8 @@ type Exporter struct {
 	partitionHighWaterMark *prometheus.Desc
 	topicLowWaterMarkSum   *prometheus.Desc
 	partitionLowWaterMark  *prometheus.Desc
+	topicRetentionBytes    *prometheus.Desc
+	topicPartitions        *prometheus.Desc
 
 	// Consumer Groups
 	consumerGroupInfo                    *prometheus.Desc
@@ -207,6 +209,21 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"group_id"},
 		nil,
 	)
+    	// Retention bytes
+	e.topicRetentionBytes = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_retention_bytes"),
+		"Retention bytes for a given topic",
+		[]string{"topic_name"},
+		nil,
+	)
+	// Partitions
+	e.topicPartitions = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partitions"),
+		"Number of partitions for a given topic",
+		[]string{"topic_name"},
+		nil,
+	)
+
 
 }
 

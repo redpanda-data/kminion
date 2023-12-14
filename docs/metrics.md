@@ -62,6 +62,14 @@ kminion_kafka_topic_partition_high_water_mark{partition_id="0",topic_name="__con
 # HELP kminion_kafka_topic_high_water_mark_sum Sum of all the topic's partition high water marks
 # TYPE kminion_kafka_topic_high_water_mark_sum gauge
 kminion_kafka_topic_high_water_mark_sum{topic_name="__consumer_offsets"} 1.512023846873e+12
+
+# HELP kminion_kafka_topic_retention_bytes Retention bytes for a given topic
+# TYPE kminion_kafka_topic_retention_bytes gauge
+kminion_kafka_topic_retention_bytes{topic_name="test1"} 2.68435456e+08
+
+# HELP kminion_kafka_topic_partitions Number of partitions for a given topic
+# TYPE kminion_kafka_topic_partitiond gauge
+kminion_kafka_topic_partitions{topic_name="test3"} 5
 ```
 
 ### Consumer Group Metrics
