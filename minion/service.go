@@ -27,10 +27,12 @@ type Service struct {
 	cache        map[string]interface{}
 	cacheLock    sync.RWMutex
 
-	AllowedGroupIDsExpr []*regexp.Regexp
-	IgnoredGroupIDsExpr []*regexp.Regexp
-	AllowedTopicsExpr   []*regexp.Regexp
-	IgnoredTopicsExpr   []*regexp.Regexp
+	AllowedGroupIDsExpr      []*regexp.Regexp
+	IgnoredGroupIDsExpr      []*regexp.Regexp
+	AllowedTopicsExpr        []*regexp.Regexp
+	IgnoredTopicsExpr        []*regexp.Regexp
+	AllowedlogDirsTopicsExpr []*regexp.Regexp
+	IgnoredlogDirsTopicsExpr []*regexp.Regexp
 
 	client  *kgo.Client
 	storage *Storage
@@ -67,6 +69,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 	ignoredGroupIDsExpr, _ := compileRegexes(cfg.ConsumerGroups.IgnoredGroupIDs)
 	allowedTopicsExpr, _ := compileRegexes(cfg.Topics.AllowedTopics)
 	ignoredTopicsExpr, _ := compileRegexes(cfg.Topics.IgnoredTopics)
+	allowedlogDirsTopicsExpr, _ := compileRegexes(cfg.LogDirs.AllowedTopics)
+	ignoredlogDirsTopicsExpr, _ := compileRegexes(cfg.LogDirs.IgnoredTopics)
 
 	service := &Service{
 		Cfg:    cfg,
@@ -80,6 +84,8 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 		IgnoredGroupIDsExpr: ignoredGroupIDsExpr,
 		AllowedTopicsExpr:   allowedTopicsExpr,
 		IgnoredTopicsExpr:   ignoredTopicsExpr,
+		AllowedlogDirsTopicsExpr: allowedlogDirsTopicsExpr,
+		IgnoredlogDirsTopicsExpr: ignoredlogDirsTopicsExpr,
 
 		client:  client,
 		storage: storage,

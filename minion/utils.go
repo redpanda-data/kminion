@@ -42,6 +42,24 @@ func (s *Service) IsTopicAllowed(topicName string) bool {
 	return isAllowed
 }
 
+func (s *Service) IsLOgDirsTopicAllowed(topicName string) bool {
+	isAllowed := false
+	for _, regex := range s.AllowedlogDirsTopicsExpr {
+		if regex.MatchString(topicName) {
+			isAllowed = true
+			break
+		}
+	}
+
+	for _, regex := range s.IgnoredlogDirsTopicsExpr {
+		if regex.MatchString(topicName) {
+			isAllowed = false
+			break
+		}
+	}
+	return isAllowed
+}
+
 func compileRegex(expr string) (*regexp.Regexp, error) {
 	if strings.HasPrefix(expr, "/") && strings.HasSuffix(expr, "/") {
 		substr := expr[1 : len(expr)-1]
