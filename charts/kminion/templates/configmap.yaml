@@ -7,4 +7,4 @@ metadata:
     {{- include "kminion.labels" . | nindent 4}}
 data:
   config.yaml: |
-    {{- toYaml .Values.kminion.config | nindent 4}}
+    {{- tpl (toYaml .Values.kminion.config) $ | nindent 4 }}
