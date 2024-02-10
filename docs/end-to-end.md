@@ -77,17 +77,24 @@ The end-to-end monitoring feature exports the following metrics.
 | Name | Description |
 | --- | --- |
 | `kminion_end_to_end_messages_produced_total ` | Messages KMinion *tried* to send |
-| `kminion_end_to_end_messages_acked_total ` | Messages actually sent and acknowledged by the cluster |
 | `kminion_end_to_end_messages_received_total ` | Number of messages received (only counts those that match, i.e. that this instance actually produced itself) |
-| `kminion_end_to_end_commits_total` | Number of successful offset commits |
+| `kminion_end_to_end_offset_commits_total` | Number of successful offset commits |
+| `kminion_end_to_end_messages_lost_total` Number of messages that have been produced successfully but not received within the configured SLA duration |
+| `kminion_end_to_end_messages_produced_failed_total` Number of messages failed to produce to Kafka because of a timeout or failure |
+| `kminion_end_to_end_offset_commits_total` Counts how many times kminions end-to-end test has committed offsets |
 
 ### Histograms
 
 | Name | Description |
 | --- | --- |
 | `kminion_end_to_end_produce_latency_seconds ` | Duration until the cluster acknowledged a message.  |
-| `kminion_end_to_end_commit_latency_seconds` | Duration of offset commits. Has a label for coordinator brokerID that answered the commit request |
+| `kminion_end_to_end_offset_commit_latency_seconds` Time kafka took to respond to kminion's offset commit |
 | `kminion_end_to_end_roundtrip_latency_seconds ` | Duration from creation of a message, until it was received/consumed again. |
+
+### Gauges
+| Name | Description |
+| --- | --- |
+| `kminion_end_to_end_messages_produced_in_flight` Number of messages that kminion's end-to-end test produced but has not received an answer for yet |
 
 ## Config Properties
 
@@ -100,7 +107,7 @@ All config properties related to this feature are located in `minion.endToEnd`.
     topicManagement:
       # You can disable topic management, without disabling the testing feature.
       # Only makes sense if you have multiple kminion instances, and for some reason only want one of them to create/configure the topic.
-      # It is strongly recommended to leave this enabled. 
+      # It is strongly recommended to leave this enabled.
       enabled: true
 
       # Name of the topic kminion uses to send its test messages
