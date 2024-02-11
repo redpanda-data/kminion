@@ -5,16 +5,17 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloudhut/kminion/v2/kafka"
-	"github.com/cloudhut/kminion/v2/logging"
-	"github.com/cloudhut/kminion/v2/minion"
-	"github.com/cloudhut/kminion/v2/prometheus"
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
+
+	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/cloudhut/kminion/v2/logging"
+	"github.com/cloudhut/kminion/v2/minion"
+	"github.com/cloudhut/kminion/v2/prometheus"
 )
 
 type Config struct {
