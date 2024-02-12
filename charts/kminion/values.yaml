@@ -23,6 +23,8 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+priorityClassName:
+
 podAnnotations: {}
 #  prometheus.io/scrape: "true"
 #  prometheus.io/port: "8080"
