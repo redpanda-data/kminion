@@ -262,6 +262,8 @@ kminion:
 #        # Enabled specifies whether log dirs shall be scraped and exported or not. This should be disabled for clusters prior
 #        # to version 1.0.0 as describing log dirs was not supported back then.
 #        enabled: true
+      endToEnd:
+        enabled: True
 #
 #    exporter:
 #      # Namespace is the prefix for all exported Prometheus metrics
