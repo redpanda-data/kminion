@@ -10,6 +10,10 @@ import (
 )
 
 func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	if !e.minionSvc.Cfg.Topics.Enabled {
+		return true
+	}
+
 	metadata, err := e.minionSvc.GetMetadataCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to get metadata", zap.Error(err))

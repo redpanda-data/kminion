@@ -10,6 +10,10 @@ import (
 )
 
 func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	if !e.minionSvc.Cfg.Topics.Enabled {
+		return true
+	}
+
 	isOk := true
 
 	// Low Watermarks
