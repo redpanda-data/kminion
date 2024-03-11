@@ -34,7 +34,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 	pID := strconv.Itoa(partition)
 	s.messagesProducedInFlight.WithLabelValues(pID).Inc()
 	s.messageTracker.addToTracker(msg)
-	s.client.Produce(childCtx, record, func(r *kgo.Record, err error) {
+	s.client.TryProduce(childCtx, record, func(r *kgo.Record, err error) {
 		defer cancel()
 		ackDuration := time.Since(startTime)
 		s.messagesProducedInFlight.WithLabelValues(pID).Dec()
@@ -45,7 +45,7 @@ func (s *Service) produceMessage(ctx context.Context, partition int) {
 
 		if err != nil {
 			s.messagesProducedFailed.WithLabelValues(pID).Inc()
-			s.messageTracker.removeFromTracker(msg.MessageID)
+			_ = s.messageTracker.removeFromTracker(msg.MessageID)
 
 			s.logger.Info("failed to produce message to end-to-end topic",
 				zap.String("topic_name", r.Topic),

@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudhut/kminion/v2/kafka"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
+
+	"github.com/cloudhut/kminion/v2/kafka"
 )
 
 type Service struct {
@@ -49,14 +50,18 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 	groupID := fmt.Sprintf("%v-%v", cfg.Consumer.GroupIdPrefix, minionID)
 
 	// Producer options
-	var kgoOpts []kgo.Opt
+	kgoOpts := []kgo.Opt{
+		kgo.ProduceRequestTimeout(3 * time.Second),
+		kgo.RecordRetries(3),
+		// We use the manual partitioner so that the records' partition id will be used as target partitio
+		kgo.RecordPartitioner(kgo.ManualPartitioner()),
+	}
 	if cfg.Producer.RequiredAcks == "all" {
 		kgoOpts = append(kgoOpts, kgo.RequiredAcks(kgo.AllISRAcks()))
 	} else {
 		kgoOpts = append(kgoOpts, kgo.RequiredAcks(kgo.LeaderAck()))
 		kgoOpts = append(kgoOpts, kgo.DisableIdempotentWrite())
 	}
-	kgoOpts = append(kgoOpts, kgo.ProduceRequestTimeout(3*time.Second))
 
 	// Consumer configs
 	kgoOpts = append(kgoOpts,
@@ -64,14 +69,12 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 		kgo.ConsumeTopics(cfg.TopicManagement.Name),
 		kgo.Balancers(kgo.CooperativeStickyBalancer()),
 		kgo.DisableAutoCommit(),
-		kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()))
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()),
+	)
 
 	// Prepare hooks
 	hooks := newEndToEndClientHooks(logger)
 	kgoOpts = append(kgoOpts, kgo.WithHooks(hooks))
-
-	// We use the manual partitioner so that the records' partition id will be used as target partition
-	kgoOpts = append(kgoOpts, kgo.RecordPartitioner(kgo.ManualPartitioner()))
 
 	// Create kafka service and check if client can successfully connect to Kafka cluster
 	logger.Info("connecting to Kafka seed brokers, trying to fetch cluster metadata",
@@ -163,26 +166,39 @@ func (s *Service) Start(ctx context.Context) error {
 	// finally start everything else (producing, consuming, continuous validation, consumer group tracking)
 	go s.startReconciliation(ctx)
 
-	// Start consumer and wait until we've received a response for the first poll which would indicate that the
-	// consumer is ready. Only if the consumer is ready we want to start the producer to ensure that we will not
-	// miss messages because the consumer wasn't ready.
-	initCh := make(chan bool)
+	// Start consumer and wait until we've received a response for the first poll
+	// which would indicate that the consumer is ready. Only if the consumer is
+	// ready we want to start the e2e producer to ensure that we will not miss
+	// messages because the consumer wasn't ready. However, if this initialization
+	// does not succeed within 30s we have to assume, that something is wrong on the
+	// consuming or producing side. KMinion is supposed to report these kind of
+	// issues and therefore this should not block KMinion from starting.
+	initCh := make(chan bool, 1)
 	s.logger.Info("initializing consumer and waiting until it has received the first record batch")
 	go s.startConsumeMessages(ctx, initCh)
 
 	// Produce an init message until the consumer received at least one fetch
 	initTicker := time.NewTicker(1 * time.Second)
 	isInitialized := false
-	// send first init message immediately
-	sendInitMessage(ctx, s.client, s.config.TopicManagement.Name)
+
+	// We send a first message immediately, but we'll keep sending more messages later
+	// since the consumers start at the latest offset and may have missed this message.
+	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	s.sendInitMessage(initCtx, s.client, s.config.TopicManagement.Name)
 
 	for !isInitialized {
 		select {
 		case <-initTicker.C:
-			sendInitMessage(ctx, s.client, s.config.TopicManagement.Name)
+			s.sendInitMessage(initCtx, s.client, s.config.TopicManagement.Name)
 		case <-initCh:
 			isInitialized = true
 			s.logger.Info("consumer has been successfully initialized")
+		case <-initCtx.Done():
+			// At this point we just assume the consumers are running fine.
+			// The entire cluster may be down or producing fails.
+			s.logger.Warn("initializing the consumers timed out, proceeding with the startup")
+			isInitialized = true
 		case <-ctx.Done():
 			return nil
 		}
@@ -198,12 +214,17 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 
-func sendInitMessage(ctx context.Context, client *kgo.Client, topicName string) {
-	client.Produce(ctx, &kgo.Record{
-		Key:   []byte("init-message"),
-		Value: nil,
-		Topic: topicName,
-	}, nil)
+func (s *Service) sendInitMessage(ctx context.Context, client *kgo.Client, topicName string) {
+	// Try to produce one record into each partition. This is important because
+	// one or more partitions may be offline, while others may still be writable.
+	for i := 0; i < s.partitionCount; i++ {
+		client.TryProduce(ctx, &kgo.Record{
+			Key:       []byte("init-message"),
+			Value:     nil,
+			Topic:     topicName,
+			Partition: int32(i),
+		}, nil)
+	}
 }
 
 func (s *Service) startReconciliation(ctx context.Context) {

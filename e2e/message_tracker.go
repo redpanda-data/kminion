@@ -129,7 +129,7 @@ func (t *messageTracker) onMessageExpired(_ string, reason ttlcache.EvictionReas
 	age := time.Since(created)
 	t.svc.lostMessages.WithLabelValues(strconv.Itoa(msg.partition)).Inc()
 
-	t.logger.Info("message expired/lost",
+	t.logger.Debug("message expired/lost",
 		zap.Int64("age_ms", age.Milliseconds()),
 		zap.Int("partition", msg.partition),
 		zap.String("message_id", msg.MessageID),
