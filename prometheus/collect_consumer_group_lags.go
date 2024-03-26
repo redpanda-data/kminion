@@ -86,7 +86,7 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 				}
 				ch <- prometheus.MustNewConstMetric(
 					e.consumerGroupTopicPartitionOffset,
-					prometheus.CounterValue,
+					prometheus.GaugeValue,
 					float64(partition.Value.Offset),
 					groupName,
 					topicName,
@@ -186,7 +186,7 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 				}
 				ch <- prometheus.MustNewConstMetric(
 					e.consumerGroupTopicPartitionOffset,
-					prometheus.CounterValue,
+					prometheus.GaugeValue,
 					float64(partition.Offset),
 					groupName,
 					topic.Topic,

@@ -96,7 +96,7 @@ kminion_kafka_consumer_group_topic_offset_sum{group_id="bigquery-sink",topic_nam
 kminion_kafka_consumer_group_topic_partition_lag{group_id="bigquery-sink",partition_id="10",topic_name="shop-activity"} 147481
 
 # HELP kminion_kafka_consumer_group_topic_partition_offset The committed offset of a consumer group for a given partition
-# TYPE kminion_kafka_consumer_group_topic_partition_offset counter
+# TYPE kminion_kafka_consumer_group_topic_partition_offset gauge
 kminion_kafka_consumer_group_topic_partition_offset{group_id="bigquery-sink",partition_id="10",topic_name="shop-activity"} 427
 
 # HELP kminion_kafka_consumer_group_topic_lag The number of messages a consumer group is lagging behind across all partitions in a topic
