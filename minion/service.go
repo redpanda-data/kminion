@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudhut/kminion/v2/kafka"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/cloudhut/kminion/v2/kafka"
 )
 
 type Service struct {
@@ -47,7 +48,7 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 	kgoOpts := []kgo.Opt{
 		kgo.WithHooks(minionHooks),
 	}
-	if cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
+	if cfg.ConsumerGroups.Enabled && cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
 		kgoOpts = append(kgoOpts,
 			kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 			kgo.ConsumeTopics("__consumer_offsets"))
@@ -94,7 +95,7 @@ func (s *Service) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to check feature compatibility against Kafka: %w", err)
 	}
 
-	if s.Cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
+	if s.Cfg.ConsumerGroups.Enabled && s.Cfg.ConsumerGroups.ScrapeMode == ConsumerGroupScrapeModeOffsetsTopic {
 		go s.startConsumingOffsets(ctx)
 	}
 
