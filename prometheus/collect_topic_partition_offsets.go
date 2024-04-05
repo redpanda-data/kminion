@@ -2,14 +2,20 @@ package prometheus
 
 import (
 	"context"
-	"github.com/cloudhut/kminion/v2/minion"
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
-	"strconv"
+
+	"github.com/cloudhut/kminion/v2/minion"
 )
 
 func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	if !e.minionSvc.Cfg.Topics.Enabled {
+		return true
+	}
+
 	isOk := true
 
 	// Low Watermarks

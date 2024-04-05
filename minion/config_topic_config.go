@@ -10,6 +10,9 @@ const (
 )
 
 type TopicConfig struct {
+	// Enabled can be set to false in order to not collect any topic metrics at all.
+	Enabled bool `koanf:"enabled"`
+
 	// Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
 	// you aren't interested in per partition metrics you could choose "topic".
 	Granularity string `koanf:"granularity"`
@@ -60,6 +63,7 @@ func (c *TopicConfig) Validate() error {
 
 // SetDefaults for topic config
 func (c *TopicConfig) SetDefaults() {
+	c.Enabled = true
 	c.Granularity = TopicGranularityPartition
 	c.AllowedTopics = []string{"/.*/"}
 	c.InfoMetric = InfoMetricConfig{ConfigKeys: []string{"cleanup.policy"}}

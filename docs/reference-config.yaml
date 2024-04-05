@@ -90,6 +90,8 @@ minion:
     # take precedence over allowed groups.
     ignoredGroups: [ ]
   topics:
+    # Enabled can be set to false in order to disable collecting any topic metrics.
+    enabled: true
     # Granularity can be per topic or per partition. If you want to reduce the number of exported metric series and
     # you aren't interested in per partition metrics you could choose "topic".
     granularity: partition
