@@ -130,6 +130,7 @@ func (s *Service) calculatePartitionReassignments(meta *kmsg.MetadataResponse) (
 	// We want to ensure that each brokerID leads at least one partition permanently. Hence let's iterate over brokers.
 	preferredLeaderPartitionsBrokerID := make(map[int32][]kmsg.MetadataResponseTopicPartition)
 	for _, broker := range brokerByID {
+		preferredLeaderPartitionsBrokerID[broker.NodeID] = make([]kmsg.MetadataResponseTopicPartition, 0)
 		for _, partition := range topicMeta.Partitions {
 			// PreferredLeader = BrokerID of the brokerID that is the desired leader. Regardless who the current leader is
 			preferredLeader := partition.Replicas[0]
