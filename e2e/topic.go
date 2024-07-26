@@ -68,6 +68,10 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		return fmt.Errorf("failed to create partitions: %w", err)
 	}
 
+	// after topic configuration is complete number of partitions must be equal to the number of brokers multiplied
+	// by the partitions per broker
+	s.partitionCount = len(meta.Brokers) * s.config.TopicManagement.PartitionsPerBroker
+
 	return nil
 }
 

@@ -155,14 +155,6 @@ func (s *Service) Start(ctx context.Context) error {
 		return fmt.Errorf("could not validate end-to-end topic: %w", err)
 	}
 
-	// Get up-to-date metadata and inform our custom partitioner about the partition count
-	topicMetadata, err := s.getTopicMetadata(ctx)
-	if err != nil {
-		return fmt.Errorf("could not get topic metadata after validation: %w", err)
-	}
-	partitions := len(topicMetadata.Topics[0].Partitions)
-	s.partitionCount = partitions
-
 	// finally start everything else (producing, consuming, continuous validation, consumer group tracking)
 	go s.startReconciliation(ctx)
 
