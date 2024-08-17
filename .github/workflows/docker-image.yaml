@@ -23,7 +23,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
         with:
-          driver-opts: image=moby/buildkit:v0.10.3,network=host
+          driver-opts: image=moby/buildkit:v0.15.2,network=host
       - name: Set build date
         run: |
           echo "BUILT_AT=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
