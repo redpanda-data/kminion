@@ -1,7 +1,7 @@
 ############################################################
 # Build image
 ############################################################
-FROM golang:1.22-alpine as builder
+FROM golang:1.22-alpine AS builder
 
 ARG VERSION
 ARG BUILT_AT
