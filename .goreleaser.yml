@@ -1,3 +1,5 @@
+---
+version: 2
 release:
   name_template: '{{.Version}} / {{time "2006-01-02"}}'
   prerelease: auto
@@ -9,7 +11,7 @@ release:
     docker pull redpandadata/kminion:{{ .Tag }}
     ```
 changelog:
-  skip: false
+  disable: false
   use: github
   filters:
     # Commit messages matching the regexp listed here will be removed from the changelog
@@ -20,7 +22,6 @@ changelog:
       - '^go.mod:'
       - '^.github:'
       - 'Merge branch'
-
 builds:
   - id: kminion
     binary: kminion
@@ -33,6 +34,5 @@ builds:
       - arm64
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.builtAt={{.Date}} -X main.commit={{.Commit}}
-
 checksum:
   name_template: 'checksums.txt'
