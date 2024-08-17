@@ -1,5 +1,5 @@
-name: "Code Scanning - Action"
-
+---
+name: codeql-analysis
 on:
   push:
     branches: [main]
@@ -16,29 +16,16 @@ on:
     #        │  │ │ │ │
     #        *  * * * *
     - cron: '30 1 * * 0'
-
 jobs:
-  CodeQL-Build:
-    # CodeQL runs on ubuntu-latest, windows-latest, and macos-latest
+  codeql:
     runs-on: ubuntu-latest
-
     permissions:
       # required for all workflows
       security-events: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      # Initializes the CodeQL tools for scanning.
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+      - uses: actions/checkout@v3
+      - uses: github/codeql-action/init@v2
         with:
           languages: go
-
-      # Autobuild attempts to build any compiled languages (C/C++, C#, or Java)
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+      - uses: github/codeql-action/autobuild@v2
+      - uses: github/codeql-action/analyze@v2
