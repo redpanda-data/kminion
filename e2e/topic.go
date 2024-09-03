@@ -75,14 +75,14 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 // The partition count must be updated after topic validation because the validation process may lead to the 
 // creation of new partitions. This can occur when new brokers are added to the cluster.
 func (s *Service) updatePartitionCount(ctx context.Context) error {
-	for {
-		timer := time.NewTimer(1 * time.Second)
-		defer timer.Stop()
+	retryTicker := time.NewTicker(1 * time.Second)
+	defer retryTicker.Stop()
 
+	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-timer.C:
+		case <-retryTicker.C:
 			meta, err := s.getTopicMetadata(ctx)
 			if err != nil {
 				return fmt.Errorf("could not get topic metadata while updating partition count: %w", err)
