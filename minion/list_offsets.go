@@ -63,9 +63,6 @@ func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListO
 	req.Topics = topicReqs
 
 	res, err := req.RequestWith(ctx, s.client)
-	if err != nil {
-		return res, err
-	}
 
 	// Log inner errors before returning them. We do that inside of this function to avoid duplicate logging as the response
 	// are cached for each scrape anyways.
