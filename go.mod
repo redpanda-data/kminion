@@ -43,6 +43,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/twmb/franz-go/pkg/kadm v1.14.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/net v0.30.0 // indirect

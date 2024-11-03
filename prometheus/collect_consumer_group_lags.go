@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
-	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
 
 	"github.com/cloudhut/kminion/v2/minion"
@@ -211,61 +211,49 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 	return isOk
 }
 
-func (e *Exporter) waterMarksByTopic(lowMarks *kmsg.ListOffsetsResponse, highMarks *kmsg.ListOffsetsResponse) map[string]map[int32]waterMark {
+func (e *Exporter) waterMarksByTopic(lowMarks kadm.ListedOffsets, highMarks kadm.ListedOffsets) map[string]map[int32]waterMark {
 	type partitionID = int32
 	type topicName = string
 	waterMarks := make(map[topicName]map[partitionID]waterMark)
 
-	for _, topic := range lowMarks.Topics {
-		_, exists := waterMarks[topic.Topic]
+	for topic, lowMarksByPartitionID := range lowMarks {
+		_, exists := waterMarks[topic]
 		if !exists {
-			waterMarks[topic.Topic] = make(map[partitionID]waterMark)
+			waterMarks[topic] = make(map[partitionID]waterMark)
 		}
-		for _, partition := range topic.Partitions {
-			err := kerr.ErrorForCode(partition.ErrorCode)
-			if err != nil {
-				e.logger.Debug("failed to get partition low water mark, inner kafka error",
-					zap.String("topic_name", topic.Topic),
-					zap.Int32("partition_id", partition.Partition),
-					zap.Error(err))
-				continue
-			}
-			waterMarks[topic.Topic][partition.Partition] = waterMark{
-				TopicName:     topic.Topic,
-				PartitionID:   partition.Partition,
-				LowWaterMark:  partition.Offset,
-				HighWaterMark: -1,
-			}
-		}
-	}
 
-	for _, topic := range highMarks.Topics {
-		mark, exists := waterMarks[topic.Topic]
-		if !exists {
-			e.logger.Error("got high water marks for a topic but no low watermarks", zap.String("topic_name", topic.Topic))
-			delete(waterMarks, topic.Topic)
-			continue
-		}
-		for _, partition := range topic.Partitions {
-			err := kerr.ErrorForCode(partition.ErrorCode)
-			if err != nil {
-				e.logger.Debug("failed to get partition high water mark, inner kafka error",
-					zap.String("topic_name", topic.Topic),
-					zap.Int32("partition_id", partition.Partition),
-					zap.Error(err))
+		for _, lowOffset := range lowMarksByPartitionID {
+			if lowOffset.Err != nil {
+				e.logger.Debug("failed to get partition low water mark, inner kafka error",
+					zap.String("topic_name", lowOffset.Topic),
+					zap.Int32("partition_id", lowOffset.Partition),
+					zap.Error(lowOffset.Err))
 				continue
 			}
-			partitionMark, exists := mark[partition.Partition]
+
+			higOffset, exists := highMarks.Lookup(lowOffset.Topic, lowOffset.Partition)
 			if !exists {
-				e.logger.Error("got high water marks for a topic's partition but no low watermarks",
-					zap.String("topic_name", topic.Topic),
-					zap.Int32("partition_id", partition.Partition),
-					zap.Int64("offset", partition.Offset))
-				delete(waterMarks, topic.Topic)
+				e.logger.Error("got low water marks for a topic's partition but no high watermarks",
+					zap.String("topic_name", lowOffset.Topic),
+					zap.Int32("partition_id", lowOffset.Partition),
+					zap.Int64("offset", lowOffset.Offset))
+				delete(waterMarks, lowOffset.Topic)
 				break // Topic watermarks are invalid -> delete & skip this topic
 			}
-			partitionMark.HighWaterMark = partition.Offset
-			waterMarks[topic.Topic][partition.Partition] = partitionMark
+			if higOffset.Err != nil {
+				e.logger.Debug("failed to get partition low water mark, inner kafka error",
+					zap.String("topic_name", lowOffset.Topic),
+					zap.Int32("partition_id", lowOffset.Partition),
+					zap.Error(lowOffset.Err))
+				continue
+			}
+
+			waterMarks[lowOffset.Topic][lowOffset.Partition] = waterMark{
+				TopicName:     lowOffset.Topic,
+				PartitionID:   lowOffset.Partition,
+				LowWaterMark:  lowOffset.Offset,
+				HighWaterMark: higOffset.Offset,
+			}
 		}
 	}
 

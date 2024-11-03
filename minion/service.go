@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"github.com/twmb/franz-go/pkg/kversion"
@@ -33,8 +34,9 @@ type Service struct {
 	AllowedTopicsExpr   []*regexp.Regexp
 	IgnoredTopicsExpr   []*regexp.Regexp
 
-	client  *kgo.Client
-	storage *Storage
+	client    *kgo.Client
+	admClient *kadm.Client
+	storage   *Storage
 }
 
 func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metricsNamespace string, ctx context.Context) (*Service, error) {
@@ -82,7 +84,9 @@ func NewService(cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, metrics
 		AllowedTopicsExpr:   allowedTopicsExpr,
 		IgnoredTopicsExpr:   ignoredTopicsExpr,
 
-		client:  client,
+		client:    client,
+		admClient: kadm.NewClient(client),
+
 		storage: storage,
 	}
 
