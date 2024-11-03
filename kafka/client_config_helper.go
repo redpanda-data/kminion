@@ -34,6 +34,9 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 		kgo.ClientID(cfg.ClientID),
 		kgo.FetchMaxBytes(5 * 1000 * 1000), // 5MB
 		kgo.MaxConcurrentFetches(10),
+		// Limit metadata age to mitigate issues with unknown partition/topic
+		// requests shortly after the creation or changing the partitions.
+		kgo.MetadataMaxAge(time.Second),
 	}
 
 	// Create Logger
