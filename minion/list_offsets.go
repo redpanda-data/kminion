@@ -2,21 +2,21 @@ package minion
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/twmb/franz-go/pkg/kerr"
-	"go.uber.org/zap"
 	"strconv"
 	"time"
 
-	"github.com/twmb/franz-go/pkg/kmsg"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"go.uber.org/zap"
 )
 
-func (s *Service) ListOffsetsCached(ctx context.Context, timestamp int64) (*kmsg.ListOffsetsResponse, error) {
+func (s *Service) ListOffsetsCached(ctx context.Context, timestamp int64) (kadm.ListedOffsets, error) {
 	reqId := ctx.Value("requestId").(string)
 	key := "partition-offsets-" + strconv.Itoa(int(timestamp)) + "-" + reqId
 
 	if cachedRes, exists := s.getCachedItem(key); exists {
-		return cachedRes.(*kmsg.ListOffsetsResponse), nil
+		return cachedRes.(kadm.ListedOffsets), nil
 	}
 
 	res, err, _ := s.requestGroup.Do(key, func() (interface{}, error) {
@@ -33,38 +33,27 @@ func (s *Service) ListOffsetsCached(ctx context.Context, timestamp int64) (*kmsg
 		return nil, err
 	}
 
-	return res.(*kmsg.ListOffsetsResponse), nil
+	return res.(kadm.ListedOffsets), nil
 }
 
 // ListOffsets fetches the low (timestamp: -2) or high water mark (timestamp: -1) for all topic partitions
-func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListOffsetsResponse, error) {
-	metadata, err := s.GetMetadataCached(ctx)
+func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (kadm.ListedOffsets, error) {
+	listedOffsets, err := s.admClient.ListEndOffsets(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list consumer groups: %w", err)
-	}
-
-	topicReqs := make([]kmsg.ListOffsetsRequestTopic, len(metadata.Topics))
-	for i, topic := range metadata.Topics {
-		req := kmsg.NewListOffsetsRequestTopic()
-		req.Topic = *topic.Topic
-
-		partitionReqs := make([]kmsg.ListOffsetsRequestTopicPartition, len(topic.Partitions))
-		for j, partition := range topic.Partitions {
-			partitionReqs[j] = kmsg.NewListOffsetsRequestTopicPartition()
-			partitionReqs[j].Partition = partition.Partition
-			partitionReqs[j].Timestamp = timestamp
+		var se *kadm.ShardErrors
+		if !errors.As(err, &se) {
+			return nil, fmt.Errorf("failed to list offsets: %w", err)
 		}
-		req.Partitions = partitionReqs
 
-		topicReqs[i] = req
-	}
-
-	req := kmsg.NewListOffsetsRequest()
-	req.Topics = topicReqs
-
-	res, err := req.RequestWith(ctx, s.client)
-	if err != nil {
-		return res, err
+		if se.AllFailed {
+			return nil, fmt.Errorf("failed to list offsets, all shard responses failed: %w", err)
+		}
+		s.logger.Info("failed to list offset from some shards", zap.Int("failed_shards", len(se.Errs)))
+		for _, shardErr := range se.Errs {
+			s.logger.Warn("shard error for listing end offsets",
+				zap.Int32("broker_id", shardErr.Broker.NodeID),
+				zap.Error(shardErr.Err))
+		}
 	}
 
 	// Log inner errors before returning them. We do that inside of this function to avoid duplicate logging as the response
@@ -72,25 +61,21 @@ func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListO
 	//
 	// Create two metrics to aggregate error logs in few messages. Logging one message per occured partition error
 	// is too much. Typical errors are LEADER_NOT_AVAILABLE etc.
-	errorCountByErrCode := make(map[int16]int)
+	errorCountByErrCode := make(map[error]int)
 	errorCountByTopic := make(map[string]int)
 
 	// Iterate on all partitions
-	for _, topic := range res.Topics {
-		for _, partition := range topic.Partitions {
-			err := kerr.TypedErrorForCode(partition.ErrorCode)
-			if err != nil {
-				errorCountByErrCode[partition.ErrorCode]++
-				errorCountByTopic[topic.Topic]++
-			}
+	listedOffsets.Each(func(offset kadm.ListedOffset) {
+		if offset.Err != nil {
+			errorCountByTopic[offset.Topic]++
+			errorCountByErrCode[offset.Err]++
 		}
-	}
+	})
 
 	// Print log line for each error type
-	for errCode, count := range errorCountByErrCode {
-		typedErr := kerr.TypedErrorForCode(errCode)
+	for err, count := range errorCountByErrCode {
 		s.logger.Warn("failed to list some partitions watermarks",
-			zap.Error(typedErr),
+			zap.Error(err),
 			zap.Int("error_count", count))
 	}
 	if len(errorCountByTopic) > 0 {
@@ -98,5 +83,5 @@ func (s *Service) ListOffsets(ctx context.Context, timestamp int64) (*kmsg.ListO
 			zap.Int("topics_with_errors", len(errorCountByTopic)))
 	}
 
-	return res, nil
+	return listedOffsets, nil
 }

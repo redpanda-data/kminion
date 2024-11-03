@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
 
 	"github.com/cloudhut/kminion/v2/minion"
@@ -32,21 +31,21 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 	}
 
 	// Process Low Watermarks
-	for _, topic := range lowWaterMarks.Topics {
-		if !e.minionSvc.IsTopicAllowed(topic.Topic) {
+
+	for topicName, partitions := range lowWaterMarks {
+		if !e.minionSvc.IsTopicAllowed(topicName) {
 			continue
 		}
 
 		waterMarkSum := int64(0)
 		hasErrors := false
-		for _, partition := range topic.Partitions {
-			err := kerr.ErrorForCode(partition.ErrorCode)
-			if err != nil {
+		for _, offset := range partitions {
+			if offset.Err != nil {
 				hasErrors = true
 				isOk = false
 				continue
 			}
-			waterMarkSum += partition.Offset
+			waterMarkSum += offset.Offset
 			// Let's end here if partition metrics shall not be exposed
 			if e.minionSvc.Cfg.Topics.Granularity == minion.TopicGranularityTopic {
 				continue
@@ -54,9 +53,9 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 			ch <- prometheus.MustNewConstMetric(
 				e.partitionLowWaterMark,
 				prometheus.GaugeValue,
-				float64(partition.Offset),
-				topic.Topic,
-				strconv.Itoa(int(partition.Partition)),
+				float64(offset.Offset),
+				topicName,
+				strconv.Itoa(int(offset.Partition)),
 			)
 		}
 		// We only want to report the sum of all partition marks if we receive watermarks from all partition
@@ -65,25 +64,24 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 				e.topicLowWaterMarkSum,
 				prometheus.GaugeValue,
 				float64(waterMarkSum),
-				topic.Topic,
+				topicName,
 			)
 		}
 	}
 
-	for _, topic := range highWaterMarks.Topics {
-		if !e.minionSvc.IsTopicAllowed(topic.Topic) {
+	for topicName, partitions := range highWaterMarks {
+		if !e.minionSvc.IsTopicAllowed(topicName) {
 			continue
 		}
 		waterMarkSum := int64(0)
 		hasErrors := false
-		for _, partition := range topic.Partitions {
-			err := kerr.ErrorForCode(partition.ErrorCode)
-			if err != nil {
+		for _, offset := range partitions {
+			if offset.Err != nil {
 				hasErrors = true
 				isOk = false
 				continue
 			}
-			waterMarkSum += partition.Offset
+			waterMarkSum += offset.Offset
 			// Let's end here if partition metrics shall not be exposed
 			if e.minionSvc.Cfg.Topics.Granularity == minion.TopicGranularityTopic {
 				continue
@@ -91,9 +89,9 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 			ch <- prometheus.MustNewConstMetric(
 				e.partitionHighWaterMark,
 				prometheus.GaugeValue,
-				float64(partition.Offset),
-				topic.Topic,
-				strconv.Itoa(int(partition.Partition)),
+				float64(offset.Offset),
+				topicName,
+				strconv.Itoa(int(offset.Partition)),
 			)
 		}
 		// We only want to report the sum of all partition marks if we receive watermarks from all partitions
@@ -102,7 +100,7 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 				e.topicHighWaterMarkSum,
 				prometheus.GaugeValue,
 				float64(waterMarkSum),
-				topic.Topic,
+				topicName,
 			)
 		}
 	}
