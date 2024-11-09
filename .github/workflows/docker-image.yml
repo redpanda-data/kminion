@@ -19,7 +19,7 @@ jobs:
       - uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
-            ,sdlc/prod/github/dockerhub_token
+            ,sdlc/prod/github/dockerhub
           parse-json-secrets: true
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -36,7 +36,6 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            vectorized/kminion
             redpandadata/kminion
           # generate Docker tags based on the following events/attributes
           # Semver type is only active on 'push tag' events,
@@ -46,7 +45,7 @@ jobs:
             type=semver,pattern={{raw}}
       - uses: docker/login-action@v3
         with:
-          username: vectorizedbot
+          username: ${{ env.DOCKERHUB_USER }}
           password: ${{ env.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
