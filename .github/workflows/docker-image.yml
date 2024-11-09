@@ -19,7 +19,7 @@ jobs:
       - uses: aws-actions/aws-secretsmanager-get-secrets@v2
         with:
           secret-ids: |
-            ,sdlc/prod/github/dockerhub_token
+            ,sdlc/prod/github/dockerhub
           parse-json-secrets: true
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
@@ -45,7 +45,7 @@ jobs:
             type=semver,pattern={{raw}}
       - uses: docker/login-action@v3
         with:
-          username: vectorizedbot
+          username: ${{ env.DOCKERHUB_USER }}
           password: ${{ env.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
