@@ -102,6 +102,8 @@ minion:
     # IgnoredTopics are regex strings of topic names that shall be ignored/skipped when exporting metrics. Ignored topics
     # take precedence over allowed topics.
     ignoredTopics: [ ]
+    # ListOffsets can be set to false in order to not collect any offset metrics at all.
+    ListOffsets: false
     # infoMetric is a configuration object for the kminion_kafka_topic_info metric
     infoMetric:
       # ConfigKeys are set of strings of Topic configs that you want to have exported as part of the metric
