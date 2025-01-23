@@ -33,7 +33,7 @@ docker pull redpandadata/kminion:latest
 
 ### ☸ Helm chart
 
-A Helm chart will be maintained as part of this repository under [/charts](/charts).
+A Helm chart will be maintained as part of Redpanda's [helm-charts](https://github.com/redpanda-data/helm-charts/tree/main/charts/kminion) repository.
 
 ### 🔧 Configuration
 
