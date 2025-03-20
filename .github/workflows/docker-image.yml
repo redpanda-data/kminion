@@ -37,6 +37,7 @@ jobs:
           # list of Docker images to use as base name for tags
           images: |
             redpandadata/kminion
+            public.ecr.aws/l9j0i2e0/kminion
           # generate Docker tags based on the following events/attributes
           # Semver type is only active on 'push tag' events,
           # hence no enable condition required
@@ -47,6 +48,13 @@ jobs:
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ env.DOCKERHUB_TOKEN }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ secrets.RP_AWS_CRED_ACCOUNT_ID }}:role/${{ vars.RP_AWS_CRED_BASE_ROLE_NAME }}${{ github.event.repository.name }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
       - uses: docker/build-push-action@v6
         with:
           provenance: false
