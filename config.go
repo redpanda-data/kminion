@@ -11,6 +11,7 @@ import (
 	"github.com/cloudhut/kminion/v2/prometheus"
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/mitchellh/mapstructure"
@@ -100,6 +101,23 @@ func newConfig(logger *zap.Logger) (Config, error) {
 	}), nil)
 	if err != nil {
 		return Config{}, err
+	}
+
+	// Lowercase the keys that are stored internally within Koanf and reload them. This is a workaround because
+	// internally keys are stored case sensitive. This causes the problem that environment variables can't match
+	// the exact key and therefore will not be unmarshalled as expected anymore. Example:
+	// YAML path: minion.endToEnd.enabled
+	// ENV path: MINION_ENDTOEND_ENABLED => minion.endtoend.enabled
+	// Internal key: minion.endToEnd.enabled
+	// See issue: https://github.com/redpanda-data/kminion/issues/179
+	keys := make(map[string]interface{}, len(k.Keys()))
+	for _, key := range k.Keys() {
+		keys[strings.ToLower(key)] = k.Get(key)
+	}
+	k.Delete("")
+	err = k.Load(confmap.Provider(keys, "."), nil)
+	if err != nil {
+		return Config{}, fmt.Errorf("failed to unmarshal confmap variables into config struct: %w", err)
 	}
 
 	err = k.Unmarshal("", &cfg)
