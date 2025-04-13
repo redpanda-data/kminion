@@ -123,7 +123,7 @@ func (s *Service) executeCreatePartitions(ctx context.Context, req *kmsg.CreateP
 	for _, topic := range res.Topics {
 		typedErr := kerr.TypedErrorForCode(topic.ErrorCode)
 		if typedErr != nil {
-			return fmt.Errorf("inner Kafka error: %w", err)
+			return fmt.Errorf("inner Kafka error: %w", typedErr)
 		}
 	}
 
@@ -397,7 +397,7 @@ func createTopicConfig(cfgTopic EndToEndTopicConfig) []kmsg.CreateTopicsRequestT
 	}
 
 	// Even though kminion's end-to-end feature actually does not require any
-	// real persistence beyond a few minutes; it might be good too keep messages
+	// real persistence beyond a few minutes; it might be good to keep messages
 	// around a bit for debugging.
 	return []kmsg.CreateTopicsRequestTopicConfig{
 		topicConfig("cleanup.policy", "delete"),

@@ -44,7 +44,7 @@ type Service struct {
 	offsetCommitLatency *prometheus.HistogramVec
 }
 
-// NewService creates a new instance of the e2e moinitoring service (wow)
+// NewService creates a new instance of the e2e monitoring service (wow)
 func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, promRegisterer prometheus.Registerer) (*Service, error) {
 	minionID := uuid.NewString()
 	groupID := fmt.Sprintf("%v-%v", cfg.Consumer.GroupIdPrefix, minionID)
@@ -53,7 +53,7 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 	kgoOpts := []kgo.Opt{
 		kgo.ProduceRequestTimeout(3 * time.Second),
 		kgo.RecordRetries(3),
-		// We use the manual partitioner so that the records' partition id will be used as target partitio
+		// We use the manual partitioner so that the records' partition id will be used as target partition
 		kgo.RecordPartitioner(kgo.ManualPartitioner()),
 	}
 	if cfg.Producer.RequiredAcks == "all" {
