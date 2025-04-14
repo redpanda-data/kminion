@@ -9,6 +9,10 @@ import (
 )
 
 func (e *Exporter) collectACLInfo(ctx context.Context, ch chan<- prometheus.Metric) bool {
+	if !e.minionSvc.Cfg.ACLs.Enabled {
+		return true
+	}
+
 	ACLRes, err := e.minionSvc.ListAllACLs(ctx)
 	if err != nil {
 		e.logger.Error("failed to fetch ACLs", zap.Error(err))
@@ -42,26 +46,7 @@ func (e *Exporter) collectACLInfo(ctx context.Context, ch chan<- prometheus.Metr
 func getResourceTypeName(ACLResponse *kmsg.DescribeACLsResponse) map[string]int {
 	ACLsByType := make(map[string]int)
 	for _, resource := range ACLResponse.Resources {
-		resourceType := "unknown"
-		switch resource.ResourceType {
-		case 0:
-			resourceType = "unknown"
-		case 1:
-			resourceType = "any"
-		case 2:
-			resourceType = "topic"
-		case 3:
-			resourceType = "group"
-		case 4:
-			resourceType = "cluster"
-		case 5:
-			resourceType = "transactional_id"
-		case 6:
-			resourceType = "delegation_token"
-		case 7:
-			resourceType = "user"
-		}
-
+		resourceType := resource.ResourceType.String()
 		ACLsByType[resourceType] += len(resource.ACLs)
 	}
 
