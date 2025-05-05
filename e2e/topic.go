@@ -121,9 +121,9 @@ func (s *Service) executeCreatePartitions(ctx context.Context, req *kmsg.CreateP
 	}
 
 	for _, topic := range res.Topics {
-		typedErr := kerr.TypedErrorForCode(topic.ErrorCode)
-		if typedErr != nil {
-			return fmt.Errorf("inner Kafka error: %w", typedErr)
+		err := kerr.ErrorForCode(topic.ErrorCode)
+		if err != nil {
+			return fmt.Errorf("inner Kafka error: %w", err)
 		}
 	}
 
