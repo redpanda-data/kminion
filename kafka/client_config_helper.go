@@ -107,6 +107,9 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 					kerbCfg,
 					client.DisablePAFXFAST(!cfg.SASL.GSSAPI.EnableFast))
 			}
+			if krbClient == nil {
+				return nil, fmt.Errorf("kafka.sasl.gssapi.authType must be one of USER_AUTH or KEYTAB_AUTH")
+			}
 			kerberosMechanism := kerberos.Auth{
 				Client:           krbClient,
 				Service:          cfg.SASL.GSSAPI.ServiceName,
