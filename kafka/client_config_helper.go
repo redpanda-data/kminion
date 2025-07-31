@@ -6,10 +6,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	saslaws "github.com/twmb/franz-go/pkg/sasl/aws"
 	"io/ioutil"
 	"net"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -125,6 +129,38 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 				}, err
 			})
 			opts = append(opts, kgo.SASL(mechanism))
+		}
+
+		// AWS MSK IAM
+		if cfg.SASL.Mechanism == SASLMechanismAWSMSKIAM {
+			mechanism := kgo.SASL(saslaws.ManagedStreamingIAM(func(ctx context.Context) (saslaws.Auth, error) {
+				var loadOptions []func(*config.LoadOptions) error
+
+				if cfg.SASL.AWS.RoleARN != "" {
+					loadOptions = append(loadOptions, config.WithAssumeRoleCredentialOptions(func(options *stscreds.AssumeRoleOptions) {
+						options.RoleARN = cfg.SASL.AWS.RoleARN
+						options.ExternalID = aws.String(cfg.SASL.AWS.ExternalID)
+						options.RoleSessionName = cfg.SASL.AWS.RoleSessionName
+					}))
+				}
+
+				awsConfig, err := config.LoadDefaultConfig(ctx, loadOptions...)
+				if err != nil {
+					return saslaws.Auth{}, err
+				}
+
+				credentials, err := awsConfig.Credentials.Retrieve(ctx)
+				if err != nil {
+					return saslaws.Auth{}, err
+				}
+
+				return saslaws.Auth{
+					AccessKey:    credentials.AccessKeyID,
+					SecretKey:    credentials.SecretAccessKey,
+					SessionToken: credentials.SessionToken,
+				}, nil
+			}))
+			opts = append(opts, mechanism)
 		}
 	}
 
