@@ -28,7 +28,7 @@ func (c *EndToEndTopicConfig) Validate() error {
 	}
 
 	if c.PartitionsPerBroker < 1 {
-		return fmt.Errorf("failed to parse partitionsPerBroker, it should be more than 1, retrieved value %v", c.ReplicationFactor)
+		return fmt.Errorf("failed to parse partitionsPerBroker, it should be more than 1, retrieved value %v", c.PartitionsPerBroker)
 	}
 
 	// If the timeduration is 0s or 0ms or its variation of zero, it will be parsed as 0
