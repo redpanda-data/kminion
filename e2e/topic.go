@@ -142,13 +142,13 @@ func (s *Service) executeAlterPartitionAssignments(ctx context.Context, req *kms
 
 	typedErr := kerr.TypedErrorForCode(res.ErrorCode)
 	if typedErr != nil {
-		return fmt.Errorf("inner Kafka error: %w", err)
+		return fmt.Errorf("inner Kafka error: %w", typedErr)
 	}
 	for _, topic := range res.Topics {
 		for _, partition := range topic.Partitions {
 			typedErr = kerr.TypedErrorForCode(partition.ErrorCode)
 			if typedErr != nil {
-				return fmt.Errorf("inner Kafka partition error on partition '%v': %w", partition.Partition, err)
+				return fmt.Errorf("inner Kafka partition error on partition '%v': %w", partition.Partition, typedErr)
 			}
 		}
 	}
