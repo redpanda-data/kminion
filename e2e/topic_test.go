@@ -1,10 +1,13 @@
 package e2e
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/twmb/franz-go/pkg/kmsg"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kmsg"
+	"go.uber.org/zap"
 )
 
 func TestCalculateAppropriateReplicas(t *testing.T) {
@@ -145,6 +148,93 @@ func TestCalculateAppropriateReplicas(t *testing.T) {
 			// Use first elementsmatch to print some valid result along with the actual results.
 			assert.ElementsMatch(t, test.ExpectedResults[0], replicaIDs, test.TestName)
 		}
+	}
+}
+
+func TestCalculatePartitionReassignments(t *testing.T) {
+	tt := []struct {
+		TestName             string
+		PartitionAssignments []int32
+
+		ExpectedReassignments *map[int32]int32
+		ExpectedAllocations   *[]int32
+	}{
+		{
+			TestName:             "there are partitions to reassign",
+			PartitionAssignments: []int32{0, 0, 1},
+			ExpectedReassignments: &map[int32]int32{
+				0: 2, // reassign one partitions from broker 0 to 2
+			},
+		},
+		{
+			TestName:             "no partitions to reassign",
+			PartitionAssignments: []int32{0, 1}, // only 2 partitions, need one more to cover all the brokers
+			ExpectedAllocations:  &[]int32{2},   // allocate one partition to broker 2
+		},
+	}
+
+	svc := Service{
+		logger: zap.NewNop(),
+		config: Config{
+			TopicManagement: EndToEndTopicConfig{
+				ReplicationFactor: 1,
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.TestName, func(t *testing.T) {
+			meta := kmsg.NewMetadataResponse()
+			meta.Brokers = []kmsg.MetadataResponseBroker{
+				{NodeID: 0},
+				{NodeID: 1},
+				{NodeID: 2},
+			}
+
+			var partitions []kmsg.MetadataResponseTopicPartition
+			for _, a := range tc.PartitionAssignments {
+				partitions = append(partitions, kmsg.MetadataResponseTopicPartition{
+					Replicas: []int32{a},
+				})
+			}
+
+			meta.Topics = []kmsg.MetadataResponseTopic{
+				{Partitions: partitions},
+			}
+
+			alterReq, createReq, err := svc.calculatePartitionReassignments(&meta)
+			require.NoError(t, err)
+
+			if tc.ExpectedReassignments == nil {
+				require.Nil(t, alterReq, "expected no reassignments but got some")
+			} else {
+				require.NotNil(t, alterReq, "expected reassignments, got nothing")
+
+				topic := alterReq.Topics[0]
+
+				actualReassignments := make(map[int32]int32)
+				for _, partition := range topic.Partitions {
+					actualReassignments[partition.Partition] = partition.Replicas[0]
+				}
+
+				assert.Equal(t, *tc.ExpectedReassignments, actualReassignments)
+			}
+
+			if tc.ExpectedAllocations == nil {
+				require.Nil(t, createReq, "expected no creations but got some")
+			} else {
+				require.NotNil(t, createReq, "expected creations, got nothing")
+
+				topic := createReq.Topics[0]
+
+				var actualAllocations []int32
+				for _, assignment := range topic.Assignment {
+					actualAllocations = append(actualAllocations, assignment.Replicas[0])
+				}
+
+				assert.ElementsMatch(t, *tc.ExpectedAllocations, actualAllocations)
+			}
+		})
 	}
 }
 
