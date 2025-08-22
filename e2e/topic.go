@@ -221,13 +221,14 @@ func (s *Service) calculatePartitionReassignments(meta *kmsg.MetadataResponse) (
 			partitionReassignments = append(partitionReassignments, req)
 
 			reassignablePartitions = reassignablePartitions[1:]
+		} else {
+			// Create a new partition for this broker
+			partitionCount++
+			assignmentReq := kmsg.NewCreatePartitionsRequestTopicAssignment()
+			assignmentReq.Replicas = s.calculateAppropriateReplicas(meta, desiredReplicationFactor, brokerByID[brokerID])
+			createPartitionAssignments = append(createPartitionAssignments, assignmentReq)
 		}
 
-		// Create a new partition for this broker
-		partitionCount++
-		assignmentReq := kmsg.NewCreatePartitionsRequestTopicAssignment()
-		assignmentReq.Replicas = s.calculateAppropriateReplicas(meta, desiredReplicationFactor, brokerByID[brokerID])
-		createPartitionAssignments = append(createPartitionAssignments, assignmentReq)
 	}
 
 	var reassignmentReq *kmsg.AlterPartitionAssignmentsRequest
