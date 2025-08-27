@@ -65,6 +65,14 @@ kafka:
       clientId: ""
       clientSecret: ""
       scope: ""
+    # AWS MSK IAM config properties
+    aws:
+      # If a role must be assumed. If unused, the current caller identity will be used.
+      roleArn: ""
+      # If the assume role policy (i.e. trust relationship) requires an external ID string.
+      externalId: ""
+      # If a specific session name is desired with the assumed role.
+      roleSessionName: ""
 
 minion:
   consumerGroups:

@@ -7,7 +7,7 @@ KMinion.
 ## 🚀 Features
 
 - **Kafka versions:** Supports all Kafka versions v0.11+
-- **Supported SASL mechanisms:** plain, scram-sha-256/512, gssapi/kerberos
+- **Supported SASL mechanisms:** plain, scram-sha-256/512, gssapi/kerberos, aws msk iam
 - **TLS support:** TLS is supported, regardless whether you need mTLS, a custom CA, encrypted keys or just the trusted
   root certs
 - **Consumer Group Lags:** Number of messages a consumer group is lagging behind the latest offset
