@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
+	"sort"
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -54,11 +54,28 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		if err = s.createManagementTopic(ctx, meta); err != nil {
 			return err
 		}
+
+		// Topic was just created with optimal assignments from the partition planner.
+		// We can skip the validation/planning phase since the topic already has the correct
+		// partition count and optimal replica assignments. We only need to update our
+		// internal partition count tracking for KMinion's e2e monitoring operations.
+		return s.updatePartitionCount(ctx)
 	}
 
-	alterReq, createReq, err := s.calculatePartitionReassignments(meta)
+	// Topic already exists - use partition planner to validate and potentially fix assignments
+	planner := NewPartitionPlanner(s.config.TopicManagement, s.logger)
+	plan, err := planner.Plan(meta)
 	if err != nil {
-		return fmt.Errorf("failed to calculate partition reassignments: %w", err)
+		return fmt.Errorf("failed to create partition plan: %w", err)
+	}
+
+	// Convert the plan to Kafka requests
+	topicName := pointerStrToStr(meta.Topics[0].Topic)
+	alterReq, createReq := plan.ToRequests(topicName)
+
+	// Log detailed operations only if there are changes planned
+	if len(plan.Reassignments) > 0 || len(plan.CreateAssignments) > 0 {
+		s.logPlannedOperations(meta, plan, topicName)
 	}
 
 	err = s.executeAlterPartitionAssignments(ctx, alterReq)
@@ -142,6 +159,7 @@ func (s *Service) executeAlterPartitionAssignments(ctx context.Context, req *kms
 
 	typedErr := kerr.TypedErrorForCode(res.ErrorCode)
 	if typedErr != nil {
+		s.logger.Error("alter partition assignments: failed to alter partition assignments", zap.Any("request_topics", req.Topics))
 		return fmt.Errorf("inner Kafka error: %w", typedErr)
 	}
 	for _, topic := range res.Topics {
@@ -156,165 +174,97 @@ func (s *Service) executeAlterPartitionAssignments(ctx context.Context, req *kms
 	return nil
 }
 
-func (s *Service) calculatePartitionReassignments(meta *kmsg.MetadataResponse) (*kmsg.AlterPartitionAssignmentsRequest, *kmsg.CreatePartitionsRequest, error) {
-	brokerByID := brokerMetadataByBrokerID(meta.Brokers)
+// logPlannedOperations logs detailed information about current state and planned changes
+func (s *Service) logPlannedOperations(meta *kmsg.MetadataResponse, plan *Plan, topicName string) {
 	topicMeta := meta.Topics[0]
-	desiredReplicationFactor := s.config.TopicManagement.ReplicationFactor
 
-	if desiredReplicationFactor > len(brokerByID) {
-		return nil, nil, fmt.Errorf("the desired replication factor of '%v' is larger than the available brokers "+
-			"('%v' brokers)", desiredReplicationFactor, len(brokerByID))
+	// Log current partition state
+	s.logger.Info("current partition assignments for e2e topic",
+		zap.String("topic", topicName),
+		zap.Int("current_partitions", len(topicMeta.Partitions)),
+		zap.Int("brokers_available", len(meta.Brokers)),
+	)
+
+	// Log each current partition assignment (sorted by partition ID)
+	sortedPartitions := make([]kmsg.MetadataResponseTopicPartition, len(topicMeta.Partitions))
+	copy(sortedPartitions, topicMeta.Partitions)
+	sort.Slice(sortedPartitions, func(i, j int) bool {
+		return sortedPartitions[i].Partition < sortedPartitions[j].Partition
+	})
+
+	for _, partition := range sortedPartitions {
+		s.logger.Info("current partition assignment",
+			zap.String("topic", topicName),
+			zap.Int32("partition", partition.Partition),
+			zap.Int32s("replicas", partition.Replicas),
+			zap.Int32("leader", partition.Leader),
+		)
 	}
 
-	// We want to ensure that each brokerID leads at least one partition permanently. Hence let's iterate over brokers.
-	preferredLeaderPartitionsBrokerID := make(map[int32][]kmsg.MetadataResponseTopicPartition)
-	for _, broker := range brokerByID {
-		preferredLeaderPartitionsBrokerID[broker.NodeID] = make([]kmsg.MetadataResponseTopicPartition, 0)
-		for _, partition := range topicMeta.Partitions {
-			// PreferredLeader = BrokerID of the brokerID that is the desired leader. Regardless who the current leader is
-			preferredLeader := partition.Replicas[0]
-			if broker.NodeID == preferredLeader {
-				preferredLeaderPartitionsBrokerID[broker.NodeID] = append(preferredLeaderPartitionsBrokerID[broker.NodeID], partition)
-			}
-		}
-	}
-
-	// Partitions that use the same brokerID more than once as preferred leader can be reassigned to other brokers
-	// We collect them to avoid creating new partitions when not needed.
-	reassignablePartitions := make([]kmsg.MetadataResponseTopicPartition, 0)
-	for _, partitions := range preferredLeaderPartitionsBrokerID {
-		if len(partitions) > 1 {
-			reassignablePartitions = append(reassignablePartitions, partitions[1:]...)
-			continue
-		}
-	}
-
-	// Now let's try to reassign (or create) new partitions for those brokers that are not the preferred leader for
-	// any partition.
-
-	partitionCount := len(topicMeta.Partitions)
-	partitionReassignments := make([]kmsg.AlterPartitionAssignmentsRequestTopicPartition, 0)
-	createPartitionAssignments := make([]kmsg.CreatePartitionsRequestTopicAssignment, 0)
-
-	for brokerID, partitions := range preferredLeaderPartitionsBrokerID {
-		// Add replicas if number of replicas is smaller than desiredReplicationFactor
-		for _, partition := range partitions {
-			if len(partition.Replicas) < desiredReplicationFactor {
-				req := kmsg.NewAlterPartitionAssignmentsRequestTopicPartition()
-				req.Partition = partition.Partition
-				req.Replicas = s.calculateAppropriateReplicas(meta, desiredReplicationFactor, brokerByID[brokerID])
-				partitionReassignments = append(partitionReassignments, req)
-			}
-		}
-
-		// TODO: Consider more than one partition per broker config
-		if len(partitions) != 0 {
-			continue
-		}
-
-		// Let's try to use one of the existing partitions before we decide to create new partitions
-		if len(reassignablePartitions) > 0 {
-			partition := reassignablePartitions[0]
-			req := kmsg.NewAlterPartitionAssignmentsRequestTopicPartition()
-			req.Partition = partition.Partition
-			req.Replicas = s.calculateAppropriateReplicas(meta, desiredReplicationFactor, brokerByID[brokerID])
-			partitionReassignments = append(partitionReassignments, req)
-
-			reassignablePartitions = reassignablePartitions[1:]
-		}
-
-		// Create a new partition for this broker
-		partitionCount++
-		assignmentReq := kmsg.NewCreatePartitionsRequestTopicAssignment()
-		assignmentReq.Replicas = s.calculateAppropriateReplicas(meta, desiredReplicationFactor, brokerByID[brokerID])
-		createPartitionAssignments = append(createPartitionAssignments, assignmentReq)
-	}
-
-	var reassignmentReq *kmsg.AlterPartitionAssignmentsRequest
-	if len(partitionReassignments) > 0 {
-		s.logger.Info("e2e probe topic has to be modified due to missing replicas or wrong preferred leader assignments",
-			zap.Int("partition_count", len(topicMeta.Partitions)),
-			zap.Int("broker_count", len(meta.Brokers)),
-			zap.Int("config_partitions_per_broker", s.config.TopicManagement.PartitionsPerBroker),
-			zap.Int("config_replication_factor", s.config.TopicManagement.ReplicationFactor),
-			zap.Int("partitions_to_reassign", len(partitionReassignments)),
+	// Log reassignment operations
+	if len(plan.Reassignments) > 0 {
+		s.logger.Info("planned partition reassignments",
+			zap.String("topic", topicName),
+			zap.Int("reassignment_count", len(plan.Reassignments)),
 		)
 
-		r := kmsg.NewAlterPartitionAssignmentsRequest()
-		reassignmentTopicReq := kmsg.NewAlterPartitionAssignmentsRequestTopic()
-		reassignmentTopicReq.Partitions = partitionReassignments
-		reassignmentTopicReq.Topic = pointerStrToStr(topicMeta.Topic)
-		r.Topics = []kmsg.AlterPartitionAssignmentsRequestTopic{reassignmentTopicReq}
-		reassignmentReq = &r
-	}
+		// Sort reassignments by partition ID for consistent logging
+		sortedReassignments := make([]Reassignment, len(plan.Reassignments))
+		copy(sortedReassignments, plan.Reassignments)
+		sort.Slice(sortedReassignments, func(i, j int) bool {
+			return sortedReassignments[i].Partition < sortedReassignments[j].Partition
+		})
 
-	var createReq *kmsg.CreatePartitionsRequest
-	if len(createPartitionAssignments) > 0 {
-		s.logger.Info("e2e probe topic does not have enough partitions. Will add partitions to the topic...",
-			zap.Int("actual_partition_count", len(topicMeta.Partitions)),
-			zap.Int("broker_count", len(meta.Brokers)),
-			zap.Int("config_partitions_per_broker", s.config.TopicManagement.PartitionsPerBroker),
-			zap.Int("partitions_to_add", len(createPartitionAssignments)),
-		)
-		r := kmsg.NewCreatePartitionsRequest()
-		createPartitionsTopicReq := kmsg.NewCreatePartitionsRequestTopic()
-		createPartitionsTopicReq.Topic = s.config.TopicManagement.Name
-		createPartitionsTopicReq.Assignment = createPartitionAssignments
-		createPartitionsTopicReq.Count = int32(partitionCount)
-		r.Topics = []kmsg.CreatePartitionsRequestTopic{createPartitionsTopicReq}
-		createReq = &r
-	}
-
-	return reassignmentReq, createReq, nil
-}
-
-// calculateAppropriateReplicas returns the best possible brokerIDs that shall be used as replicas.
-// It takes care of the brokers' rack awareness and general distribution among the available brokers.
-func (s *Service) calculateAppropriateReplicas(meta *kmsg.MetadataResponse, replicationFactor int, leaderBroker kmsg.MetadataResponseBroker) []int32 {
-	brokersWithoutLeader := make([]kmsg.MetadataResponseBroker, 0, len(meta.Brokers)-1)
-	for _, broker := range meta.Brokers {
-		if broker.NodeID == leaderBroker.NodeID {
-			continue
-		}
-		brokersWithoutLeader = append(brokersWithoutLeader, broker)
-	}
-	brokersByRack := brokerMetadataByRackID(brokersWithoutLeader)
-
-	replicasPerRack := make(map[string]int)
-	replicas := make([]int32, replicationFactor)
-	replicas[0] = leaderBroker.NodeID
-
-	for rack := range brokersByRack {
-		replicasPerRack[rack] = 0
-	}
-	replicasPerRack[pointerStrToStr(leaderBroker.Rack)]++
-
-	popBrokerFromRack := func(rackID string) kmsg.MetadataResponseBroker {
-		broker := brokersByRack[rackID][0]
-		if len(brokersByRack[rackID]) == 1 {
-			delete(brokersByRack, rackID)
-		} else {
-			brokersByRack[rackID] = brokersByRack[rackID][1:]
-		}
-		return broker
-	}
-
-	for i := 1; i < len(replicas); i++ {
-		// Find best rack
-		min := math.MaxInt32
-		bestRack := ""
-		for rack, replicaCount := range replicasPerRack {
-			if replicaCount < min {
-				bestRack = rack
-				min = replicaCount
+		for _, reassignment := range sortedReassignments {
+			// Find current assignment for this partition
+			var currentReplicas []int32
+			var currentLeader int32 = -1
+			for _, partition := range topicMeta.Partitions {
+				if partition.Partition == reassignment.Partition {
+					currentReplicas = partition.Replicas
+					currentLeader = partition.Leader
+					break
+				}
 			}
-		}
 
-		replicas[i] = popBrokerFromRack(bestRack).NodeID
-		replicasPerRack[bestRack]++
+			s.logger.Info("partition reassignment",
+				zap.String("topic", topicName),
+				zap.Int32("partition", reassignment.Partition),
+				zap.Int32s("current_replicas", currentReplicas),
+				zap.Int32s("new_replicas", reassignment.Replicas),
+				zap.Int32("current_leader", currentLeader),
+				zap.Int32("new_leader", reassignment.Replicas[0]),
+			)
+		}
 	}
 
-	return replicas
+	// Log creation operations
+	if len(plan.CreateAssignments) > 0 {
+		s.logger.Info("planned partition creations",
+			zap.String("topic", topicName),
+			zap.Int("creation_count", len(plan.CreateAssignments)),
+			zap.Int("current_partitions", len(topicMeta.Partitions)),
+			zap.Int("final_partitions", plan.FinalPartitionCount),
+		)
+
+		nextPartitionID := int32(len(topicMeta.Partitions))
+		for i, creation := range plan.CreateAssignments {
+			s.logger.Info("new partition creation",
+				zap.String("topic", topicName),
+				zap.Int32("new_partition", nextPartitionID+int32(i)),
+				zap.Int32s("replicas", creation.Replicas),
+				zap.Int32("leader", creation.Replicas[0]),
+			)
+		}
+	}
+
+	// Log final expected state summary
+	s.logger.Info("final expected state summary",
+		zap.String("topic", topicName),
+		zap.Int("total_partitions", plan.FinalPartitionCount),
+		zap.Int("reassignments_applied", len(plan.Reassignments)),
+		zap.Int("new_partitions_created", len(plan.CreateAssignments)),
+	)
 }
 
 func (s *Service) createManagementTopic(ctx context.Context, allMeta *kmsg.MetadataResponse) error {
@@ -330,11 +280,29 @@ func (s *Service) createManagementTopic(ctx context.Context, allMeta *kmsg.Metad
 		zap.Int("total_partitions", totalPartitions),
 	)
 
+	// Use partition planner to determine optimal assignments for the new topic.
+	// The metadata already contains broker info, and since the topic doesn't exist,
+	// meta.Topics[0].Partitions will be empty, which is exactly what we want.
+	planner := NewPartitionPlanner(topicCfg, s.logger)
+	plan, err := planner.Plan(allMeta)
+	if err != nil {
+		return fmt.Errorf("failed to create partition plan for new topic: %w", err)
+	}
+
+	// Create topic with specific replica assignments from the planner
 	topic := kmsg.NewCreateTopicsRequestTopic()
 	topic.Topic = topicCfg.Name
-	topic.NumPartitions = int32(totalPartitions)
-	topic.ReplicationFactor = int16(topicCfg.ReplicationFactor)
+	topic.NumPartitions = -1     // Must be -1 when using ReplicaAssignment
+	topic.ReplicationFactor = -1 // Must be -1 when using ReplicaAssignment
 	topic.Configs = createTopicConfig(topicCfg)
+
+	// Convert planner's CreateAssignments to Kafka's ReplicaAssignment format
+	for i, assignment := range plan.CreateAssignments {
+		replica := kmsg.NewCreateTopicsRequestTopicReplicaAssignment()
+		replica.Partition = int32(i)
+		replica.Replicas = append([]int32(nil), assignment.Replicas...)
+		topic.ReplicaAssignment = append(topic.ReplicaAssignment, replica)
+	}
 
 	req := kmsg.NewCreateTopicsRequest()
 	req.Topics = []kmsg.CreateTopicsRequestTopic{topic}
@@ -344,8 +312,9 @@ func (s *Service) createManagementTopic(ctx context.Context, allMeta *kmsg.Metad
 		return fmt.Errorf("failed to create e2e topic: %w", err)
 	}
 	if len(res.Topics) > 0 {
-		if res.Topics[0].ErrorMessage != nil && *res.Topics[0].ErrorMessage != "" {
-			return fmt.Errorf("failed to create e2e topic: %s", *res.Topics[0].ErrorMessage)
+		err := kerr.ErrorForCode(res.Topics[0].ErrorCode)
+		if err != nil {
+			return fmt.Errorf("failed to create e2e topic: %w", err)
 		}
 	}
 
