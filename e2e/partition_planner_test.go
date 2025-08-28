@@ -1,4 +1,3 @@
-// partition_planner_plan_test.go
 package e2e
 
 import (
