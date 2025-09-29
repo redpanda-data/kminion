@@ -48,9 +48,6 @@ func (p *PartitionPlanner) Plan(meta *kmsg.MetadataResponse) (*Plan, error) {
 	if len(meta.Brokers) == 0 {
 		return nil, fmt.Errorf("metadata response has no brokers")
 	}
-	if p.cfg.ReplicationFactor < 1 {
-		return nil, fmt.Errorf("replication factor must be >= 1 (got %d)", p.cfg.ReplicationFactor)
-	}
 	if p.cfg.ReplicationFactor > len(meta.Brokers) {
 		return nil, fmt.Errorf("replication factor %d exceeds available brokers %d", p.cfg.ReplicationFactor, len(meta.Brokers))
 	}
@@ -122,8 +119,8 @@ type PlanBuilder struct {
 	// view is our predictive map: partitionID -> replicas (preferred leader at idx 0)
 	view map[int32][]int32
 
-	reassign []Reassignment     // staged reassignments for existing partitions
-	creates  []CreateAssignment // staged creations of new partitions
+	reassignments []Reassignment     // staged reassignments for existing partitions
+	creations     []CreateAssignment // staged creations of new partitions
 }
 
 // Reassignment captures a single partition’s new replica list.
@@ -169,22 +166,22 @@ func NewPlanBuilder(state ClusterState, desired Desired, tracker *LoadTracker) *
 // partition count as current + number of creates.
 func (b *PlanBuilder) Build() *Plan {
 	return &Plan{
-		Reassignments:       b.reassign,
-		CreateAssignments:   b.creates,
-		FinalPartitionCount: len(b.state.Partitions) + len(b.creates),
+		Reassignments:       b.reassignments,
+		CreateAssignments:   b.creations,
+		FinalPartitionCount: len(b.state.Partitions) + len(b.creations),
 	}
 }
 
 // CommitReassignment records a reassignment and updates the predictive view.
 func (b *PlanBuilder) CommitReassignment(pid int32, reps []int32) {
-	b.reassign = append(b.reassign, Reassignment{Partition: pid, Replicas: reps})
+	b.reassignments = append(b.reassignments, Reassignment{Partition: pid, Replicas: reps})
 	b.view[pid] = reps
 }
 
 // CommitCreate records a new-partition assignment. The final partition count is
 // computed when building the Plan.
 func (b *PlanBuilder) CommitCreate(reps []int32) {
-	b.creates = append(b.creates, CreateAssignment{Replicas: reps})
+	b.creations = append(b.creations, CreateAssignment{Replicas: reps})
 }
 
 // fixReplicationAndRack enforces configured RF on each existing partition
@@ -407,7 +404,7 @@ func ensureLeaderCoverage(b *PlanBuilder, sel ReplicaSelector) {
 		b.CommitCreate(reps)
 
 		// Track a synthetic partition ID so counts stay consistent within this loop.
-		newPID := int32(len(b.state.Partitions) + len(b.creates) - 1)
+		newPID := int32(len(b.state.Partitions) + len(b.creations) - 1)
 		leadersByBroker[target] = append(leadersByBroker[target], newPID)
 	}
 }
@@ -421,7 +418,7 @@ func ensureLeaderCoverage(b *PlanBuilder, sel ReplicaSelector) {
 //     the fewest partitions (stable tie-breaker via leastLoadedLeader).
 func ensurePartitionCount(b *PlanBuilder, sel ReplicaSelector) {
 	desiredTotal := b.desired.DesiredPartitions
-	total := len(b.state.Partitions) + len(b.creates)
+	total := len(b.state.Partitions) + len(b.creations)
 	if total >= desiredTotal || len(b.state.BrokerIDs) == 0 {
 		return
 	}
@@ -434,7 +431,7 @@ func ensurePartitionCount(b *PlanBuilder, sel ReplicaSelector) {
 		}
 	}
 	// Also include leaders from staged creates (from phase 2 and any prior adds)
-	for _, ca := range b.creates {
+	for _, ca := range b.creations {
 		if len(ca.Replicas) > 0 {
 			leaderCount[ca.Replicas[0]]++
 		}
