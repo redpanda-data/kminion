@@ -332,6 +332,7 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 	return req.RequestWith(ctx, s.client)
 }
 
+//nolint:unused
 func (s *Service) getTopicsConfigs(ctx context.Context, configNames []string) (*kmsg.DescribeConfigsResponse, error) {
 	req := kmsg.NewDescribeConfigsRequest()
 	req.IncludeDocumentation = false
