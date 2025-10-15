@@ -1,0 +1,49 @@
+kafka:
+  brokers:
+    - localhost:9092
+  clientId: kminion-e2e-test
+
+minion:
+  consumerGroups:
+    enabled: true
+    scrapeMode: adminApi
+    granularity: partition
+    allowedGroups: [".*"]
+    ignoredGroups: []
+
+  topics:
+    enabled: true
+    granularity: partition
+    allowedTopics: [".*"]
+    ignoredTopics: []
+    infoMetric:
+      configKeys: ["cleanup.policy"]
+
+  logDirs:
+    enabled: true
+
+  endToEnd:
+    enabled: true
+    probeInterval: 500ms
+    topicManagement:
+      enabled: true
+      name: kminion-end-to-end
+      replicationFactor: 1
+      partitionsPerBroker: 1
+      reconciliationInterval: 10s
+    producer:
+      ackSla: 5s
+      requiredAcks: all
+    consumer:
+      groupIdPrefix: kminion-end-to-end
+      deleteStaleConsumerGroups: false
+      roundtripSla: 10s
+      commitSla: 5s
+
+exporter:
+  namespace: kminion
+  port: 8080
+
+logger:
+  level: info
+
