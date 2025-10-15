@@ -67,6 +67,8 @@ func (s *Service) logCommitErrors(r *kmsg.OffsetCommitResponse, err error) strin
 }
 
 // brokerMetadataByBrokerID returns a map of all broker metadata keyed by their BrokerID
+//
+//nolint:unused
 func brokerMetadataByBrokerID(meta []kmsg.MetadataResponseBroker) map[int32]kmsg.MetadataResponseBroker {
 	res := make(map[int32]kmsg.MetadataResponseBroker)
 	for _, broker := range meta {
@@ -76,6 +78,8 @@ func brokerMetadataByBrokerID(meta []kmsg.MetadataResponseBroker) map[int32]kmsg
 }
 
 // brokerMetadataByRackID returns a map of all broker metadata keyed by their Rack identifier
+//
+//nolint:unused
 func brokerMetadataByRackID(meta []kmsg.MetadataResponseBroker) map[string][]kmsg.MetadataResponseBroker {
 	res := make(map[string][]kmsg.MetadataResponseBroker)
 	for _, broker := range meta {
@@ -95,6 +99,7 @@ func pointerStrToStr(str *string) string {
 	return *str
 }
 
+//nolint:unused
 func safeUnwrap(err error) string {
 	if err == nil {
 		return "<nil>"

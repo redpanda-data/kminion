@@ -30,6 +30,7 @@ var (
 	// builtAt is a string that represent a human-readable date when the binary was built.
 	builtAt = "N/A"
 	// commit is a string that represents the last git commit for this build.
+	//nolint:unused
 	commit = "N/A"
 )
 

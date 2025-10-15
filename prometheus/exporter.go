@@ -226,7 +226,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	// Attach a unique id which will be used for caching (and and it's invalidation) of the kafka requests
 	uuid := uuid2.New()
-	ctx = context.WithValue(ctx, "requestId", uuid.String())
+	ctx = context.WithValue(ctx, minion.RequestIDKey, uuid.String())
 
 	ok := e.collectClusterInfo(ctx, ch)
 	ok = e.collectExporterMetrics(ctx, ch) && ok

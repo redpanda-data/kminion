@@ -128,13 +128,13 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan<- prometheus.Metric, marks map[string]map[int32]waterMark) bool {
 	isOk := true
 
-	groupOffsets, err := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
+	groupOffsets, _ := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
 	for groupName, offsetRes := range groupOffsets {
 		if !e.minionSvc.IsGroupAllowed(groupName) {
 			continue
 		}
 
-		err = kerr.ErrorForCode(offsetRes.ErrorCode)
+		err := kerr.ErrorForCode(offsetRes.ErrorCode)
 		if err != nil {
 			e.logger.Warn("failed to get offsets from consumer group, inner kafka error",
 				zap.String("consumer_group", groupName),

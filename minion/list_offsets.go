@@ -12,7 +12,10 @@ import (
 )
 
 func (s *Service) ListOffsetsCached(ctx context.Context, timestamp int64) (kadm.ListedOffsets, error) {
-	reqId := ctx.Value("requestId").(string)
+	reqId, ok := ctx.Value(RequestIDKey).(string)
+	if !ok || reqId == "" {
+		reqId = "default"
+	}
 	key := "partition-offsets-" + strconv.Itoa(int(timestamp)) + "-" + reqId
 
 	if cachedRes, exists := s.getCachedItem(key); exists {
