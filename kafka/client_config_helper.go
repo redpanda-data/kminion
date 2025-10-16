@@ -30,7 +30,6 @@ import (
 func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(cfg.Brokers...),
-		kgo.MaxVersions(kversion.V2_7_0()),
 		kgo.ClientID(cfg.ClientID),
 		kgo.FetchMaxBytes(5 * 1000 * 1000), // 5MB
 		kgo.MaxConcurrentFetches(10),
