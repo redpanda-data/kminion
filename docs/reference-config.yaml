@@ -50,6 +50,7 @@ kafka:
     mechanism: "PLAIN"
     # GSSAPI / Kerberos config properties
     gssapi:
+      # Required. One of USER_AUTH or KEYTAB_AUTH
       authType: ""
       keyTabPath: ""
       kerberosConfigPath: ""
