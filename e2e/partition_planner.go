@@ -327,11 +327,20 @@ func ensureLeaderCoverage(b *PlanBuilder, sel ReplicaSelector) {
 		return // Actual coverage is perfect - no need to rebalance preferred leaders
 	}
 
-	// Build "leadersByBroker": broker -> list of partition IDs it currently leads.
+	// Build "leadersByBroker": broker -> list of partition IDs it currently leads (preferred).
 	leadersByBroker := indexLeaders(b.state.BrokerIDs, b.view)
 
-	// Brokers that currently lead zero partitions.
-	missing := brokersMissingLeadership(b.state.BrokerIDs, leadersByBroker)
+	// Brokers that currently lead zero partitions (preferred).
+	// However, if a broker already has actual leadership (even if not preferred),
+	// we can skip it to minimize unnecessary reassignments.
+	missing := []int32{}
+	for _, broker := range brokersMissingLeadership(b.state.BrokerIDs, leadersByBroker) {
+		// Skip if this broker already has actual leadership
+		if len(actualLeaders[broker]) > 0 {
+			continue
+		}
+		missing = append(missing, broker)
+	}
 	if len(missing) == 0 {
 		return
 	}
@@ -339,9 +348,27 @@ func ensureLeaderCoverage(b *PlanBuilder, sel ReplicaSelector) {
 	// Local helpers that both perform the action and update leadersByBroker.
 	rotateIfReplica := func(target int32, donors []int32) bool {
 		for _, donor := range donors {
-			// Sort partition IDs for deterministic iteration
+			// Collect candidate partitions where target is already a replica
 			pids := append([]int32(nil), leadersByBroker[donor]...)
-			sort.Slice(pids, func(i, j int) bool { return pids[i] < pids[j] })
+
+			// Sort with preference: partitions where the donor is the ACTUAL leader first.
+			// This ensures we're actually freeing up leadership from the donor, rather than
+			// rotating a partition where the donor is only the preferred leader.
+			// Then by partition ID for determinism.
+			sort.Slice(pids, func(i, j int) bool {
+				pi, pj := pids[i], pids[j]
+
+				// Prefer partitions where the donor is the actual leader
+				iDonorIsActual := b.state.Partitions[pi].Leader == donor
+				jDonorIsActual := b.state.Partitions[pj].Leader == donor
+
+				if iDonorIsActual != jDonorIsActual {
+					return iDonorIsActual
+				}
+				// Then by partition ID for stability
+				return pi < pj
+			})
+
 			for _, pid := range pids {
 				reps := b.view[pid]
 				if !contains(reps, target) {
