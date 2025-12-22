@@ -62,6 +62,53 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		return s.updatePartitionCount(ctx)
 	}
 
+	// If topic management is disabled, skip validation and alteration of the existing topic.
+	// This allows kminion to work on managed Kafka platforms (e.g., Confluent Cloud) that
+	// block partition reassignment operations.
+	if !s.config.TopicManagement.Enabled {
+		topicMeta := meta.Topics[0]
+		brokerIDs := make([]int32, len(meta.Brokers))
+		for i, broker := range meta.Brokers {
+			brokerIDs[i] = broker.NodeID
+		}
+
+		s.logger.Info("topic management is disabled, skipping validation and alteration of existing topic",
+			zap.String("topic", s.config.TopicManagement.Name),
+			zap.Int("current_partitions", len(topicMeta.Partitions)),
+			zap.Int("replication_factor", len(topicMeta.Partitions[0].Replicas)))
+
+		// Log warnings if the topic configuration differs from expectations
+		expectedPartitions := s.config.TopicManagement.PartitionsPerBroker * len(brokerIDs)
+		if len(topicMeta.Partitions) != expectedPartitions {
+			s.logger.Warn("topic partition count differs from expected configuration",
+				zap.Int("current_partitions", len(topicMeta.Partitions)),
+				zap.Int("expected_partitions", expectedPartitions),
+				zap.Int("brokers", len(brokerIDs)),
+				zap.Int("partitions_per_broker_config", s.config.TopicManagement.PartitionsPerBroker),
+				zap.String("reason", "topic management is disabled, will not alter"))
+		}
+
+		// Check if each broker is leading at least one partition
+		leaderCounts := make(map[int32]int)
+		for _, partition := range topicMeta.Partitions {
+			leaderCounts[partition.Leader]++
+		}
+		brokersWithoutLeader := []int32{}
+		for _, brokerID := range brokerIDs {
+			if leaderCounts[brokerID] == 0 {
+				brokersWithoutLeader = append(brokersWithoutLeader, brokerID)
+			}
+		}
+		if len(brokersWithoutLeader) > 0 {
+			s.logger.Warn("some brokers are not leading any partitions on the e2e topic",
+				zap.Int32s("brokers_without_leader", brokersWithoutLeader),
+				zap.String("reason", "topic management is disabled, will not alter"),
+				zap.String("impact", "end-to-end monitoring may not cover all brokers"))
+		}
+
+		return s.updatePartitionCount(ctx)
+	}
+
 	// Topic already exists - use partition planner to validate and potentially fix assignments
 	planner := NewPartitionPlanner(s.config.TopicManagement, s.logger)
 	plan, err := planner.Plan(meta)
