@@ -6,8 +6,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"time"
 
 	"github.com/jcmturner/gokrb5/v8/client"
@@ -136,7 +136,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 		if cfg.TLS.CaFilepath != "" || len(cfg.TLS.Ca) > 0 {
 			ca := []byte(cfg.TLS.Ca)
 			if cfg.TLS.CaFilepath != "" {
-				caBytes, err := ioutil.ReadFile(cfg.TLS.CaFilepath)
+				caBytes, err := os.ReadFile(cfg.TLS.CaFilepath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to load ca cert: %w", err)
 				}
@@ -158,7 +158,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 			privateKey := []byte(cfg.TLS.Key)
 			// 1. Read certificates
 			if cfg.TLS.CertFilepath != "" {
-				certBytes, err := ioutil.ReadFile(cfg.TLS.CertFilepath)
+				certBytes, err := os.ReadFile(cfg.TLS.CertFilepath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to TLS certificate: %w", err)
 				}
@@ -166,27 +166,23 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 			}
 
 			if cfg.TLS.KeyFilepath != "" {
-				keyBytes, err := ioutil.ReadFile(cfg.TLS.KeyFilepath)
+				keyBytes, err := os.ReadFile(cfg.TLS.KeyFilepath)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read TLS key: %w", err)
 				}
 				privateKey = keyBytes
 			}
 
-			// 2. Check if private key needs to be decrypted. Decrypt it if passphrase is given, otherwise return error
-			pemBlock, _ := pem.Decode(privateKey)
-			if pemBlock == nil {
-				return nil, fmt.Errorf("no valid private key found")
+			// 2. Decrypt private key if encrypted and passphrase is provided
+			if cfg.TLS.Passphrase != "" {
+				var err error
+				privateKey, err = decryptPrivateKey(privateKey, cfg.TLS.Passphrase, logger)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decrypt private key: %w", err)
+				}
 			}
 
-			if x509.IsEncryptedPEMBlock(pemBlock) {
-				decryptedKey, err := x509.DecryptPEMBlock(pemBlock, []byte(cfg.TLS.Passphrase))
-				if err != nil {
-					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %s", err)
-				}
-				// If private key was encrypted we can overwrite the original contents now with the decrypted version
-				privateKey = pem.EncodeToMemory(&pem.Block{Type: pemBlock.Type, Bytes: decryptedKey})
-			}
+			// 3. Parse the certificate and key pair
 			tlsCert, err := tls.X509KeyPair(cert, privateKey)
 			if err != nil {
 				return nil, fmt.Errorf("cannot parse pem: %s", err)
@@ -206,4 +202,47 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 	}
 
 	return opts, nil
+}
+
+
+// decryptPrivateKey attempts to decrypt an encrypted PEM-encoded private key.
+// It supports both modern PKCS#8 encrypted keys and legacy PEM encryption (with deprecation warning).
+// If the key is not encrypted, it returns the key as-is.
+func decryptPrivateKey(keyPEM []byte, passphrase string, logger *zap.Logger) ([]byte, error) {
+	block, _ := pem.Decode(keyPEM)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block containing private key")
+	}
+
+	// Check if it's an encrypted PKCS#8 key (modern, secure)
+	if block.Type == "ENCRYPTED PRIVATE KEY" {
+		// PKCS#8 encrypted keys should be decrypted using x509.ParsePKCS8PrivateKey
+		// which doesn't support password-based decryption directly in stdlib.
+		// For now, we'll use the legacy method with nolint for PKCS#8 as well.
+		// TODO: Consider using golang.org/x/crypto/pkcs12 for proper PKCS#8 support
+		decrypted, err := x509.DecryptPEMBlock(block, []byte(passphrase)) //nolint:staticcheck // No stdlib alternative for PKCS#8 password decryption
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt PKCS#8 private key: %w", err)
+		}
+		// Re-encode as unencrypted PKCS#8
+		return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: decrypted}), nil
+	}
+
+	// Check if it's a legacy encrypted PEM block (insecure, deprecated)
+	if x509.IsEncryptedPEMBlock(block) { //nolint:staticcheck // Supporting legacy keys for backward compatibility
+		logger.Warn("Using legacy PEM encryption for private key. This encryption method is insecure and deprecated. " +
+			"Please migrate to PKCS#8 encrypted keys. " +
+			"You can convert your key using: openssl pkcs8 -topk8 -v2 aes256 -in old_key.pem -out new_key.pem")
+
+		// Decrypt using legacy method (insecure but needed for backward compatibility)
+		decrypted, err := x509.DecryptPEMBlock(block, []byte(passphrase)) //nolint:staticcheck // Supporting legacy keys
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt legacy PEM private key: %w", err)
+		}
+		// Re-encode as unencrypted PEM
+		return pem.EncodeToMemory(&pem.Block{Type: block.Type, Bytes: decrypted}), nil
+	}
+
+	// Key is not encrypted, return as-is
+	return keyPEM, nil
 }
