@@ -530,3 +530,52 @@ func TestActualLeaderCoverageSkipsPreferredRebalancing(t *testing.T) {
 		assertNoDuplicates(t, reps)
 	}
 }
+
+func TestMinimalReassignmentsWhenActualLeadersDivergeFromPreferred(t *testing.T) {
+	// Scenario: all partitions have same preferred leader (broker 0), but actual
+	// leaders are distributed. Algorithm should recognize brokers with actual
+	// leadership and only fix gaps, not realign everything to preferred.
+	brokers := map[int32]string{
+		0: "rack-a", 1: "rack-b", 2: "rack-c",
+	}
+
+	meta := buildMeta("_redpanda_e2e_probe", brokers, [][]int32{
+		{0, 1, 2}, // partition 0: preferred leader = 0
+		{0, 1, 2}, // partition 1: preferred leader = 0
+		{0, 1, 2}, // partition 2: preferred leader = 0
+	})
+
+	// Set actual leaders to show divergence from preferred
+	meta.Topics[0].Partitions[0].Leader = 0 // p0: preferred=0, actual=0 (match)
+	meta.Topics[0].Partitions[1].Leader = 1 // p1: preferred=0, actual=1 (DIVERGED)
+	meta.Topics[0].Partitions[2].Leader = 0 // p2: preferred=0, actual=0 (match)
+
+	cfg := EndToEndTopicConfig{
+		ReplicationFactor:   3,
+		PartitionsPerBroker: 1,
+	}
+
+	planner := NewPartitionPlanner(cfg, zap.NewNop())
+	plan, err := planner.Plan(meta)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+
+	// Key assertion: should have ONLY ONE reassignment
+	// Broker 1 already has actual leadership (p1), even though preferred leader of
+	// p1 is broker 0. Only broker 2 is missing from actual leadership, so we only
+	// need to fix that one gap.
+	assert.Equal(t, 1, len(plan.Reassignments), "should need only ONE reassignment since broker 1 already has actual leadership")
+	assert.Equal(t, 0, len(plan.CreateAssignments), "should have no creates")
+
+	// Verify the reassignment gives broker 2 preferred leadership
+	require.Len(t, plan.Reassignments, 1)
+	reassignment := plan.Reassignments[0]
+	assert.Equal(t, int32(2), reassignment.Replicas[0], "reassignment should give broker 2 preferred leadership")
+
+	// Verify all partitions still have correct RF and no duplicates
+	final := applyPlan(meta, plan)
+	for pid, reps := range final {
+		assert.Lenf(t, reps, 3, "pid %d must have RF=3", pid)
+		assertNoDuplicates(t, reps)
+	}
+}

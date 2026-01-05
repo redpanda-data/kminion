@@ -119,8 +119,23 @@ minion:
     # How often to send end-to-end test messages
     probeInterval: 100ms
     topicManagement:
-      # You can disable topic management, without disabling the testing feature.
-      # Only makes sense if you have multiple kminion instances, and for some reason only want one of them to create/configure the topic
+      # Controls whether kminion should create, validate, and alter the end-to-end topic.
+      #
+      # When enabled (true):
+      # - kminion creates the topic if it doesn't exist
+      # - Validates partition count and replica assignments on startup and periodically (based on reconciliationInterval)
+      # - Alters the topic (reassigns partitions, adds partitions) to ensure one partition leader per broker
+      # - Fails on startup if topic alteration operations fail
+      #
+      # When disabled (false):
+      # - kminion will NOT create the topic if it doesn't exist (startup will fail)
+      # - Will NOT validate or alter an existing topic (accepts current partition layout as-is)
+      # - Logs warnings if the topic configuration is suboptimal
+      # - Continues end-to-end testing with whatever partition layout exists
+      #
+      # Use disabled mode on managed Kafka platforms that restrict partition reassignment operations.
+      # In this mode, you must manually create the topic with appropriate partition distribution
+      # before starting kminion.
       enabled: true
 
       # Name of the topic kminion uses to send its test messages
