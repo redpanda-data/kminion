@@ -116,14 +116,21 @@ func main() {
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {
-			logger.Error("error stopping HTTP server", zap.Error(err))
+			logger.Error("error stopping server", zap.Error(err))
 			os.Exit(1)
 		}
 	}()
 	logger.Info("listening on address", zap.String("listen_address", address))
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Error("error starting HTTP server", zap.Error(err))
-		os.Exit(1)
+	if cfg.Exporter.TLSCertFile != "" {
+		if err := srv.ListenAndServeTLS(cfg.Exporter.TLSCertFile, cfg.Exporter.TLSKeyFile); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("error starting HTTPS server", zap.Error(err))
+			os.Exit(1)
+		}
+	} else {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("error starting HTTP server", zap.Error(err))
+			os.Exit(1)
+		}
 	}
 
 	logger.Info("kminion stopped")

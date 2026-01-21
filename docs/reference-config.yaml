@@ -184,7 +184,11 @@ minion:
 exporter:
   # Namespace is the prefix for all exported Prometheus metrics
   namespace: "kminion"
-  # Host that shall be used to bind the HTTP server on
+  # Host that shall be used to bind the HTTP(S) server on
   host: ""
-  # Port that shall be used to bind the HTTP server on
+  # Port that shall be used to bind the HTTP(S) server on
   port: 8080
+  # Certificate file to be used if configuring as a HTTPS server, leave empty to configure as a HTTP server
+  tlsCertificate: ""
+  # Key file to be used if configuring as a HTTPS server, ignored if tlsCertificate isnt set
+  tlsKey: ""

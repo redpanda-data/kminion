@@ -1,9 +1,11 @@
 package prometheus
 
 type Config struct {
-	Host      string `koanf:"host"`
-	Port      int    `koanf:"port"`
-	Namespace string `koanf:"namespace"`
+	Host        string `koanf:"host"`
+	Port        int    `koanf:"port"`
+	Namespace   string `koanf:"namespace"`
+	TLSCertFile string `koanf:"tlsCertificate"`
+	TLSKeyFile  string `koanf:"tlsKey"`
 }
 
 func (c *Config) SetDefaults() {
