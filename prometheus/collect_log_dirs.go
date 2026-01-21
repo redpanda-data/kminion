@@ -39,6 +39,9 @@ func (e *Exporter) collectLogDirs(ctx context.Context, ch chan<- prometheus.Metr
 				continue
 			}
 			for _, topic := range dir.Topics {
+                if !e.minionSvc.IsLOgDirsTopicAllowed(topic.Topic) {
+                    continue
+                }
 				topicSize := int64(0)
 				for _, partition := range topic.Partitions {
 					topicSize += partition.Size
