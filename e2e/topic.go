@@ -125,9 +125,17 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		s.logPlannedOperations(meta, plan, topicName)
 	}
 
-	err = s.executeAlterPartitionAssignments(ctx, alterReq)
-	if err != nil {
-		return fmt.Errorf("failed to alter partition assignments: %w", err)
+	if s.config.TopicManagement.RebalancePartitions {
+		err = s.executeAlterPartitionAssignments(ctx, alterReq)
+		if err != nil {
+			return fmt.Errorf("failed to alter partition assignments: %w", err)
+		}
+	} else if len(plan.Reassignments) > 0 {
+		s.logger.Info("skipping partition reassignment because rebalancePartitions is disabled",
+			zap.String("topic", topicName),
+			zap.Int("skipped_reassignments", len(plan.Reassignments)),
+			zap.String("reason", "rebalancePartitions is disabled to avoid conflicts with external partition balancers"),
+		)
 	}
 
 	err = s.executeCreatePartitions(ctx, createReq)
