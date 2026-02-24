@@ -126,7 +126,7 @@ func TestPartitionPlanner_RebalancePartitionsDisabled(t *testing.T) {
 
 	// The planner should still detect that reassignments are needed —
 	// it's the caller's responsibility to skip executing them.
-	// We just assert the plan itself is structurally valid.
+	assert.NotEmpty(t, plan.Reassignments, "planner should detect reassignments are needed")
 	for _, ra := range plan.Reassignments {
 		assertNoDuplicates(t, ra.Replicas)
 		assert.Len(t, ra.Replicas, cfg.ReplicationFactor)
@@ -135,4 +135,45 @@ func TestPartitionPlanner_RebalancePartitionsDisabled(t *testing.T) {
 	// No new partitions should be created (3 brokers × 1 per broker = 3 already exist).
 	assert.Empty(t, plan.CreateAssignments)
 	assert.Equal(t, 3, plan.FinalPartitionCount)
+}
+
+// TestPartitionPlanner_RebalancePartitionsDisabled_Creates verifies that when
+// RebalancePartitions is false and new partitions need to be created, Phase 3
+// uses actual current leaders (not predicted leaders from staged reassignments)
+// to pick the preferred leader for new partitions.
+func TestPartitionPlanner_RebalancePartitionsDisabled_Creates(t *testing.T) {
+	// 4 brokers, 3 partitions all led by broker 0.
+	// PartitionsPerBroker=1 means desired = 4, so Phase 3 must create 1.
+	meta := buildMeta("e2e",
+		map[int32]string{0: "", 1: "", 2: "", 3: ""},
+		[][]int32{
+			{0, 1, 2},
+			{0, 2, 3},
+			{0, 1, 3},
+		},
+	)
+
+	cfg := EndToEndTopicConfig{
+		Enabled:                true,
+		Name:                   "e2e",
+		ReplicationFactor:      3,
+		PartitionsPerBroker:    1,
+		ReconciliationInterval: 10 * time.Minute,
+		RebalancePartitions:    false,
+	}
+
+	planner := NewPartitionPlanner(cfg, zap.NewNop())
+	plan, err := planner.Plan(meta)
+	require.NoError(t, err)
+
+	// Phase 3 should create exactly 1 partition (4 desired - 3 existing).
+	require.Len(t, plan.CreateAssignments, 1)
+
+	// The new partition's preferred leader should NOT be broker 0,
+	// because actual state shows broker 0 already leads 3 partitions.
+	// With rebalancePartitions=false, Phase 3 counts from actual leaders,
+	// so it should pick one of the under-represented brokers (1, 2, or 3).
+	newLeader := plan.CreateAssignments[0].Replicas[0]
+	assert.NotEqual(t, int32(0), newLeader,
+		"new partition should not be led by broker 0 (already leads 3 partitions in actual state)")
 }

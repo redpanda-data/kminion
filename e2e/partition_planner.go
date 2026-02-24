@@ -59,7 +59,7 @@ func (p *PartitionPlanner) Plan(meta *kmsg.MetadataResponse) (*Plan, error) {
 	selector := NewRackAwareSelector(state, tracker)
 	p.sel = selector
 
-	b := NewPlanBuilder(state, desired, tracker)
+	b := NewPlanBuilder(state, desired, tracker, p.cfg.RebalancePartitions)
 
 	// Phase 1: normalize RF and racks (low movement first)
 	// Grow/trim replicas to configured RF and re-pick to maximize unique racks
@@ -116,6 +116,11 @@ type PlanBuilder struct {
 	desired Desired
 	tracker *LoadTracker
 
+	// rebalancePartitions indicates whether reassignments will actually be executed.
+	// When false, Phase 3 uses actual current leaders instead of predicted leaders
+	// from the view, since reassignments won't be applied.
+	rebalancePartitions bool
+
 	// view is our predictive map: partitionID -> replicas (preferred leader at idx 0)
 	view map[int32][]int32
 
@@ -154,12 +159,12 @@ type Plan struct {
 
 // NewPlanBuilder initializes a predictive view by cloning the current
 // partition->replicas map. We avoid accidental mutation by copying slices.
-func NewPlanBuilder(state ClusterState, desired Desired, tracker *LoadTracker) *PlanBuilder {
+func NewPlanBuilder(state ClusterState, desired Desired, tracker *LoadTracker, rebalancePartitions bool) *PlanBuilder {
 	view := make(map[int32][]int32, len(state.Partitions))
 	for pid, p := range state.Partitions {
 		view[pid] = append([]int32(nil), p.Replicas...)
 	}
-	return &PlanBuilder{state: state, desired: desired, tracker: tracker, view: view}
+	return &PlanBuilder{state: state, desired: desired, tracker: tracker, rebalancePartitions: rebalancePartitions, view: view}
 }
 
 // Build freezes the current staged operations into a Plan. We compute the final
@@ -450,14 +455,24 @@ func ensurePartitionCount(b *PlanBuilder, sel ReplicaSelector) {
 		return
 	}
 
-	// Count current leaders per broker based on the present view.
+	// Count current leaders per broker.
 	leaderCount := make(map[int32]int, len(b.state.BrokerIDs))
-	for _, reps := range b.view {
-		if len(reps) > 0 {
-			leaderCount[reps[0]]++
+	if b.rebalancePartitions {
+		// Use predictive view (reassignments will be applied)
+		for _, reps := range b.view {
+			if len(reps) > 0 {
+				leaderCount[reps[0]]++
+			}
+		}
+	} else {
+		// Use actual current leaders (reassignments won't be applied)
+		for _, p := range b.state.Partitions {
+			if p.Leader != -1 {
+				leaderCount[p.Leader]++
+			}
 		}
 	}
-	// Also include leaders from staged creates (from phase 2 and any prior adds)
+	// Always include leaders from staged creates (Phase 2 fallback creates are always executed)
 	for _, ca := range b.creations {
 		if len(ca.Replicas) > 0 {
 			leaderCount[ca.Replicas[0]]++
