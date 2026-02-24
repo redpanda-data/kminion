@@ -371,8 +371,9 @@ func TestPartitionPlanner_Plan(t *testing.T) {
 				{2, 3, 1}, // preferred leader is 2, but we'll set actual leader to 3 in buildMetaWithLeader
 			},
 			cfg: EndToEndTopicConfig{
-				ReplicationFactor:   3,
-				PartitionsPerBroker: 1, // 3*1=3 total desired, have 2, need 1 more
+				ReplicationFactor:      3,
+				PartitionsPerBroker:    1, // 3*1=3 total desired, have 2, need 1 more
+				RebalancePartitions:    true,
 			},
 			check: func(t *testing.T, meta *kmsg.MetadataResponse, plan *Plan, final map[int32][]int32) {
 				// With our manually set leaders (2, 3), broker 1 has no leadership
