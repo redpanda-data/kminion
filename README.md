@@ -1,6 +1,6 @@
 # Redpanda Minion (KMinion) - Prometheus Exporter via Kafka API
 
-Redpanda Minion is a feature-rich and flexible Prometheus Exporter to monitor your Redpanda or Kafka cluster. 
+[Redpanda](https://www.redpanda.com) Minion is a feature-rich and flexible Prometheus Exporter to monitor your Redpanda or Kafka cluster. 
 All valuable information that are accessible via the Kafka protocol are supposed to be accessible using
 KMinion.
 
