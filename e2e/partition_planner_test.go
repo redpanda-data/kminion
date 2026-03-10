@@ -532,6 +532,80 @@ func TestActualLeaderCoverageSkipsPreferredRebalancing(t *testing.T) {
 	}
 }
 
+// TestPlan_ToRequests_RebalancePartitions verifies that ToRequests omits explicit
+// replica assignments from the CreatePartitions request when RebalancePartitions
+// is false, but still sets the correct total Count.
+func TestPlan_ToRequests_RebalancePartitions(t *testing.T) {
+	brokers := map[int32]string{1: "a", 2: "b", 3: "c", 4: "d", 5: "e", 6: "f"}
+	// Topic currently has 3 partitions; 6 brokers → planner will want 6 total.
+	partitions := [][]int32{
+		{1, 2, 3},
+		{2, 3, 4},
+		{3, 4, 5},
+	}
+	meta := buildMeta("probe", brokers, partitions)
+
+	t.Run("rebalancePartitions=true includes explicit assignments", func(t *testing.T) {
+		cfg := EndToEndTopicConfig{
+			ReplicationFactor:   3,
+			PartitionsPerBroker: 1,
+			RebalancePartitions: true,
+		}
+		plan, err := NewPartitionPlanner(cfg, zap.NewNop()).Plan(meta)
+		require.NoError(t, err)
+		_, createReq := plan.ToRequests("probe", true)
+		require.NotNil(t, createReq, "should have a CreatePartitions request")
+
+		topic := createReq.Topics[0]
+		assert.Equal(t, int32(plan.FinalPartitionCount), topic.Count)
+		assert.NotEmpty(t, topic.Assignment, "assignments must be present when rebalancePartitions=true")
+		assert.Equal(t, len(plan.CreateAssignments), len(topic.Assignment),
+			"one assignment entry per new partition")
+	})
+
+	t.Run("rebalancePartitions=false omits assignments", func(t *testing.T) {
+		cfg := EndToEndTopicConfig{
+			ReplicationFactor:   3,
+			PartitionsPerBroker: 1,
+			RebalancePartitions: false,
+		}
+		plan, err := NewPartitionPlanner(cfg, zap.NewNop()).Plan(meta)
+		require.NoError(t, err)
+		// Planner should still compute create assignments (used for logging / count),
+		// but ToRequests must NOT include them in the wire request.
+		require.NotEmpty(t, plan.CreateAssignments, "planner should still compute assignments for count tracking")
+
+		_, createReq := plan.ToRequests("probe", false)
+		require.NotNil(t, createReq, "should still produce a CreatePartitions request")
+
+		topic := createReq.Topics[0]
+		assert.Equal(t, int32(plan.FinalPartitionCount), topic.Count,
+			"Count must reflect the desired total even without explicit assignments")
+		assert.Empty(t, topic.Assignment,
+			"assignments must be absent when rebalancePartitions=false")
+	})
+
+	t.Run("no creates needed produces nil create request regardless of flag", func(t *testing.T) {
+		// Already-optimal topic: 3 brokers, 3 partitions, each broker leads one.
+		optMeta := buildMeta("probe",
+			map[int32]string{1: "", 2: "", 3: ""},
+			[][]int32{{1, 2, 3}, {2, 3, 1}, {3, 1, 2}},
+		)
+		for _, rebalance := range []bool{true, false} {
+			cfg := EndToEndTopicConfig{
+				ReplicationFactor:   3,
+				PartitionsPerBroker: 1,
+				RebalancePartitions: rebalance,
+			}
+			plan, err := NewPartitionPlanner(cfg, zap.NewNop()).Plan(optMeta)
+			require.NoError(t, err)
+			assert.Empty(t, plan.CreateAssignments)
+			_, createReq := plan.ToRequests("probe", rebalance)
+			assert.Nil(t, createReq, "no CreatePartitions request when nothing to create (rebalance=%v)", rebalance)
+		}
+	})
+}
+
 func TestMinimalReassignmentsWhenActualLeadersDivergeFromPreferred(t *testing.T) {
 	// Scenario: all partitions have same preferred leader (broker 0), but actual
 	// leaders are distributed. Algorithm should recognize brokers with actual
