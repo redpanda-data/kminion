@@ -24,3 +24,4 @@ jobs:
         env:
           CGO_ENABLED: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
