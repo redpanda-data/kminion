@@ -784,7 +784,12 @@ func (s *RackAwareSelector) ChooseReplicas(preferredLeader int32, rf int) []int3
 
 // ToRequests converts a Plan to Kafka admin requests. Either result may be nil
 // if the plan contains no operations of that type.
-func (p *Plan) ToRequests(topic string) (*kmsg.AlterPartitionAssignmentsRequest, *kmsg.CreatePartitionsRequest) {
+//
+// rebalancePartitions controls whether explicit replica assignments are included
+// in the CreatePartitions request. Set it to false for Redpanda Cloud, which
+// disallows explicit partition assignments via the Kafka API and returns
+// INVALID_REQUEST when they are present.
+func (p *Plan) ToRequests(topic string, rebalancePartitions bool) (*kmsg.AlterPartitionAssignmentsRequest, *kmsg.CreatePartitionsRequest) {
 	var alter *kmsg.AlterPartitionAssignmentsRequest
 	var create *kmsg.CreatePartitionsRequest
 
@@ -807,10 +812,16 @@ func (p *Plan) ToRequests(topic string) (*kmsg.AlterPartitionAssignmentsRequest,
 		t := kmsg.NewCreatePartitionsRequestTopic()
 		t.Topic = topic
 		t.Count = int32(p.FinalPartitionCount)
-		for _, ca := range p.CreateAssignments {
-			ta := kmsg.NewCreatePartitionsRequestTopicAssignment()
-			ta.Replicas = append([]int32(nil), ca.Replicas...)
-			t.Assignment = append(t.Assignment, ta)
+		// Redpanda Cloud disallows explicit partition assignments via the Kafka API
+		// (returning INVALID_REQUEST), the same restriction that applies to
+		// AlterPartitionAssignments. Omit the Assignment list and let the broker
+		// auto-place new partitions when rebalancing is disabled.
+		if rebalancePartitions {
+			for _, ca := range p.CreateAssignments {
+				ta := kmsg.NewCreatePartitionsRequestTopicAssignment()
+				ta.Replicas = append([]int32(nil), ca.Replicas...)
+				t.Assignment = append(t.Assignment, ta)
+			}
 		}
 		r.Topics = []kmsg.CreatePartitionsRequestTopic{t}
 		create = &r

@@ -118,7 +118,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 	// Convert the plan to Kafka requests
 	topicName := pointerStrToStr(meta.Topics[0].Topic)
-	alterReq, createReq := plan.ToRequests(topicName)
+	alterReq, createReq := plan.ToRequests(topicName, s.config.TopicManagement.RebalancePartitions)
 
 	if s.config.TopicManagement.RebalancePartitions {
 		if len(plan.Reassignments) > 0 {
@@ -136,7 +136,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 	}
 
 	if len(plan.CreateAssignments) > 0 {
-		s.logPlannedCreations(meta, plan, topicName)
+		s.logPlannedCreations(meta, plan, topicName, s.config.TopicManagement.RebalancePartitions)
 	}
 	err = s.executeCreatePartitions(ctx, createReq)
 	if err != nil {
@@ -292,7 +292,7 @@ func (s *Service) logPlannedReassignments(meta *kmsg.MetadataResponse, plan *Pla
 }
 
 // logPlannedCreations logs planned partition creation details.
-func (s *Service) logPlannedCreations(meta *kmsg.MetadataResponse, plan *Plan, topicName string) {
+func (s *Service) logPlannedCreations(meta *kmsg.MetadataResponse, plan *Plan, topicName string, rebalancePartitions bool) {
 	topicMeta := meta.Topics[0]
 
 	s.logger.Info("planned partition creations",
@@ -301,6 +301,13 @@ func (s *Service) logPlannedCreations(meta *kmsg.MetadataResponse, plan *Plan, t
 		zap.Int("current_partitions", len(topicMeta.Partitions)),
 		zap.Int("final_partitions", plan.FinalPartitionCount),
 	)
+
+	if !rebalancePartitions {
+		s.logger.Info("partition assignments will be auto-placed by broker (rebalancePartitions is disabled)",
+			zap.String("topic", topicName),
+		)
+		return
+	}
 
 	nextPartitionID := int32(len(topicMeta.Partitions))
 	for i, creation := range plan.CreateAssignments {
