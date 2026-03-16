@@ -11,6 +11,7 @@ type Config struct {
 	Topics         TopicConfig         `koanf:"topics"`
 	LogDirs        LogDirsConfig       `koanf:"logDirs"`
 	EndToEnd       e2e.Config          `koanf:"endToEnd"`
+	ACLs           ACLsConfig          `koanf:"acls"`
 }
 
 func (c *Config) SetDefaults() {
@@ -18,6 +19,7 @@ func (c *Config) SetDefaults() {
 	c.Topics.SetDefaults()
 	c.LogDirs.SetDefaults()
 	c.EndToEnd.SetDefaults()
+	c.ACLs.SetDefaults()
 }
 
 func (c *Config) Validate() error {
@@ -39,6 +41,11 @@ func (c *Config) Validate() error {
 	err = c.EndToEnd.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate endToEnd config: %w", err)
+	}
+
+	err = c.ACLs.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate ACLs config: %w", err)
 	}
 
 	return nil
