@@ -130,6 +130,18 @@ func (s *Service) HandleIsReady() http.HandlerFunc {
 	}
 }
 
+func (s *Service) HandleIsLive() http.HandlerFunc {
+	type response struct {
+		StatusCode int `json:"statusCode"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		res := response{StatusCode: http.StatusOK}
+		resJson, _ := json.Marshal(res)
+		w.WriteHeader(http.StatusOK)
+		w.Write(resJson)
+	}
+}
+
 // ensureCompatibility checks whether the options as configured are available in the connected cluster. For example
 // we will check if the target Kafka's API version support the LogDirs request. If that's not the case we will
 // disable the option and print a warning message.

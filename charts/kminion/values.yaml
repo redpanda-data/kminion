@@ -144,6 +144,8 @@ daemonset:
   enabled: false
 
 deployment:
+  livenessProbe:
+    enabled: true
   readinessProbe:
     enabled: true
 
