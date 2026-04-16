@@ -87,7 +87,7 @@ func (s *Service) listOffsetsInternal(ctx context.Context, listFunc listOffsetsF
 	// Log inner errors before returning them. We do that inside of this function to avoid duplicate logging as the response
 	// are cached for each scrape anyways.
 	//
-	// Create two metrics to aggregate error logs in few messages. Logging one message per occured partition error
+	// Create two metrics to aggregate error logs in few messages. Logging one message per occurred partition error
 	// is too much. Typical errors are LEADER_NOT_AVAILABLE etc.
 	errorCountByErrCode := make(map[error]int)
 	errorCountByTopic := make(map[string]int)
