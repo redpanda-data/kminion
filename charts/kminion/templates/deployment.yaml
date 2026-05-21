@@ -50,6 +50,11 @@ spec:
         {{- with .Values.deployment.volumes.extra }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- if .Values.deployment.tlsEnabled }}
+        - name: exporter-tls
+          secret:
+            secretName: {{ .Values.deployment.tlsCertSecret }}
+        {{- end }}
       initContainers:
       {{- with .Values.deployment.initContainers }}
       {{- toYaml . | nindent 8 }}
@@ -92,13 +97,24 @@ spec:
             - name: {{.secretName}}
               mountPath: {{.mountPath}}
             {{- end}}
+            {{- if .Values.deployment.tlsEnabled }}
+            - name: exporter-tls
+              mountPath: {{ .Values.deployment.tlsMountPath }}
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12}}
           {{- if .Values.deployment.readinessProbe.enabled }}
           readinessProbe:
+            {{- if .Values.deployment.tlsEnabled }}
+            httpsGet:
+              path: /ready
+              port: {{ .Values.service.port }}
+            {{- else }}
             httpGet:
               path: /ready
-              port: {{.Values.service.port}}
+              port: {{ .Values.service.port }}
+            {{- end }}
             initialDelaySeconds: 10
           {{- end }}
         {{- with .Values.deployment.extraContainers }}

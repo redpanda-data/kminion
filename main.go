@@ -120,10 +120,17 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-	logger.Info("listening on address", zap.String("listen_address", address))
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Error("error starting HTTP server", zap.Error(err))
-		os.Exit(1)
+	logger.Info("listening on address", zap.String("listen_address", address), zap.Bool("tls_enabled", cfg.Exporter.TLSEnabled))
+	if cfg.Exporter.TLSEnabled {
+		if err := srv.ListenAndServeTLS(cfg.Exporter.TLSCertFilepath, cfg.Exporter.TLSKeyFilepath); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("error starting HTTPS server", zap.Error(err))
+			os.Exit(1)
+		}
+	} else {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("error starting HTTP server", zap.Error(err))
+			os.Exit(1)
+		}
 	}
 
 	logger.Info("kminion stopped")

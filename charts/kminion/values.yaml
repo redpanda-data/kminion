@@ -159,6 +159,13 @@ deployment:
     # - name: example
     #   emptyDir: {}
 
+  # TLS configuration for the exporter HTTP server
+  tlsEnabled: false
+  # Name of a Kubernetes secret containing tls.crt and tls.key
+  tlsCertSecret: ""
+  # Path inside the container where the TLS secret will be mounted
+  tlsMountPath: /etc/kminion/tls
+
   # If you want to provide specifc config settings like sensitive Kafka credentials via environment variables you can
   # do so by making them available here. See the kminion reference config to figure out the expected variable names.
   env:
@@ -189,6 +196,10 @@ kminion:
   # end up in a YAML file which will be mounted into the kminion container.
   # See reference config: https://github.com/cloudhut/kminion/blob/master/docs/reference-config.yaml
   config: {}
+#    exporter:
+#      tlsEnabled: false
+#      tlsCertFilepath: ""
+#      tlsKeyFilepath: ""
 #    kafka:
 #      brokers: [ ]
 #      clientId: "kminion"
