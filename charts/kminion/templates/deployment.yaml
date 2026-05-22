@@ -104,17 +104,23 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12}}
-          {{- if .Values.deployment.readinessProbe.enabled }}
-          readinessProbe:
-            {{- if .Values.deployment.tlsEnabled }}
-            httpsGet:
-              path: /ready
-              port: {{ .Values.service.port }}
-            {{- else }}
+          livenessProbe:
             httpGet:
               path: /ready
-              port: {{ .Values.service.port }}
-            {{- end }}
+              port: {{.Values.service.port}}
+              {{- if .Values.deployment.tlsEnabled }}
+              scheme: HTTPS
+              {{- end }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- if .Values.deployment.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{.Values.service.port}}
+              {{- if .Values.deployment.tlsEnabled }}
+              scheme: HTTPS
+              {{- end }}
             initialDelaySeconds: 10
           {{- end }}
         {{- with .Values.deployment.extraContainers }}
