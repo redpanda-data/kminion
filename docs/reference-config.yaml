@@ -50,7 +50,7 @@ kafka:
     username: ""
     # Password to use for PLAIN or SCRAM mechanism
     password: ""
-    # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI, OAUTHBEARER
+    # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI, OAUTHBEARER, AWS_MSK_IAM
     mechanism: "PLAIN"
     # GSSAPI / Kerberos config properties
     gssapi:
@@ -69,6 +69,12 @@ kafka:
       clientId: ""
       clientSecret: ""
       scope: ""
+    # AWS_MSK_IAM config properties
+    aws:
+      region: ""
+      roleArn: ""
+      externalId: ""
+      roleSessionName: ""
   # Maximum number of concurrent fetch requests, must be > 0
   maxConcurrentFetches: 10
   # Whether to retry the initial test connection to Kafka. False will exit with code 1 on error,
