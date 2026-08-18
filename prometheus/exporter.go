@@ -44,6 +44,7 @@ type Exporter struct {
 	consumerGroupMembersEmpty            *prometheus.Desc
 	consumerGroupTopicMembers            *prometheus.Desc
 	consumerGroupAssignedTopicPartitions *prometheus.Desc
+	consumerGroupTopicPartitionOffset    *prometheus.Desc
 	consumerGroupTopicOffsetSum          *prometheus.Desc
 	consumerGroupTopicPartitionLag       *prometheus.Desc
 	consumerGroupTopicLag                *prometheus.Desc
@@ -179,7 +180,14 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"group_id", "topic_name"},
 		nil,
 	)
-	// Topic / Partition Offset Sum (useful for calculating the consumed messages / sec on a topic)
+	// Topic Partition Offsets (useful for calculating the consumed messages / sec on a topic partition)
+	e.consumerGroupTopicPartitionOffset = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_partition_offset"),
+		"The committed offset of a consumer group for a given partition",
+		[]string{"group_id", "topic_name", "partition_id"},
+		nil,
+	)
+	// Topic Offset Sum (useful for calculating the consumed messages / sec on a topic)
 	e.consumerGroupTopicOffsetSum = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_topic_offset_sum"),
 		"The sum of all committed group offsets across all partitions in a topic",
