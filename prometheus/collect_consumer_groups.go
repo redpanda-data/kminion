@@ -23,6 +23,24 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 
 	// The list of groups may be incomplete due to group coordinators that might fail to respond. We do log an error
 	// message in that case (in the kafka request method) and groups will not be included in this list.
+	//
+	// seenGroups deduplicates consumer groups to prevent duplicate metric emission.
+	//
+	// Root cause: listConsumerGroups calls ListGroups via franz-go, which fans the
+	// request out to ALL brokers simultaneously (listGroupsSharder → allBrokersShardedReq).
+	// Each broker responds with the groups it currently believes it coordinates, and
+	// franz-go merges the responses by simple concatenation. During a coordinator
+	// migration (common when large consumer groups rebalance), both the old and new
+	// coordinator broker may transiently include the same group in their ListGroups
+	// response, producing duplicate group IDs in the merged list.
+	//
+	// Those duplicate IDs flow into DescribeGroups, causing the same group to appear
+	// multiple times in the DescribeGroups response. Without this guard, group-level
+	// metrics (consumer_group_info, consumer_group_members, …) would be emitted more
+	// than once per scrape cycle, and the Prometheus registry would reject the entire
+	// scrape with "collected metric … was collected before with the same name and
+	// label values".
+	seenGroups := make(map[string]struct{})
 	for _, grp := range groups {
 		coordinator := grp.BrokerMetadata.NodeID
 		for _, group := range grp.Groups.Groups {
@@ -37,6 +55,14 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			if !e.minionSvc.IsGroupAllowed(group.Group) {
 				continue
 			}
+			if _, seen := seenGroups[group.Group]; seen {
+				e.logger.Debug("skipping duplicate consumer group from broker shard response",
+					zap.String("group_id", group.Group),
+					zap.Int32("broker_id", coordinator),
+				)
+				continue
+			}
+			seenGroups[group.Group] = struct{}{}
 			state := 0
 			if group.State == "Stable" {
 				state = 1
