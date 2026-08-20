@@ -109,6 +109,7 @@ func main() {
 		),
 	)
 	http.Handle("/ready", minionSvc.HandleIsReady())
+	http.Handle("/live", minionSvc.HandleIsLive())
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
