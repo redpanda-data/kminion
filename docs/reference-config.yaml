@@ -194,3 +194,9 @@ exporter:
   host: ""
   # Port that shall be used to bind the HTTP server on
   port: 8080
+  # Whether or not TLS shall be enabled for the HTTP server
+  tlsEnabled: false
+  # Filepath to the TLS certificate (PEM format)
+  tlsCertFilepath: ""
+  # Filepath to the TLS private key (PEM format)
+  tlsKeyFilepath: ""
