@@ -24,6 +24,9 @@ type TopicConfig struct {
 	// take precedence over allowed topics.
 	IgnoredTopics []string `koanf:"ignoredTopics"`
 
+	// ListOffsets can be set to false in order to not collect any offset metrics at all.
+	ListOffsets bool `koanf:"listOffsets"`
+
 	// InfoMetric configures how the kafka_topic_info metric is populated
 	InfoMetric InfoMetricConfig `koanf:"infoMetric"`
 }
@@ -66,5 +69,6 @@ func (c *TopicConfig) SetDefaults() {
 	c.Enabled = true
 	c.Granularity = TopicGranularityPartition
 	c.AllowedTopics = []string{"/.*/"}
+	c.ListOffsets = true
 	c.InfoMetric = InfoMetricConfig{ConfigKeys: []string{"cleanup.policy"}}
 }
