@@ -48,6 +48,10 @@ type Exporter struct {
 	consumerGroupTopicPartitionLag       *prometheus.Desc
 	consumerGroupTopicLag                *prometheus.Desc
 	offsetCommits                        *prometheus.Desc
+
+	// ACLs
+	aclCount       *prometheus.Desc
+	aclCountByType *prometheus.Desc
 }
 
 func NewExporter(cfg Config, logger *zap.Logger, minionSvc *minion.Service) (*Exporter, error) {
@@ -158,7 +162,7 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"group_id"},
 		nil,
 	)
-	// Group Empty Memmbers
+	// Group Empty Members
 	e.consumerGroupMembersEmpty = prometheus.NewDesc(
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "consumer_group_empty_members"),
 		"It will report the number of members in the consumer group with no partition assigned",
@@ -207,7 +211,19 @@ func (e *Exporter) InitializeMetrics() {
 		[]string{"group_id"},
 		nil,
 	)
-
+	// ACLs
+	e.aclCount = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "acls_total"),
+		"The total number of ACLs in the cluster",
+		[]string{},
+		nil,
+	)
+	e.aclCountByType = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "acls_by_type"),
+		"The number of ACLs by resource type",
+		[]string{"resource_type"},
+		nil,
+	)
 }
 
 // Describe implements the prometheus.Collector interface. It sends the
@@ -224,7 +240,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
 
-	// Attach a unique id which will be used for caching (and and it's invalidation) of the kafka requests
+	// Attach a unique id which will be used for caching (and it's invalidation) of the kafka requests
 	uuid := uuid2.New()
 	ctx = context.WithValue(ctx, "requestId", uuid.String())
 
@@ -236,6 +252,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ok = e.collectTopicPartitionOffsets(ctx, ch) && ok
 	ok = e.collectConsumerGroupLags(ctx, ch) && ok
 	ok = e.collectTopicInfo(ctx, ch) && ok
+	ok = e.collectACLInfo(ctx, ch) && ok
 
 	if ok {
 		ch <- prometheus.MustNewConstMetric(e.exporterUp, prometheus.GaugeValue, 1.0)
