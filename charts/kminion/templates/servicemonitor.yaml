@@ -23,6 +23,10 @@ spec:
       relabelings:
       {{ toYaml .Values.serviceMonitor.relabelings | nindent 6 }}
       {{- end }}
+      {{- if .Values.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+      {{ toYaml .Values.serviceMonitor.metricRelabelings | nindent 6 }}
+      {{- end }}
   {{- if .Values.serviceMonitor.targetLabels}}
   targetLabels:
     {{- toYaml .Values.serviceMonitor.targetLabels | nindent 4}}

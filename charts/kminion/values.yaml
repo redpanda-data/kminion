@@ -138,6 +138,10 @@ serviceMonitor:
   #   targetLabel: my_label
   #   replacement: $1
   #   action: replace
+  metricRelabelings: []
+  # - sourcelabels: [ __name__ ]
+  #   regex: (dependency_group_name)
+  #   action: drop
 
 # For DaemonSet mode you may set daemonset to "true" and replicaCount to 0.
 daemonset:
