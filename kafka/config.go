@@ -11,6 +11,8 @@ type Config struct {
 	TLS  TLSConfig  `koanf:"tls"`
 	SASL SASLConfig `koanf:"sasl"`
 
+	ConnectionHealthCheck ConnectionHealthCheckConfig `koanf:"connectionHealthCheck"`
+
 	RetryInitConnection bool `koanf:"retryInitConnection"`
 }
 
@@ -19,6 +21,7 @@ func (c *Config) SetDefaults() {
 
 	c.TLS.SetDefaults()
 	c.SASL.SetDefaults()
+	c.ConnectionHealthCheck.SetDefaults()
 }
 
 func (c *Config) Validate() error {
@@ -34,6 +37,11 @@ func (c *Config) Validate() error {
 	err = c.SASL.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate SASL config: %w", err)
+	}
+
+	err = c.ConnectionHealthCheck.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate connectionHealthCheck config: %w", err)
 	}
 
 	return nil
