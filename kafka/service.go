@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -22,6 +23,29 @@ func NewService(cfg Config, logger *zap.Logger) *Service {
 		cfg:    cfg,
 		logger: logger.Named("kafka_service"),
 	}
+}
+
+// StartConnectionHealthCheck starts the opt-in per-broker connection health
+// check described by cfg.ConnectionHealthCheck. It returns immediately; the
+// check runs in a background goroutine until ctx is canceled. It is a no-op
+// if cfg.ConnectionHealthCheck.Enabled is false, so existing deployments that
+// don't set this config key see no behavior change.
+//
+// The check is fully independent of the client this Service (and the minion
+// and end-to-end services) use for their own checks: it creates its own
+// throwaway client every tick and never touches theirs.
+func (s *Service) StartConnectionHealthCheck(ctx context.Context, promRegisterer prometheus.Registerer) {
+	if !s.cfg.ConnectionHealthCheck.Enabled {
+		return
+	}
+
+	logger := s.logger.Named("connection_health_check")
+	metrics := newConnectionProbeMetrics(promRegisterer)
+	newProber := func(ctx context.Context) (brokerConnectionProber, error) {
+		return newLiveBrokerProber(s.cfg, logger)
+	}
+
+	go runConnectionHealthCheck(ctx, newProber, s.cfg.ConnectionHealthCheck.Interval, metrics, logger)
 }
 
 // CreateAndTestClient creates a client with the services default settings

@@ -65,6 +65,15 @@ kafka:
       clientId: ""
       clientSecret: ""
       scope: ""
+  # ConnectionHealthCheck is an optional, disabled-by-default probe. When
+  # enabled, kminion periodically opens a brand new connection to every
+  # broker in the cluster (independent of the connections used by the checks
+  # below) to detect a broker that has silently stopped accepting new Kafka
+  # connections. See kafka_connection_probe_* metrics.
+  connectionHealthCheck:
+    enabled: false
+    # How often to probe every broker with a fresh connection.
+    interval: 1m
 
 minion:
   consumerGroups:
