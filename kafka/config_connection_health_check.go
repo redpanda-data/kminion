@@ -16,7 +16,11 @@ import (
 type ConnectionHealthCheckConfig struct {
 	// Enabled turns the probe on.
 	Enabled bool `koanf:"enabled"`
-	// Interval is how often the probe runs against every broker in the cluster.
+	// Interval is how often the probe runs against every broker in the
+	// cluster. Values shorter than the ~10s per-broker request timeout
+	// (connectionProbeRequestTimeout) are allowed but not particularly
+	// useful, since a tick runs to completion before the next one starts
+	// and so ticks never overlap.
 	Interval time.Duration `koanf:"interval"`
 }
 

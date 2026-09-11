@@ -41,7 +41,7 @@ func (s *Service) StartConnectionHealthCheck(ctx context.Context, promRegisterer
 
 	logger := s.logger.Named("connection_health_check")
 	metrics := newConnectionProbeMetrics(promRegisterer)
-	newProber := func(ctx context.Context) (brokerConnectionProber, error) {
+	newProber := func(_ context.Context) (brokerConnectionProber, error) {
 		return newLiveBrokerProber(s.cfg, logger)
 	}
 

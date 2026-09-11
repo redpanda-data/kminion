@@ -69,7 +69,7 @@ kafka:
   # enabled, kminion periodically opens a brand new connection to every
   # broker in the cluster (independent of the connections used by the checks
   # below) to detect a broker that has silently stopped accepting new Kafka
-  # connections. See kafka_connection_probe_* metrics.
+  # connections. See kminion_kafka_connection_probe_* metrics (kminion_ is exporter.namespace).
   connectionHealthCheck:
     enabled: false
     # How often to probe every broker with a fresh connection.
