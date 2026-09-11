@@ -17,3 +17,4 @@ zk-multiple-kafka-multiple
 
 config
 /kminion
+.worktrees/
