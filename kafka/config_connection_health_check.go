@@ -16,17 +16,17 @@ import (
 type ConnectionHealthCheckConfig struct {
 	// Enabled turns the probe on.
 	Enabled bool `koanf:"enabled"`
-	// Interval is how often the probe runs against every broker in the
+	// ProbeInterval is how often the probe runs against every broker in the
 	// cluster. Values shorter than the ~10s per-broker request timeout
 	// (connectionProbeRequestTimeout) are allowed but not particularly
 	// useful, since a tick runs to completion before the next one starts
 	// and so ticks never overlap.
-	Interval time.Duration `koanf:"interval"`
+	ProbeInterval time.Duration `koanf:"probeInterval"`
 }
 
 func (c *ConnectionHealthCheckConfig) SetDefaults() {
 	c.Enabled = false
-	c.Interval = time.Minute
+	c.ProbeInterval = time.Minute
 }
 
 func (c *ConnectionHealthCheckConfig) Validate() error {
@@ -34,8 +34,8 @@ func (c *ConnectionHealthCheckConfig) Validate() error {
 		return nil
 	}
 
-	if c.Interval <= 0 {
-		return fmt.Errorf("failed to validate connectionHealthCheck config: interval must be greater than zero")
+	if c.ProbeInterval <= 0 {
+		return fmt.Errorf("probeInterval must be greater than zero")
 	}
 
 	return nil

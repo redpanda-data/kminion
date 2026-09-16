@@ -4,19 +4,22 @@ import (
 	"fmt"
 
 	"github.com/cloudhut/kminion/v2/e2e"
+	"github.com/cloudhut/kminion/v2/kafka"
 )
 
 type Config struct {
-	ConsumerGroups ConsumerGroupConfig `koanf:"consumerGroups"`
-	Topics         TopicConfig         `koanf:"topics"`
-	LogDirs        LogDirsConfig       `koanf:"logDirs"`
-	EndToEnd       e2e.Config          `koanf:"endToEnd"`
+	ConsumerGroups        ConsumerGroupConfig               `koanf:"consumerGroups"`
+	Topics                TopicConfig                       `koanf:"topics"`
+	LogDirs               LogDirsConfig                     `koanf:"logDirs"`
+	ConnectionHealthCheck kafka.ConnectionHealthCheckConfig `koanf:"connectionHealthCheck"`
+	EndToEnd              e2e.Config                        `koanf:"endToEnd"`
 }
 
 func (c *Config) SetDefaults() {
 	c.ConsumerGroups.SetDefaults()
 	c.Topics.SetDefaults()
 	c.LogDirs.SetDefaults()
+	c.ConnectionHealthCheck.SetDefaults()
 	c.EndToEnd.SetDefaults()
 }
 
@@ -34,6 +37,11 @@ func (c *Config) Validate() error {
 	err = c.LogDirs.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate log dirs config: %w", err)
+	}
+
+	err = c.ConnectionHealthCheck.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate connectionHealthCheck config: %w", err)
 	}
 
 	err = c.EndToEnd.Validate()

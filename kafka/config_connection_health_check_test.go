@@ -13,7 +13,7 @@ func TestConnectionHealthCheckConfig_SetDefaults(t *testing.T) {
 	c.SetDefaults()
 
 	assert.False(t, c.Enabled)
-	assert.Equal(t, time.Minute, c.Interval)
+	assert.Equal(t, time.Minute, c.ProbeInterval)
 }
 
 func TestConnectionHealthCheckConfig_Validate(t *testing.T) {
@@ -24,22 +24,22 @@ func TestConnectionHealthCheckConfig_Validate(t *testing.T) {
 	}{
 		{
 			name:    "disabled with zero interval is valid",
-			cfg:     ConnectionHealthCheckConfig{Enabled: false, Interval: 0},
+			cfg:     ConnectionHealthCheckConfig{Enabled: false, ProbeInterval: 0},
 			wantErr: false,
 		},
 		{
 			name:    "enabled with zero interval is invalid",
-			cfg:     ConnectionHealthCheckConfig{Enabled: true, Interval: 0},
+			cfg:     ConnectionHealthCheckConfig{Enabled: true, ProbeInterval: 0},
 			wantErr: true,
 		},
 		{
 			name:    "enabled with negative interval is invalid",
-			cfg:     ConnectionHealthCheckConfig{Enabled: true, Interval: -time.Second},
+			cfg:     ConnectionHealthCheckConfig{Enabled: true, ProbeInterval: -time.Second},
 			wantErr: true,
 		},
 		{
 			name:    "enabled with positive interval is valid",
-			cfg:     ConnectionHealthCheckConfig{Enabled: true, Interval: time.Minute},
+			cfg:     ConnectionHealthCheckConfig{Enabled: true, ProbeInterval: time.Minute},
 			wantErr: false,
 		},
 	}

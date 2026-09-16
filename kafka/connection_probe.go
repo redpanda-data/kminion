@@ -20,6 +20,15 @@ import (
 // cannot delay the probes to the others or stall the next tick.
 const connectionProbeRequestTimeout = 10 * time.Second
 
+// connectionProbeTickTimeout bounds an entire tick's work: creating a
+// client, listing brokers, and probing every one of them. Without this, a
+// hung ListBrokerIDs call (e.g. during a network partition) would block
+// forever, freezing every future tick along with it - not just the current
+// one. It is comfortably larger than connectionProbeRequestTimeout to leave
+// room for listing brokers plus the per-broker probes, which run
+// concurrently within it.
+const connectionProbeTickTimeout = 30 * time.Second
+
 // brokerConnectionProber is the seam that makes the connection health check
 // loop unit-testable without a live Kafka cluster: newLiveBrokerProber wraps a
 // real kgo.Client, and tests inject a fake implementation.
@@ -156,7 +165,10 @@ func pruneStaleBrokerLabels(metrics *connectionProbeMetrics, previous map[int32]
 // broker list (newProber or ListBrokerIDs failed), in which case
 // tickFailuresTotal is incremented.
 func probeAllBrokersOnce(ctx context.Context, newProber func(ctx context.Context) (brokerConnectionProber, error), metrics *connectionProbeMetrics, logger *zap.Logger) []int32 {
-	prober, err := newProber(ctx)
+	tickCtx, cancel := context.WithTimeout(ctx, connectionProbeTickTimeout)
+	defer cancel()
+
+	prober, err := newProber(tickCtx)
 	if err != nil {
 		logger.Warn("connection health check: failed to create prober", zap.Error(err))
 		metrics.tickFailuresTotal.Inc()
@@ -164,14 +176,21 @@ func probeAllBrokersOnce(ctx context.Context, newProber func(ctx context.Context
 	}
 	defer prober.Close()
 
-	brokerIDs, err := prober.ListBrokerIDs(ctx)
+	brokerIDs, err := prober.ListBrokerIDs(tickCtx)
 	if err != nil {
 		logger.Warn("connection health check: failed to list brokers", zap.Error(err))
 		metrics.tickFailuresTotal.Inc()
 		return nil
 	}
 
-	now := time.Now()
+	// Proactively initialize the failure-counter series for every discovered
+	// broker so it exists (at 0) from the moment the broker is seen, rather
+	// than staying absent from Prometheus until its first failure. Mirrors
+	// the same add(0) pattern e2e/producer.go already uses for its own
+	// per-partition failure counters.
+	for _, brokerID := range brokerIDs {
+		metrics.failuresTotal.WithLabelValues(strconv.FormatInt(int64(brokerID), 10)).Add(0)
+	}
 
 	var wg sync.WaitGroup
 	for _, brokerID := range brokerIDs {
@@ -179,7 +198,7 @@ func probeAllBrokersOnce(ctx context.Context, newProber func(ctx context.Context
 		go func(brokerID int32) {
 			defer wg.Done()
 
-			probeCtx, cancel := context.WithTimeout(ctx, connectionProbeRequestTimeout)
+			probeCtx, cancel := context.WithTimeout(tickCtx, connectionProbeRequestTimeout)
 			defer cancel()
 
 			probeErr := prober.ProbeBroker(probeCtx, brokerID)
@@ -189,7 +208,12 @@ func probeAllBrokersOnce(ctx context.Context, newProber func(ctx context.Context
 					zap.Error(probeErr))
 			}
 
-			recordProbeResult(metrics, brokerID, probeErr, now)
+			// time.Now() is read per-broker, right before recording, rather
+			// than once for the whole tick: probes run concurrently and can
+			// finish at meaningfully different times, so
+			// last_success_timestamp should reflect each broker's own
+			// completion time, not the tick's start time.
+			recordProbeResult(metrics, brokerID, probeErr, time.Now())
 		}(brokerID)
 	}
 	wg.Wait()
@@ -208,11 +232,17 @@ type liveBrokerProber struct {
 // TLS/SASL/etc settings as kminion's other Kafka clients, and wraps it as a
 // brokerConnectionProber. The caller must call Close() on the returned
 // prober once done with it.
-func newLiveBrokerProber(cfg Config, logger *zap.Logger) (brokerConnectionProber, error) {
+//
+// ctx bounds the client's own background work (e.g. connection teardown) via
+// kgo.WithContext, in addition to the ctx callers already pass explicitly to
+// every per-call method below - so if the tick that owns this prober is
+// canceled or times out, the client doesn't keep working past that point.
+func newLiveBrokerProber(ctx context.Context, cfg Config, logger *zap.Logger) (brokerConnectionProber, error) {
 	kgoOpts, err := NewKgoConfig(cfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka client config: %w", err)
 	}
+	kgoOpts = append(kgoOpts, kgo.WithContext(ctx))
 
 	client, err := kgo.NewClient(kgoOpts...)
 	if err != nil {
@@ -226,13 +256,16 @@ func newLiveBrokerProber(cfg Config, logger *zap.Logger) (brokerConnectionProber
 }
 
 func (p *liveBrokerProber) ListBrokerIDs(ctx context.Context) ([]int32, error) {
-	brokers, err := p.adm.ListBrokers(ctx)
+	// BrokerMetadata (unlike ListBrokers) explicitly requests no topics, so
+	// this stays a cheap "just the broker list" call rather than pulling
+	// every topic and partition in the cluster just to learn broker IDs.
+	meta, err := p.adm.BrokerMetadata(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list brokers: %w", err)
 	}
 
-	ids := make([]int32, 0, len(brokers))
-	for _, broker := range brokers {
+	ids := make([]int32, 0, len(meta.Brokers))
+	for _, broker := range meta.Brokers {
 		ids = append(ids, broker.NodeID)
 	}
 
