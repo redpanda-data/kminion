@@ -60,6 +60,12 @@ func main() {
 	// Create kafka service
 	kafkaSvc := kafka.NewService(cfg.Kafka, logger)
 
+	// Start the opt-in per-broker connection health check. This is a no-op
+	// unless cfg.Minion.ConnectionHealthCheck.Enabled is set, and is
+	// independent of the minion and end-to-end services started below: it
+	// never shares a client with either.
+	kafkaSvc.StartConnectionHealthCheck(ctx, cfg.Minion.ConnectionHealthCheck.Enabled, cfg.Minion.ConnectionHealthCheck.ProbeInterval, wrappedRegisterer)
+
 	// Create minion service
 	// Prometheus exporter only talks to the minion service which
 	// issues all the requests to Kafka and wraps the interface accordingly.

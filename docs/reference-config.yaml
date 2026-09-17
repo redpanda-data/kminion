@@ -112,6 +112,17 @@ minion:
     # to version 1.0.0 as describing log dirs was not supported back then.
     enabled: true
 
+  # ConnectionHealthCheck is an optional, disabled-by-default probe. When
+  # enabled, kminion periodically opens a brand new connection to every
+  # broker in the cluster (independent of the connections used by the checks
+  # above and below) to detect a broker that has silently stopped accepting
+  # new Kafka connections. See kminion_kafka_connection_probe_* metrics
+  # (kminion_ is exporter.namespace).
+  connectionHealthCheck:
+    enabled: false
+    # How often to probe every broker with a fresh connection.
+    probeInterval: 1m
+
   # EndToEnd Metrics
   # When enabled, kminion creates a topic which it produces to and consumes from, to measure various advanced metrics. See docs for more info
   endToEnd:

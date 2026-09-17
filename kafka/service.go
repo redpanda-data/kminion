@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
@@ -22,6 +23,26 @@ func NewService(cfg Config, logger *zap.Logger) *Service {
 		cfg:    cfg,
 		logger: logger.Named("kafka_service"),
 	}
+}
+
+// StartConnectionHealthCheck is a no-op if enabled is false, so existing
+// deployments see no behavior change; it takes probeInterval directly rather
+// than minion's config struct to avoid an import cycle (minion already
+// imports kafka). Otherwise it runs the check in a background goroutine,
+// using its own throwaway client every tick, fully independent of this
+// Service's other checks, until ctx is canceled.
+func (s *Service) StartConnectionHealthCheck(ctx context.Context, enabled bool, probeInterval time.Duration, promRegisterer prometheus.Registerer) {
+	if !enabled {
+		return
+	}
+
+	logger := s.logger.Named("connection_health_check")
+	metrics := newConnectionProbeMetrics(promRegisterer)
+	newProber := func(ctx context.Context) (brokerConnectionProber, error) {
+		return newLiveBrokerProber(ctx, s.cfg, logger)
+	}
+
+	go runConnectionHealthCheck(ctx, newProber, probeInterval, metrics, logger)
 }
 
 // CreateAndTestClient creates a client with the services default settings
