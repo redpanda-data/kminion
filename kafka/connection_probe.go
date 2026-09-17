@@ -95,17 +95,12 @@ func recordProbeResult(metrics *connectionProbeMetrics, brokerID int32, probeErr
 	metrics.lastSuccessTimestamp.WithLabelValues(label).Set(float64(now.Unix()))
 }
 
-// runConnectionHealthCheck runs probeAllBrokersOnce once immediately and then
-// again on every tick of a ticker, until ctx is canceled. Probing immediately
-// on startup means a crash-looping process still gets at least one probe
-// recorded, rather than waiting a full interval for the first result.
-// newProber is called at the start of every tick so each tick probes with
-// brand new connections rather than reusing ones from the previous tick.
-//
-// Between ticks it tracks which broker IDs were seen on the previous
-// successful tick and deletes the metric label series for any broker ID that
-// has since dropped out of the cluster, so a replaced broker doesn't leave
-// behind a permanently-frozen, permanently-"stale" series.
+// runConnectionHealthCheck probes once immediately (so a crash-looping
+// process still records one result) and then on every tick until ctx is
+// canceled, calling newProber fresh each time so every tick uses brand new
+// connections. Between ticks it deletes the metric series for any broker ID
+// that has dropped out of the cluster since the last successful tick, so a
+// replaced broker doesn't leave a permanently-stale series behind.
 func runConnectionHealthCheck(ctx context.Context, newProber func(ctx context.Context) (brokerConnectionProber, error), interval time.Duration, metrics *connectionProbeMetrics, logger *zap.Logger) {
 	seenBrokerIDs := make(map[int32]struct{})
 
@@ -228,15 +223,12 @@ type liveBrokerProber struct {
 	adm    *kadm.Client
 }
 
-// newLiveBrokerProber creates a brand new kgo.Client using the same
-// TLS/SASL/etc settings as kminion's other Kafka clients, and wraps it as a
-// brokerConnectionProber. The caller must call Close() on the returned
-// prober once done with it.
-//
-// ctx bounds the client's own background work (e.g. connection teardown) via
-// kgo.WithContext, in addition to the ctx callers already pass explicitly to
-// every per-call method below - so if the tick that owns this prober is
-// canceled or times out, the client doesn't keep working past that point.
+// newLiveBrokerProber creates a brand new kgo.Client with the same
+// TLS/SASL/etc settings as kminion's other clients and wraps it as a
+// brokerConnectionProber; the caller must call Close() on it when done. ctx
+// also bounds the client's own background work via kgo.WithContext, not
+// just the per-call contexts passed to its methods, so the client stops
+// working once the owning tick is canceled or times out.
 func newLiveBrokerProber(ctx context.Context, cfg Config, logger *zap.Logger) (brokerConnectionProber, error) {
 	kgoOpts, err := NewKgoConfig(cfg, logger)
 	if err != nil {
