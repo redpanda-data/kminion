@@ -18,7 +18,7 @@ func TestService_StartConnectionHealthCheck_DisabledIsNoop(t *testing.T) {
 	svc := NewService(cfg, zap.NewNop())
 	registry := prometheus.NewRegistry()
 
-	svc.StartConnectionHealthCheck(context.Background(), ConnectionHealthCheckConfig{Enabled: false}, registry)
+	svc.StartConnectionHealthCheck(context.Background(), false, time.Minute, registry)
 
 	metricFamilies, err := registry.Gather()
 	require.NoError(t, err)
@@ -32,7 +32,6 @@ func TestService_StartConnectionHealthCheck_EnabledRegistersMetrics(t *testing.T
 	// that enabling the check registers its metrics and starts the
 	// background loop, not to successfully probe a broker.
 	cfg.Brokers = []string{"127.0.0.1:1"}
-	healthCheckCfg := ConnectionHealthCheckConfig{Enabled: true, ProbeInterval: time.Hour}
 
 	svc := NewService(cfg, zap.NewNop())
 	registry := prometheus.NewRegistry()
@@ -40,7 +39,7 @@ func TestService_StartConnectionHealthCheck_EnabledRegistersMetrics(t *testing.T
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	svc.StartConnectionHealthCheck(ctx, healthCheckCfg, registry)
+	svc.StartConnectionHealthCheck(ctx, true, time.Hour, registry)
 
 	// StartConnectionHealthCheck registers the metrics synchronously, before
 	// launching the background loop in a goroutine, so this can be asserted

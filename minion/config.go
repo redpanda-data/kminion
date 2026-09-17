@@ -4,15 +4,14 @@ import (
 	"fmt"
 
 	"github.com/cloudhut/kminion/v2/e2e"
-	"github.com/cloudhut/kminion/v2/kafka"
 )
 
 type Config struct {
-	ConsumerGroups        ConsumerGroupConfig               `koanf:"consumerGroups"`
-	Topics                TopicConfig                       `koanf:"topics"`
-	LogDirs               LogDirsConfig                     `koanf:"logDirs"`
-	ConnectionHealthCheck kafka.ConnectionHealthCheckConfig `koanf:"connectionHealthCheck"`
-	EndToEnd              e2e.Config                        `koanf:"endToEnd"`
+	ConsumerGroups        ConsumerGroupConfig         `koanf:"consumerGroups"`
+	Topics                TopicConfig                 `koanf:"topics"`
+	LogDirs               LogDirsConfig               `koanf:"logDirs"`
+	ConnectionHealthCheck ConnectionHealthCheckConfig `koanf:"connectionHealthCheck"`
+	EndToEnd              e2e.Config                  `koanf:"endToEnd"`
 }
 
 func (c *Config) SetDefaults() {

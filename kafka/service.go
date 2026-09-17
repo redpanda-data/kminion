@@ -26,16 +26,22 @@ func NewService(cfg Config, logger *zap.Logger) *Service {
 }
 
 // StartConnectionHealthCheck starts the opt-in per-broker connection health
-// check described by cfg. It returns immediately; the check runs in a
-// background goroutine until ctx is canceled. It is a no-op if
-// cfg.Enabled is false, so existing deployments that don't set this config
-// key see no behavior change.
+// check. It returns immediately; the check runs in a background goroutine
+// until ctx is canceled. It is a no-op if enabled is false, so existing
+// deployments that don't set this config key see no behavior change.
+//
+// The config type this feature is described by (minion.ConnectionHealthCheckConfig)
+// lives outside this package to keep it nested under the minion: config
+// block; this method takes the two values out of it directly rather than
+// the struct itself, so this package has no dependency on minion's types
+// (which would otherwise be an import cycle, since minion already imports
+// kafka).
 //
 // The check is fully independent of the client this Service (and the minion
 // and end-to-end services) use for their own checks: it creates its own
 // throwaway client every tick and never touches theirs.
-func (s *Service) StartConnectionHealthCheck(ctx context.Context, cfg ConnectionHealthCheckConfig, promRegisterer prometheus.Registerer) {
-	if !cfg.Enabled {
+func (s *Service) StartConnectionHealthCheck(ctx context.Context, enabled bool, probeInterval time.Duration, promRegisterer prometheus.Registerer) {
+	if !enabled {
 		return
 	}
 
@@ -45,7 +51,7 @@ func (s *Service) StartConnectionHealthCheck(ctx context.Context, cfg Connection
 		return newLiveBrokerProber(ctx, s.cfg, logger)
 	}
 
-	go runConnectionHealthCheck(ctx, newProber, cfg.ProbeInterval, metrics, logger)
+	go runConnectionHealthCheck(ctx, newProber, probeInterval, metrics, logger)
 }
 
 // CreateAndTestClient creates a client with the services default settings
