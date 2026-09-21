@@ -32,11 +32,14 @@ type Exporter struct {
 	topicLogDirSize  *prometheus.Desc
 
 	// Topic / Partition
-	topicInfo              *prometheus.Desc
-	topicHighWaterMarkSum  *prometheus.Desc
-	partitionHighWaterMark *prometheus.Desc
-	topicLowWaterMarkSum   *prometheus.Desc
-	partitionLowWaterMark  *prometheus.Desc
+	topicInfo                *prometheus.Desc
+	topicHighWaterMarkSum    *prometheus.Desc
+	partitionHighWaterMark   *prometheus.Desc
+	topicLowWaterMarkSum     *prometheus.Desc
+	partitionLowWaterMark    *prometheus.Desc
+	topicPartitionCount      *prometheus.Desc
+	partitionUnderReplicated *prometheus.Desc
+	partitionLeader          *prometheus.Desc
 
 	// Consumer Groups
 	consumerGroupInfo                    *prometheus.Desc
@@ -140,6 +143,27 @@ func (e *Exporter) InitializeMetrics() {
 		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_high_water_mark_sum"),
 		"Sum of all the topic's partition high water marks",
 		[]string{"topic_name"},
+		nil,
+	)
+
+	e.topicPartitionCount = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_count"),
+		"Number of topic partitions",
+		[]string{"topic_name"},
+		nil,
+	)
+
+	e.partitionLeader = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_partition_leader"),
+		"Leader Broker id of partition",
+		[]string{"topic_name", "partition_id"},
+		nil,
+	)
+
+	e.partitionUnderReplicated = prometheus.NewDesc(
+		prometheus.BuildFQName(e.cfg.Namespace, "kafka", "topic_under_replicated_partition"),
+		"Under replicated partition",
+		[]string{"topic_name", "partition_id"},
 		nil,
 	)
 
