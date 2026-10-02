@@ -42,6 +42,13 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("failed to validate minion config: %w", err)
 	}
 
+	if c.Exporter.TLSEnabled && c.Exporter.TLSCertFilepath == "" {
+		return fmt.Errorf("exporter TLS is enabled but 'tlsCertFilepath' is not set")
+	}
+	if c.Exporter.TLSEnabled && c.Exporter.TLSKeyFilepath == "" {
+		return fmt.Errorf("exporter TLS is enabled but 'tlsKeyFilepath' is not set")
+	}
+
 	err = c.Logger.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate logger config: %w", err)

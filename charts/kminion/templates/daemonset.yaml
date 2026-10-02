@@ -40,6 +40,11 @@ spec:
           secret:
             secretName: {{.secretName}}
         {{- end}}
+        {{- if .Values.deployment.tlsEnabled }}
+        - name: exporter-tls
+          secret:
+            secretName: {{ .Values.deployment.tlsCertSecret }}
+        {{- end }}
       containers:
         - name: {{.Chart.Name}}
           securityContext:
@@ -86,6 +91,11 @@ spec:
             - name: {{.secretName}}
               mountPath: {{.mountPath}}
             {{- end}}
+            {{- if .Values.deployment.tlsEnabled }}
+            - name: exporter-tls
+              mountPath: {{ .Values.deployment.tlsMountPath }}
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12}}
           livenessProbe:
@@ -93,7 +103,11 @@ spec:
             httpGet:
               path: /ready
               port: metrics
+              {{- if .Values.deployment.tlsEnabled }}
+              scheme: HTTPS
+              {{- else }}
               scheme: HTTP
+              {{- end }}
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
@@ -103,7 +117,11 @@ spec:
             httpGet:
               path: /ready
               port: metrics
+              {{- if .Values.deployment.tlsEnabled }}
+              scheme: HTTPS
+              {{- else }}
               scheme: HTTP
+              {{- end }}
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1

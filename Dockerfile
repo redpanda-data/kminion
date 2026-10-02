@@ -33,7 +33,9 @@ COPY --from=builder /app/bin/kminion /app/kminion
 RUN addgroup -S redpanda \
     && adduser -S redpanda -G redpanda \
     && chmod o+rx /app/kminion \
-    && apk upgrade --no-cache
+    && apk upgrade --no-cache \
+    && mkdir -p /etc/kminion/tls \
+    && chown -R redpanda:redpanda /etc/kminion
 USER redpanda
 
 ENTRYPOINT ["/app/kminion"]
