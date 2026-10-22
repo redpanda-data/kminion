@@ -11,21 +11,15 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Service) startConsumeMessages(ctx context.Context, initializedCh chan<- bool) {
+func (s *Service) startConsumeMessages(ctx context.Context) {
 	client := s.client
 
 	s.logger.Info("starting to consume end-to-end topic",
 		zap.String("topic_name", s.config.TopicManagement.Name),
 		zap.String("group_id", s.groupId))
 
-	isInitialized := false
 	for {
 		fetches := client.PollFetches(ctx)
-		if !isInitialized {
-			isInitialized = true
-			initializedCh <- true
-			close(initializedCh)
-		}
 
 		// Log all errors and continue afterwards as we might get errors and still have some fetch results
 		errors := fetches.Errors()
