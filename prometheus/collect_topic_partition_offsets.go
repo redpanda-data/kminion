@@ -14,6 +14,9 @@ func (e *Exporter) collectTopicPartitionOffsets(ctx context.Context, ch chan<- p
 	if !e.minionSvc.Cfg.Topics.Enabled {
 		return true
 	}
+	if !e.minionSvc.Cfg.Topics.ListOffsets {
+		return true
+	}
 
 	isOk := true
 
