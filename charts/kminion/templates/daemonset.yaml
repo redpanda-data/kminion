@@ -91,7 +91,7 @@ spec:
           livenessProbe:
             failureThreshold: 3
             httpGet:
-              path: /ready
+              path: /live
               port: metrics
               scheme: HTTP
             initialDelaySeconds: 10
