@@ -65,7 +65,7 @@ kminion_kafka_connection_probe_tick_failures_total 0
 ```
 # HELP kminion_kafka_topic_info Info labels for a given topic
 # TYPE kminion_kafka_topic_info gauge
-kminion_kafka_topic_info{cleanup_policy="compact",partition_count="1",replication_factor="1",topic_name="_confluent-ksql-default__command_topic"} 1
+kminion_kafka_topic_info{cleanup_policy="compact",partition_count="1",replication_factor="1",topic_id="1mzZUsAWTfeaM0Aq7IUJbw",topic_name="_confluent-ksql-default__command_topic"} 1
 
 # HELP kminion_kafka_topic_partition_low_water_mark Partition Low Water Mark
 # TYPE kminion_kafka_topic_partition_low_water_mark gauge
