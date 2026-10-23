@@ -10,10 +10,15 @@ import (
 	"net"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl"
+	saslaws "github.com/twmb/franz-go/pkg/sasl/aws"
 	"github.com/twmb/franz-go/pkg/sasl/kerberos"
 	"github.com/twmb/franz-go/pkg/sasl/oauth"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
@@ -124,6 +129,44 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 					Zid:   cfg.SASL.OAuthBearer.ClientID,
 					Token: token,
 				}, err
+			})
+			opts = append(opts, kgo.SASL(mechanism))
+		}
+
+		// AWS MSK IAM
+		if cfg.SASL.Mechanism == SASLMechanismAWSMSKIAM {
+			var loadOptions []func(*awsconfig.LoadOptions) error
+			if cfg.SASL.AWS.Region != "" {
+				loadOptions = append(loadOptions, awsconfig.WithRegion(cfg.SASL.AWS.Region))
+			}
+			awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOptions...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load aws config: %w", err)
+			}
+
+			credentialsProvider := awsCfg.Credentials
+			if cfg.SASL.AWS.RoleARN != "" {
+				stsClient := sts.NewFromConfig(awsCfg)
+				credentialsProvider = aws.NewCredentialsCache(stscreds.NewAssumeRoleProvider(stsClient, cfg.SASL.AWS.RoleARN, func(options *stscreds.AssumeRoleOptions) {
+					if cfg.SASL.AWS.RoleSessionName != "" {
+						options.RoleSessionName = cfg.SASL.AWS.RoleSessionName
+					}
+					if cfg.SASL.AWS.ExternalID != "" {
+						options.ExternalID = aws.String(cfg.SASL.AWS.ExternalID)
+					}
+				}))
+			}
+
+			mechanism := saslaws.ManagedStreamingIAM(func(ctx context.Context) (saslaws.Auth, error) {
+				credentials, err := credentialsProvider.Retrieve(ctx)
+				if err != nil {
+					return saslaws.Auth{}, fmt.Errorf("failed to retrieve aws credentials: %w", err)
+				}
+				return saslaws.Auth{
+					AccessKey:    credentials.AccessKeyID,
+					SecretKey:    credentials.SecretAccessKey,
+					SessionToken: credentials.SessionToken,
+				}, nil
 			})
 			opts = append(opts, kgo.SASL(mechanism))
 		}
