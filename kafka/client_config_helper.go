@@ -31,7 +31,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 		kgo.SeedBrokers(cfg.Brokers...),
 		kgo.ClientID(cfg.ClientID),
 		kgo.FetchMaxBytes(5 * 1000 * 1000), // 5MB
-		kgo.MaxConcurrentFetches(10),
+		kgo.MaxConcurrentFetches(cfg.MaxConcurrentFetches),
 		// Allow metadata to be refreshed more often than 5s (default) if needed.
 		// That will mitigate issues with unknown partitions shortly after creating
 		// them.
