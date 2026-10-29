@@ -2,6 +2,8 @@ module github.com/cloudhut/kminion/v2
 
 go 1.26.10
 
+godebug multipathtcp=0
+
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jcmturner/gokrb5/v8 v8.4.4
