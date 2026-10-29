@@ -25,8 +25,6 @@ kafka:
   brokers: [ ]
   clientId: "kminion"
   rackId: ""
-  # Maximum number of concurrent fetch requests, must be > 0
-  maxConcurrentFetches: 10
   tls:
     enabled: false
     caFilepath: ""
@@ -67,6 +65,8 @@ kafka:
       clientId: ""
       clientSecret: ""
       scope: ""
+  # Maximum number of concurrent fetch requests, must be > 0
+  maxConcurrentFetches: 10
 
 minion:
   consumerGroups:

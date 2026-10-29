@@ -8,29 +8,26 @@ type Config struct {
 	ClientID string   `koanf:"clientId"`
 	RackID   string   `koanf:"rackId"`
 
-	MaxConcurrentFetches int `koanf:"maxConcurrentFetches"`
-
 	TLS  TLSConfig  `koanf:"tls"`
 	SASL SASLConfig `koanf:"sasl"`
 
-	RetryInitConnection bool `koanf:"retryInitConnection"`
+	// Client behavior
+	MaxConcurrentFetches int  `koanf:"maxConcurrentFetches"`
+	RetryInitConnection  bool `koanf:"retryInitConnection"`
 }
 
 func (c *Config) SetDefaults() {
 	c.ClientID = "kminion"
-	c.MaxConcurrentFetches = 10
 
 	c.TLS.SetDefaults()
 	c.SASL.SetDefaults()
+
+	c.MaxConcurrentFetches = 10
 }
 
 func (c *Config) Validate() error {
 	if len(c.Brokers) == 0 {
 		return fmt.Errorf("no seed brokers specified, at least one must be configured")
-	}
-
-	if c.MaxConcurrentFetches < 1 {
-		return fmt.Errorf("maxConcurrentFetches must be greater than 0")
 	}
 
 	err := c.TLS.Validate()
@@ -41,6 +38,10 @@ func (c *Config) Validate() error {
 	err = c.SASL.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate SASL config: %w", err)
+	}
+
+	if c.MaxConcurrentFetches < 1 {
+		return fmt.Errorf("maxConcurrentFetches must be greater than 0")
 	}
 
 	return nil
