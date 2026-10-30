@@ -94,6 +94,16 @@ spec:
             {{- end}}
           resources:
             {{- toYaml .Values.resources | nindent 12}}
+          {{- if .Values.deployment.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: {{.Values.service.port}}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
+          {{- end }}
           {{- if .Values.deployment.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
