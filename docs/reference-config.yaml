@@ -67,6 +67,9 @@ kafka:
       scope: ""
   # Maximum number of concurrent fetch requests, must be > 0
   maxConcurrentFetches: 10
+  # Whether to retry the initial test connection to Kafka. False will exit with code 1 on error,
+  # while true will retry until success.
+  retryInitConnection: false
 
 minion:
   consumerGroups:
