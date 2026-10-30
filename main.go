@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/cloudhut/kminion/v2/e2e"
 	"github.com/cloudhut/kminion/v2/kafka"
@@ -119,7 +120,7 @@ func main() {
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
-	srv := &http.Server{Addr: address}
+	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {
