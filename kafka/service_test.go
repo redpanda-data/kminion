@@ -48,3 +48,23 @@ func TestService_StartConnectionHealthCheck_EnabledRegistersMetrics(t *testing.T
 	require.NoError(t, err)
 	require.NotEmpty(t, metricFamilies, "metrics should be registered as soon as the check is enabled")
 }
+
+func TestService_CreateAndTestClient_RetryStopsOnContextCancel(t *testing.T) {
+	cfg := Config{}
+	cfg.SetDefaults()
+	// Nothing listens on this port, so every connection test fails.
+	cfg.Brokers = []string{"127.0.0.1:1"}
+	cfg.RetryInitConnection = true
+
+	svc := NewService(cfg, zap.NewNop())
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	start := time.Now()
+	client, err := svc.CreateAndTestClient(ctx, zap.NewNop(), nil)
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Nil(t, client)
+	require.Less(t, time.Since(start), 5*time.Second, "the retry loop should stop when the context is done")
+}
