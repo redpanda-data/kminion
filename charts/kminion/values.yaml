@@ -207,7 +207,7 @@ kminion:
 #        username: ""
 #        # Password to use for PLAIN or SCRAM mechanism
 #        password: ""
-#        # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI
+#        # Mechanism to use for SASL Authentication. Valid values are PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI, OAUTHBEARER
 #        mechanism: "PLAIN"
 #        # GSSAPI / Kerberos config properties
 #        gssapi:
@@ -218,6 +218,12 @@ kminion:
 #          username: ""
 #          password: ""
 #          realm: ""
+#        # OAUTHBEARER config properties
+#        oauth:
+#          tokenEndpoint: ""
+#          clientId: ""
+#          clientSecret: ""
+#          scope: ""
 #      # Whether to retry the initial test connection to Kafka. False will exit with code 1 on error,
 #      # while true will retry until success.
 #      retryInitConnection: false
