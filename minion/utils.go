@@ -43,7 +43,7 @@ func (s *Service) IsTopicAllowed(topicName string) bool {
 }
 
 func compileRegex(expr string) (*regexp.Regexp, error) {
-	if strings.HasPrefix(expr, "/") && strings.HasSuffix(expr, "/") {
+	if len(expr) >= 2 && strings.HasPrefix(expr, "/") && strings.HasSuffix(expr, "/") {
 		substr := expr[1 : len(expr)-1]
 		regex, err := regexp.Compile(substr)
 		if err != nil {
