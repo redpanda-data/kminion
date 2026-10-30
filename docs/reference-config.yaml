@@ -191,6 +191,10 @@ minion:
       # KMinion to cleanup it's old consumer groups. It should only be used if you use a unique prefix for KMinion.
       deleteStaleConsumerGroups: false
 
+      # How long startup waits for the consumer group to assign partitions before the producer starts anyway.
+      # Raise it if the brokers use a long group_initial_rebalance_delay.
+      initTimeout: 30s
+
       # This defines:
       # - Upper bound for histogram buckets in "roundtrip_latency"
       # - Time limit beyond which a message is considered "lost" (failed the roundtrip)

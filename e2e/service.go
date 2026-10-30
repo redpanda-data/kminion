@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,7 @@ type Service struct {
 	groupTracker   *groupTracker   // tracks consumer groups starting with the kminion prefix and deletes them if they are unused for some time
 	messageTracker *messageTracker // tracks successfully produced messages,
 	clientHooks    *clientHooks    // logs broker events, tracks the coordinator (i.e. which broker last responded to our offset commit)
+	assignedCh     chan struct{}   // closed once the consumer group has assigned partitions to this instance
 	partitionCount int             // number of partitions of our test topic, used to send messages to all partitions
 
 	// Metrics
@@ -48,6 +50,9 @@ type Service struct {
 func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *kafka.Service, promRegisterer prometheus.Registerer) (*Service, error) {
 	minionID := uuid.NewString()
 	groupID := fmt.Sprintf("%v-%v", cfg.Consumer.GroupIdPrefix, minionID)
+
+	assignedCh := make(chan struct{})
+	var assignedOnce sync.Once
 
 	// Producer options
 	kgoOpts := []kgo.Opt{
@@ -70,6 +75,11 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 		kgo.Balancers(kgo.CooperativeStickyBalancer()),
 		kgo.DisableAutoCommit(),
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()),
+		kgo.OnPartitionsAssigned(func(_ context.Context, _ *kgo.Client, assigned map[string][]int32) {
+			if len(assigned) > 0 {
+				assignedOnce.Do(func() { close(assignedCh) })
+			}
+		}),
 	)
 
 	// Prepare hooks
@@ -91,6 +101,7 @@ func NewService(ctx context.Context, cfg Config, logger *zap.Logger, kafkaSvc *k
 		kafkaSvc: kafkaSvc,
 		client:   client,
 
+		assignedCh:  assignedCh,
 		minionID:    minionID,
 		groupId:     groupID,
 		clientHooks: hooks,
@@ -158,24 +169,23 @@ func (s *Service) Start(ctx context.Context) error {
 	// finally start everything else (producing, consuming, continuous validation, consumer group tracking)
 	go s.startReconciliation(ctx)
 
-	// Start consumer and wait until we've received a response for the first poll
-	// which would indicate that the consumer is ready. Only if the consumer is
-	// ready we want to start the e2e producer to ensure that we will not miss
-	// messages because the consumer wasn't ready. However, if this initialization
-	// does not succeed within 30s we have to assume, that something is wrong on the
-	// consuming or producing side. KMinion is supposed to report these kind of
+	// Start consumer and wait until the group has assigned partitions to it. Only then
+	// we start the e2e producer, otherwise messages produced before the assignment are
+	// never consumed and would be reported as lost. However, if this does not succeed
+	// within the configured init timeout we have to assume that something is wrong on
+	// the consuming or producing side. KMinion is supposed to report these kind of
 	// issues and therefore this should not block KMinion from starting.
-	initCh := make(chan bool, 1)
-	s.logger.Info("initializing consumer and waiting until it has received the first record batch")
-	go s.startConsumeMessages(ctx, initCh)
+	s.logger.Info("initializing consumer and waiting until the group has assigned partitions")
+	go s.startConsumeMessages(ctx)
 
-	// Produce an init message until the consumer received at least one fetch
+	// Produce an init message until the consumer is assigned partitions
 	initTicker := time.NewTicker(1 * time.Second)
+	defer initTicker.Stop()
 	isInitialized := false
 
 	// We send a first message immediately, but we'll keep sending more messages later
 	// since the consumers start at the latest offset and may have missed this message.
-	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	initCtx, cancel := context.WithTimeout(ctx, s.config.Consumer.InitTimeout)
 	defer cancel()
 	s.sendInitMessage(initCtx, s.client, s.config.TopicManagement.Name)
 
@@ -183,13 +193,14 @@ func (s *Service) Start(ctx context.Context) error {
 		select {
 		case <-initTicker.C:
 			s.sendInitMessage(initCtx, s.client, s.config.TopicManagement.Name)
-		case <-initCh:
+		case <-s.assignedCh:
 			isInitialized = true
 			s.logger.Info("consumer has been successfully initialized")
 		case <-initCtx.Done():
 			// At this point we just assume the consumers are running fine.
 			// The entire cluster may be down or producing fails.
-			s.logger.Warn("initializing the consumers timed out, proceeding with the startup")
+			s.logger.Warn("initializing the consumers timed out, proceeding with the startup",
+				zap.Duration("init_timeout", s.config.Consumer.InitTimeout))
 			isInitialized = true
 		case <-ctx.Done():
 			return nil
