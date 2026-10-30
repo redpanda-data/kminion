@@ -8,7 +8,8 @@ This chart is intentionally very light on input validation. The goal was to offe
 users to deploy KMinion the way they want to. Therefore it's very flexible at the cost of less input validation, so that
 you might run into runtime errors for a misconfiguration.
 
-All available input is documented inside of the [values.yaml](./kminion/values.yaml) file.
+The chart source is no longer in this repo. To see the values of an archived chart version, run
+`helm show values kminion/kminion --version <version>`.
 
 ## Installing the Helm chart
 
