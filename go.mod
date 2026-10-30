@@ -2,6 +2,10 @@ module github.com/cloudhut/kminion/v2
 
 go 1.26.10
 
+// Disable MPTCP listeners (Go 1.24+ default on Linux). This reduces the kernel attack surface.
+// See CVE-2026-98432 and https://go.dev/issue/82717.
+godebug multipathtcp=0
+
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jcmturner/gokrb5/v8 v8.4.4
