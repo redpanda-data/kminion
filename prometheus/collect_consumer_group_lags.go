@@ -129,6 +129,10 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 	isOk := true
 
 	groupOffsets, err := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
+	if err != nil {
+		e.logger.Error("failed to list consumer group offsets from the admin api", zap.Error(err))
+		return false
+	}
 	for groupName, offsetRes := range groupOffsets {
 		if !e.minionSvc.IsGroupAllowed(groupName) {
 			continue
