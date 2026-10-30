@@ -14,6 +14,7 @@ func TestPartitionGroupIDsByType(t *testing.T) {
 		groups           []kmsg.ListGroupsResponseGroup
 		expectedClassic  []string
 		expectedConsumer []string
+		expectedSkipped  []string
 	}{
 		{
 			name: "splits groups by their reported type",
@@ -23,6 +24,7 @@ func TestPartitionGroupIDsByType(t *testing.T) {
 			},
 			expectedClassic:  []string{"classic-group"},
 			expectedConsumer: []string{"kip848-group"},
+			expectedSkipped:  []string{},
 		},
 		{
 			name: "treats groups without a reported type as classic",
@@ -31,6 +33,7 @@ func TestPartitionGroupIDsByType(t *testing.T) {
 			},
 			expectedClassic:  []string{"old-broker-group"},
 			expectedConsumer: []string{},
+			expectedSkipped:  []string{},
 		},
 		{
 			name: "matches the group type case insensitively",
@@ -39,14 +42,18 @@ func TestPartitionGroupIDsByType(t *testing.T) {
 			},
 			expectedClassic:  []string{},
 			expectedConsumer: []string{"kip848-group"},
+			expectedSkipped:  []string{},
 		},
 		{
-			name: "treats unknown group types as classic",
+			name: "skips groups of any other type",
 			groups: []kmsg.ListGroupsResponseGroup{
+				{Group: "classic-group", GroupType: "classic"},
 				{Group: "share-group", GroupType: "share"},
+				{Group: "streams-group", GroupType: "streams"},
 			},
-			expectedClassic:  []string{"share-group"},
+			expectedClassic:  []string{"classic-group"},
 			expectedConsumer: []string{},
+			expectedSkipped:  []string{"share-group", "streams-group"},
 		},
 	}
 
@@ -55,10 +62,15 @@ func TestPartitionGroupIDsByType(t *testing.T) {
 			listRes := kmsg.NewPtrListGroupsResponse()
 			listRes.Groups = test.groups
 
-			classicGroupIDs, consumerGroupIDs := partitionGroupIDsByType(listRes)
+			classicGroupIDs, consumerGroupIDs, skippedGroups := partitionGroupIDsByType(listRes)
 
+			skippedGroupIDs := make([]string, 0, len(skippedGroups))
+			for _, group := range skippedGroups {
+				skippedGroupIDs = append(skippedGroupIDs, group.Group)
+			}
 			assert.Equal(t, test.expectedClassic, classicGroupIDs)
 			assert.Equal(t, test.expectedConsumer, consumerGroupIDs)
+			assert.Equal(t, test.expectedSkipped, skippedGroupIDs)
 		})
 	}
 }
@@ -133,6 +145,51 @@ func TestConsumerGroupDescribeToDescribeGroups(t *testing.T) {
 	t.Run("reports a member without an assignment as unassigned", func(t *testing.T) {
 		member := kmsg.NewConsumerGroupDescribeResponseGroupMember()
 		member.MemberID = "member-id"
+
+		group := kmsg.NewConsumerGroupDescribeResponseGroup()
+		group.Group = "kip848-group"
+		group.Members = []kmsg.ConsumerGroupDescribeResponseGroupMember{member}
+
+		res := kmsg.NewPtrConsumerGroupDescribeResponse()
+		res.Groups = []kmsg.ConsumerGroupDescribeResponseGroup{group}
+
+		converted := consumerGroupDescribeToDescribeGroups(res)
+
+		require.Len(t, converted.Groups, 1)
+		require.Len(t, converted.Groups[0].Members, 1)
+		assert.Empty(t, converted.Groups[0].Members[0].MemberAssignment)
+	})
+	t.Run("skips assigned topics without a name", func(t *testing.T) {
+		member := kmsg.NewConsumerGroupDescribeResponseGroupMember()
+		member.MemberID = "member-id"
+		member.Assignment.TopicPartitions = []kmsg.AssignmentTopicPartition{
+			{Topic: "", Partitions: []int32{0}},
+			{Topic: "topic-a", Partitions: []int32{1}},
+		}
+
+		group := kmsg.NewConsumerGroupDescribeResponseGroup()
+		group.Group = "kip848-group"
+		group.Members = []kmsg.ConsumerGroupDescribeResponseGroupMember{member}
+
+		res := kmsg.NewPtrConsumerGroupDescribeResponse()
+		res.Groups = []kmsg.ConsumerGroupDescribeResponseGroup{group}
+
+		converted := consumerGroupDescribeToDescribeGroups(res)
+
+		require.Len(t, converted.Groups, 1)
+		require.Len(t, converted.Groups[0].Members, 1)
+		assignment := kmsg.NewConsumerMemberAssignment()
+		require.NoError(t, assignment.ReadFrom(converted.Groups[0].Members[0].MemberAssignment))
+		require.Len(t, assignment.Topics, 1)
+		assert.Equal(t, "topic-a", assignment.Topics[0].Topic)
+	})
+
+	t.Run("reports a member with only unnamed topics as unassigned", func(t *testing.T) {
+		member := kmsg.NewConsumerGroupDescribeResponseGroupMember()
+		member.MemberID = "member-id"
+		member.Assignment.TopicPartitions = []kmsg.AssignmentTopicPartition{
+			{Topic: "", Partitions: []int32{0}},
+		}
 
 		group := kmsg.NewConsumerGroupDescribeResponseGroup()
 		group.Group = "kip848-group"
