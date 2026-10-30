@@ -91,6 +91,14 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 					continue
 				}
 				ch <- prometheus.MustNewConstMetric(
+					e.consumerGroupTopicPartitionOffset,
+					prometheus.GaugeValue,
+					float64(partition.Value.Offset),
+					groupName,
+					topicName,
+					strconv.Itoa(int(partitionID)),
+				)
+				ch <- prometheus.MustNewConstMetric(
 					e.consumerGroupTopicPartitionLag,
 					prometheus.GaugeValue,
 					lag,
@@ -182,6 +190,14 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 				if e.minionSvc.Cfg.ConsumerGroups.Granularity == minion.ConsumerGroupGranularityTopic {
 					continue
 				}
+				ch <- prometheus.MustNewConstMetric(
+					e.consumerGroupTopicPartitionOffset,
+					prometheus.GaugeValue,
+					float64(partition.Offset),
+					groupName,
+					topic.Topic,
+					strconv.Itoa(int(partition.Partition)),
+				)
 				ch <- prometheus.MustNewConstMetric(
 					e.consumerGroupTopicPartitionLag,
 					prometheus.GaugeValue,
