@@ -67,6 +67,10 @@ kafka:
       scope: ""
   # Maximum number of concurrent fetch requests, must be > 0
   maxConcurrentFetches: 10
+  # Whether to retry the initial test connection to Kafka. False will exit with code 1 on error,
+  # while true will retry until success. Each attempt times out after 15s, attempts are 5s apart and there
+  # is no attempt limit. This applies to the end-to-end client as well.
+  retryInitConnection: false
 
 minion:
   consumerGroups:
