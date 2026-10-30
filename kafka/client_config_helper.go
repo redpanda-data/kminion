@@ -86,7 +86,7 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 			}
 
 			switch cfg.SASL.GSSAPI.AuthType {
-			case "USER_AUTH:":
+			case "USER_AUTH":
 				krbClient = client.NewWithPassword(
 					cfg.SASL.GSSAPI.Username,
 					cfg.SASL.GSSAPI.Realm,
