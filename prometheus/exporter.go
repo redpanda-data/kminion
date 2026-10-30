@@ -224,7 +224,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	// A panic here would kill the whole process, because the registry runs Collect in its own goroutine.
 	defer func() {
 		if r := recover(); r != nil {
-			e.logger.Error("recovered from panic while collecting metrics", zap.Any("panic", r))
+			e.logger.Error("recovered from panic while collecting metrics", zap.Any("panic", r), zap.Stack("stack"))
 			ch <- prometheus.MustNewConstMetric(e.exporterUp, prometheus.GaugeValue, 0.0)
 		}
 	}()
