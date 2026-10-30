@@ -137,6 +137,11 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 		if !e.minionSvc.IsGroupAllowed(groupName) {
 			continue
 		}
+		if offsetRes == nil {
+			// The offset fetch request for this group failed, the error has already been logged.
+			isOk = false
+			continue
+		}
 
 		err = kerr.ErrorForCode(offsetRes.ErrorCode)
 		if err != nil {
