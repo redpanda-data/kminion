@@ -34,8 +34,7 @@ func (s *Service) GetMetadataCached(ctx context.Context) (*kmsg.MetadataResponse
 }
 
 func (s *Service) GetMetadata(ctx context.Context) (*kmsg.MetadataResponse, error) {
-	req := kmsg.NewMetadataRequest()
-	req.Topics = nil
+	req := s.metadataRequest()
 
 	res, err := req.RequestWith(ctx, s.client)
 	if err != nil {
@@ -43,4 +42,19 @@ func (s *Service) GetMetadata(ctx context.Context) (*kmsg.MetadataResponse, erro
 	}
 
 	return res, nil
+}
+
+// metadataRequest asks for every topic only when topic collection is enabled: a
+// nil topic list means all topics, an empty one means none. Either way the
+// response still carries the brokers, cluster ID and controller ID that the
+// cluster and broker collectors read.
+func (s *Service) metadataRequest() kmsg.MetadataRequest {
+	req := kmsg.NewMetadataRequest()
+	if s.Cfg.Topics.Enabled {
+		req.Topics = nil
+	} else {
+		req.Topics = []kmsg.MetadataRequestTopic{}
+	}
+
+	return req
 }
