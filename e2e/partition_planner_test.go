@@ -371,8 +371,9 @@ func TestPartitionPlanner_Plan(t *testing.T) {
 				{2, 3, 1}, // preferred leader is 2, but we'll set actual leader to 3 in buildMetaWithLeader
 			},
 			cfg: EndToEndTopicConfig{
-				ReplicationFactor:   3,
-				PartitionsPerBroker: 1, // 3*1=3 total desired, have 2, need 1 more
+				ReplicationFactor:      3,
+				PartitionsPerBroker:    1, // 3*1=3 total desired, have 2, need 1 more
+				RebalancePartitions:    true,
 			},
 			check: func(t *testing.T, meta *kmsg.MetadataResponse, plan *Plan, final map[int32][]int32) {
 				// With our manually set leaders (2, 3), broker 1 has no leadership
@@ -525,6 +526,129 @@ func TestActualLeaderCoverageSkipsPreferredRebalancing(t *testing.T) {
 	assert.Equal(t, []int32{1, 2, 0}, final[2], "partition 2 replicas should be unchanged")
 
 	// Verify all partitions still have correct RF and no duplicates
+	for pid, reps := range final {
+		assert.Lenf(t, reps, 3, "pid %d must have RF=3", pid)
+		assertNoDuplicates(t, reps)
+	}
+}
+
+// TestPlan_ToRequests_RebalancePartitions verifies that ToRequests omits explicit
+// replica assignments from the CreatePartitions request when RebalancePartitions
+// is false, but still sets the correct total Count.
+func TestPlan_ToRequests_RebalancePartitions(t *testing.T) {
+	brokers := map[int32]string{1: "a", 2: "b", 3: "c", 4: "d", 5: "e", 6: "f"}
+	// Topic currently has 3 partitions; 6 brokers → planner will want 6 total.
+	partitions := [][]int32{
+		{1, 2, 3},
+		{2, 3, 4},
+		{3, 4, 5},
+	}
+	meta := buildMeta("probe", brokers, partitions)
+
+	t.Run("rebalancePartitions=true includes explicit assignments", func(t *testing.T) {
+		cfg := EndToEndTopicConfig{
+			ReplicationFactor:   3,
+			PartitionsPerBroker: 1,
+			RebalancePartitions: true,
+		}
+		plan, err := NewPartitionPlanner(cfg, zap.NewNop()).Plan(meta)
+		require.NoError(t, err)
+		_, createReq := plan.ToRequests("probe", true)
+		require.NotNil(t, createReq, "should have a CreatePartitions request")
+
+		topic := createReq.Topics[0]
+		assert.Equal(t, int32(plan.FinalPartitionCount), topic.Count)
+		assert.NotEmpty(t, topic.Assignment, "assignments must be present when rebalancePartitions=true")
+		assert.Equal(t, len(plan.CreateAssignments), len(topic.Assignment),
+			"one assignment entry per new partition")
+	})
+
+	t.Run("rebalancePartitions=false omits assignments", func(t *testing.T) {
+		cfg := EndToEndTopicConfig{
+			ReplicationFactor:   3,
+			PartitionsPerBroker: 1,
+			RebalancePartitions: false,
+		}
+		plan, err := NewPartitionPlanner(cfg, zap.NewNop()).Plan(meta)
+		require.NoError(t, err)
+		// Planner should still compute create assignments (used for logging / count),
+		// but ToRequests must NOT include them in the wire request.
+		require.NotEmpty(t, plan.CreateAssignments, "planner should still compute assignments for count tracking")
+
+		_, createReq := plan.ToRequests("probe", false)
+		require.NotNil(t, createReq, "should still produce a CreatePartitions request")
+
+		topic := createReq.Topics[0]
+		assert.Equal(t, int32(plan.FinalPartitionCount), topic.Count,
+			"Count must reflect the desired total even without explicit assignments")
+		assert.Empty(t, topic.Assignment,
+			"assignments must be absent when rebalancePartitions=false")
+	})
+
+	t.Run("no creates needed produces nil create request regardless of flag", func(t *testing.T) {
+		// Already-optimal topic: 3 brokers, 3 partitions, each broker leads one.
+		optMeta := buildMeta("probe",
+			map[int32]string{1: "", 2: "", 3: ""},
+			[][]int32{{1, 2, 3}, {2, 3, 1}, {3, 1, 2}},
+		)
+		for _, rebalance := range []bool{true, false} {
+			cfg := EndToEndTopicConfig{
+				ReplicationFactor:   3,
+				PartitionsPerBroker: 1,
+				RebalancePartitions: rebalance,
+			}
+			plan, err := NewPartitionPlanner(cfg, zap.NewNop()).Plan(optMeta)
+			require.NoError(t, err)
+			assert.Empty(t, plan.CreateAssignments)
+			_, createReq := plan.ToRequests("probe", rebalance)
+			assert.Nil(t, createReq, "no CreatePartitions request when nothing to create (rebalance=%v)", rebalance)
+		}
+	})
+}
+
+func TestMinimalReassignmentsWhenActualLeadersDivergeFromPreferred(t *testing.T) {
+	// Scenario: all partitions have same preferred leader (broker 0), but actual
+	// leaders are distributed. Algorithm should recognize brokers with actual
+	// leadership and only fix gaps, not realign everything to preferred.
+	brokers := map[int32]string{
+		0: "rack-a", 1: "rack-b", 2: "rack-c",
+	}
+
+	meta := buildMeta("_redpanda_e2e_probe", brokers, [][]int32{
+		{0, 1, 2}, // partition 0: preferred leader = 0
+		{0, 1, 2}, // partition 1: preferred leader = 0
+		{0, 1, 2}, // partition 2: preferred leader = 0
+	})
+
+	// Set actual leaders to show divergence from preferred
+	meta.Topics[0].Partitions[0].Leader = 0 // p0: preferred=0, actual=0 (match)
+	meta.Topics[0].Partitions[1].Leader = 1 // p1: preferred=0, actual=1 (DIVERGED)
+	meta.Topics[0].Partitions[2].Leader = 0 // p2: preferred=0, actual=0 (match)
+
+	cfg := EndToEndTopicConfig{
+		ReplicationFactor:   3,
+		PartitionsPerBroker: 1,
+	}
+
+	planner := NewPartitionPlanner(cfg, zap.NewNop())
+	plan, err := planner.Plan(meta)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+
+	// Key assertion: should have ONLY ONE reassignment
+	// Broker 1 already has actual leadership (p1), even though preferred leader of
+	// p1 is broker 0. Only broker 2 is missing from actual leadership, so we only
+	// need to fix that one gap.
+	assert.Equal(t, 1, len(plan.Reassignments), "should need only ONE reassignment since broker 1 already has actual leadership")
+	assert.Equal(t, 0, len(plan.CreateAssignments), "should have no creates")
+
+	// Verify the reassignment gives broker 2 preferred leadership
+	require.Len(t, plan.Reassignments, 1)
+	reassignment := plan.Reassignments[0]
+	assert.Equal(t, int32(2), reassignment.Replicas[0], "reassignment should give broker 2 preferred leadership")
+
+	// Verify all partitions still have correct RF and no duplicates
+	final := applyPlan(meta, plan)
 	for pid, reps := range final {
 		assert.Lenf(t, reps, 3, "pid %d must have RF=3", pid)
 		assertNoDuplicates(t, reps)

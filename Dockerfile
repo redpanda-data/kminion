@@ -1,13 +1,13 @@
 ############################################################
 # Build image
 ############################################################
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26.10-alpine AS builder
 
 ARG VERSION
 ARG BUILT_AT
 ARG COMMIT
 
-RUN apk update && apk add --no-cache git ca-certificates && update-ca-certificates
+RUN apk update && apk upgrade --no-cache && apk add --no-cache git ca-certificates && update-ca-certificates
 
 WORKDIR /app
 

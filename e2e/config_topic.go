@@ -11,6 +11,12 @@ type EndToEndTopicConfig struct {
 	ReplicationFactor      int           `koanf:"replicationFactor"`
 	PartitionsPerBroker    int           `koanf:"partitionsPerBroker"`
 	ReconciliationInterval time.Duration `koanf:"reconciliationInterval"`
+	// RebalancePartitions controls whether kminion will issue AlterPartitionAssignments
+	// requests to rebalance partition leaders across brokers. Set to false when running
+	// against Kafka-compatible clusters (e.g. Redpanda with autobalancer enabled, Confluent
+	// Cloud) that reject AlterPartitionAssignments. Topic creation and partition count
+	// management remain active regardless of this setting.
+	RebalancePartitions bool `koanf:"rebalancePartitions"`
 }
 
 func (c *EndToEndTopicConfig) SetDefaults() {
@@ -19,6 +25,7 @@ func (c *EndToEndTopicConfig) SetDefaults() {
 	c.ReplicationFactor = 1
 	c.PartitionsPerBroker = 1
 	c.ReconciliationInterval = 10 * time.Minute
+	c.RebalancePartitions = true
 }
 
 func (c *EndToEndTopicConfig) Validate() error {

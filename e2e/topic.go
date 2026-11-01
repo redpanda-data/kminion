@@ -62,6 +62,53 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		return s.updatePartitionCount(ctx)
 	}
 
+	// If topic management is disabled, skip validation and alteration of the existing topic.
+	// This allows kminion to work on managed Kafka platforms (e.g., Confluent Cloud) that
+	// block partition reassignment operations.
+	if !s.config.TopicManagement.Enabled {
+		topicMeta := meta.Topics[0]
+		brokerIDs := make([]int32, len(meta.Brokers))
+		for i, broker := range meta.Brokers {
+			brokerIDs[i] = broker.NodeID
+		}
+
+		s.logger.Info("topic management is disabled, skipping validation and alteration of existing topic",
+			zap.String("topic", s.config.TopicManagement.Name),
+			zap.Int("current_partitions", len(topicMeta.Partitions)),
+			zap.Int("replication_factor", len(topicMeta.Partitions[0].Replicas)))
+
+		// Log warnings if the topic configuration differs from expectations
+		expectedPartitions := s.config.TopicManagement.PartitionsPerBroker * len(brokerIDs)
+		if len(topicMeta.Partitions) != expectedPartitions {
+			s.logger.Warn("topic partition count differs from expected configuration",
+				zap.Int("current_partitions", len(topicMeta.Partitions)),
+				zap.Int("expected_partitions", expectedPartitions),
+				zap.Int("brokers", len(brokerIDs)),
+				zap.Int("partitions_per_broker_config", s.config.TopicManagement.PartitionsPerBroker),
+				zap.String("reason", "topic management is disabled, will not alter"))
+		}
+
+		// Check if each broker is leading at least one partition
+		leaderCounts := make(map[int32]int)
+		for _, partition := range topicMeta.Partitions {
+			leaderCounts[partition.Leader]++
+		}
+		brokersWithoutLeader := []int32{}
+		for _, brokerID := range brokerIDs {
+			if leaderCounts[brokerID] == 0 {
+				brokersWithoutLeader = append(brokersWithoutLeader, brokerID)
+			}
+		}
+		if len(brokersWithoutLeader) > 0 {
+			s.logger.Warn("some brokers are not leading any partitions on the e2e topic",
+				zap.Int32s("brokers_without_leader", brokersWithoutLeader),
+				zap.String("reason", "topic management is disabled, will not alter"),
+				zap.String("impact", "end-to-end monitoring may not cover all brokers"))
+		}
+
+		return s.updatePartitionCount(ctx)
+	}
+
 	// Topic already exists - use partition planner to validate and potentially fix assignments
 	planner := NewPartitionPlanner(s.config.TopicManagement, s.logger)
 	plan, err := planner.Plan(meta)
@@ -71,18 +118,26 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 
 	// Convert the plan to Kafka requests
 	topicName := pointerStrToStr(meta.Topics[0].Topic)
-	alterReq, createReq := plan.ToRequests(topicName)
+	alterReq, createReq := plan.ToRequests(topicName, s.config.TopicManagement.RebalancePartitions)
 
-	// Log detailed operations only if there are changes planned
-	if len(plan.Reassignments) > 0 || len(plan.CreateAssignments) > 0 {
-		s.logPlannedOperations(meta, plan, topicName)
+	if s.config.TopicManagement.RebalancePartitions {
+		if len(plan.Reassignments) > 0 {
+			s.logPlannedReassignments(meta, plan, topicName)
+		}
+		err = s.executeAlterPartitionAssignments(ctx, alterReq)
+		if err != nil {
+			return fmt.Errorf("failed to alter partition assignments: %w", err)
+		}
+	} else if len(plan.Reassignments) > 0 {
+		s.logger.Info("skipping partition reassignment because rebalancePartitions is disabled",
+			zap.String("topic", topicName),
+			zap.Int("skipped_reassignments", len(plan.Reassignments)),
+		)
 	}
 
-	err = s.executeAlterPartitionAssignments(ctx, alterReq)
-	if err != nil {
-		return fmt.Errorf("failed to alter partition assignments: %w", err)
+	if len(plan.CreateAssignments) > 0 {
+		s.logPlannedCreations(meta, plan, topicName, s.config.TopicManagement.RebalancePartitions)
 	}
-
 	err = s.executeCreatePartitions(ctx, createReq)
 	if err != nil {
 		return fmt.Errorf("failed to create partitions: %w", err)
@@ -174,8 +229,8 @@ func (s *Service) executeAlterPartitionAssignments(ctx context.Context, req *kms
 	return nil
 }
 
-// logPlannedOperations logs detailed information about current state and planned changes
-func (s *Service) logPlannedOperations(meta *kmsg.MetadataResponse, plan *Plan, topicName string) {
+// logPlannedReassignments logs current partition state and planned reassignment details.
+func (s *Service) logPlannedReassignments(meta *kmsg.MetadataResponse, plan *Plan, topicName string) {
 	topicMeta := meta.Topics[0]
 
 	// Log current partition state
@@ -201,70 +256,68 @@ func (s *Service) logPlannedOperations(meta *kmsg.MetadataResponse, plan *Plan, 
 		)
 	}
 
-	// Log reassignment operations
-	if len(plan.Reassignments) > 0 {
-		s.logger.Info("planned partition reassignments",
-			zap.String("topic", topicName),
-			zap.Int("reassignment_count", len(plan.Reassignments)),
-		)
-
-		// Sort reassignments by partition ID for consistent logging
-		sortedReassignments := make([]Reassignment, len(plan.Reassignments))
-		copy(sortedReassignments, plan.Reassignments)
-		sort.Slice(sortedReassignments, func(i, j int) bool {
-			return sortedReassignments[i].Partition < sortedReassignments[j].Partition
-		})
-
-		for _, reassignment := range sortedReassignments {
-			// Find current assignment for this partition
-			var currentReplicas []int32
-			var currentLeader int32 = -1
-			for _, partition := range topicMeta.Partitions {
-				if partition.Partition == reassignment.Partition {
-					currentReplicas = partition.Replicas
-					currentLeader = partition.Leader
-					break
-				}
-			}
-
-			s.logger.Info("partition reassignment",
-				zap.String("topic", topicName),
-				zap.Int32("partition", reassignment.Partition),
-				zap.Int32s("current_replicas", currentReplicas),
-				zap.Int32s("new_replicas", reassignment.Replicas),
-				zap.Int32("current_leader", currentLeader),
-				zap.Int32("new_leader", reassignment.Replicas[0]),
-			)
-		}
-	}
-
-	// Log creation operations
-	if len(plan.CreateAssignments) > 0 {
-		s.logger.Info("planned partition creations",
-			zap.String("topic", topicName),
-			zap.Int("creation_count", len(plan.CreateAssignments)),
-			zap.Int("current_partitions", len(topicMeta.Partitions)),
-			zap.Int("final_partitions", plan.FinalPartitionCount),
-		)
-
-		nextPartitionID := int32(len(topicMeta.Partitions))
-		for i, creation := range plan.CreateAssignments {
-			s.logger.Info("new partition creation",
-				zap.String("topic", topicName),
-				zap.Int32("new_partition", nextPartitionID+int32(i)),
-				zap.Int32s("replicas", creation.Replicas),
-				zap.Int32("leader", creation.Replicas[0]),
-			)
-		}
-	}
-
-	// Log final expected state summary
-	s.logger.Info("final expected state summary",
+	s.logger.Info("planned partition reassignments",
 		zap.String("topic", topicName),
-		zap.Int("total_partitions", plan.FinalPartitionCount),
-		zap.Int("reassignments_applied", len(plan.Reassignments)),
-		zap.Int("new_partitions_created", len(plan.CreateAssignments)),
+		zap.Int("reassignment_count", len(plan.Reassignments)),
 	)
+
+	// Sort reassignments by partition ID for consistent logging
+	sortedReassignments := make([]Reassignment, len(plan.Reassignments))
+	copy(sortedReassignments, plan.Reassignments)
+	sort.Slice(sortedReassignments, func(i, j int) bool {
+		return sortedReassignments[i].Partition < sortedReassignments[j].Partition
+	})
+
+	for _, reassignment := range sortedReassignments {
+		// Find current assignment for this partition
+		var currentReplicas []int32
+		var currentLeader int32 = -1
+		for _, partition := range topicMeta.Partitions {
+			if partition.Partition == reassignment.Partition {
+				currentReplicas = partition.Replicas
+				currentLeader = partition.Leader
+				break
+			}
+		}
+
+		s.logger.Info("partition reassignment",
+			zap.String("topic", topicName),
+			zap.Int32("partition", reassignment.Partition),
+			zap.Int32s("current_replicas", currentReplicas),
+			zap.Int32s("new_replicas", reassignment.Replicas),
+			zap.Int32("current_leader", currentLeader),
+			zap.Int32("new_leader", reassignment.Replicas[0]),
+		)
+	}
+}
+
+// logPlannedCreations logs planned partition creation details.
+func (s *Service) logPlannedCreations(meta *kmsg.MetadataResponse, plan *Plan, topicName string, rebalancePartitions bool) {
+	topicMeta := meta.Topics[0]
+
+	s.logger.Info("planned partition creations",
+		zap.String("topic", topicName),
+		zap.Int("creation_count", len(plan.CreateAssignments)),
+		zap.Int("current_partitions", len(topicMeta.Partitions)),
+		zap.Int("final_partitions", plan.FinalPartitionCount),
+	)
+
+	if !rebalancePartitions {
+		s.logger.Info("partition assignments will be auto-placed by broker (rebalancePartitions is disabled)",
+			zap.String("topic", topicName),
+		)
+		return
+	}
+
+	nextPartitionID := int32(len(topicMeta.Partitions))
+	for i, creation := range plan.CreateAssignments {
+		s.logger.Info("new partition creation",
+			zap.String("topic", topicName),
+			zap.Int32("new_partition", nextPartitionID+int32(i)),
+			zap.Int32s("replicas", creation.Replicas),
+			zap.Int32("leader", creation.Replicas[0]),
+		)
+	}
 }
 
 func (s *Service) createManagementTopic(ctx context.Context, allMeta *kmsg.MetadataResponse) error {

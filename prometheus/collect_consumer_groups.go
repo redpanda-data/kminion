@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kerr"
@@ -147,6 +148,10 @@ func decodeMemberAssignments(protocolType string, member kmsg.DescribeGroupsResp
 		a := kmsg.NewConsumerMemberAssignment()
 		if err := a.ReadFrom(member.MemberAssignment); err != nil {
 			return nil, fmt.Errorf("failed to decode member assignment: %w", err)
+		}
+		// Group leaders choose these bytes freely, and invalid UTF-8 label values panic in MustNewConstMetric.
+		for i := range a.Topics {
+			a.Topics[i].Topic = strings.ToValidUTF8(a.Topics[i].Topic, "�")
 		}
 		return &a, nil
 	case "connect":

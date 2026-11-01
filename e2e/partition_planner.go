@@ -59,7 +59,7 @@ func (p *PartitionPlanner) Plan(meta *kmsg.MetadataResponse) (*Plan, error) {
 	selector := NewRackAwareSelector(state, tracker)
 	p.sel = selector
 
-	b := NewPlanBuilder(state, desired, tracker)
+	b := NewPlanBuilder(state, desired, tracker, p.cfg.RebalancePartitions)
 
 	// Phase 1: normalize RF and racks (low movement first)
 	// Grow/trim replicas to configured RF and re-pick to maximize unique racks
@@ -116,6 +116,11 @@ type PlanBuilder struct {
 	desired Desired
 	tracker *LoadTracker
 
+	// rebalancePartitions indicates whether reassignments will actually be executed.
+	// When false, Phase 3 uses actual current leaders instead of predicted leaders
+	// from the view, since reassignments won't be applied.
+	rebalancePartitions bool
+
 	// view is our predictive map: partitionID -> replicas (preferred leader at idx 0)
 	view map[int32][]int32
 
@@ -154,12 +159,12 @@ type Plan struct {
 
 // NewPlanBuilder initializes a predictive view by cloning the current
 // partition->replicas map. We avoid accidental mutation by copying slices.
-func NewPlanBuilder(state ClusterState, desired Desired, tracker *LoadTracker) *PlanBuilder {
+func NewPlanBuilder(state ClusterState, desired Desired, tracker *LoadTracker, rebalancePartitions bool) *PlanBuilder {
 	view := make(map[int32][]int32, len(state.Partitions))
 	for pid, p := range state.Partitions {
 		view[pid] = append([]int32(nil), p.Replicas...)
 	}
-	return &PlanBuilder{state: state, desired: desired, tracker: tracker, view: view}
+	return &PlanBuilder{state: state, desired: desired, tracker: tracker, rebalancePartitions: rebalancePartitions, view: view}
 }
 
 // Build freezes the current staged operations into a Plan. We compute the final
@@ -327,11 +332,20 @@ func ensureLeaderCoverage(b *PlanBuilder, sel ReplicaSelector) {
 		return // Actual coverage is perfect - no need to rebalance preferred leaders
 	}
 
-	// Build "leadersByBroker": broker -> list of partition IDs it currently leads.
+	// Build "leadersByBroker": broker -> list of partition IDs it currently leads (preferred).
 	leadersByBroker := indexLeaders(b.state.BrokerIDs, b.view)
 
-	// Brokers that currently lead zero partitions.
-	missing := brokersMissingLeadership(b.state.BrokerIDs, leadersByBroker)
+	// Brokers that currently lead zero partitions (preferred).
+	// However, if a broker already has actual leadership (even if not preferred),
+	// we can skip it to minimize unnecessary reassignments.
+	missing := []int32{}
+	for _, broker := range brokersMissingLeadership(b.state.BrokerIDs, leadersByBroker) {
+		// Skip if this broker already has actual leadership
+		if len(actualLeaders[broker]) > 0 {
+			continue
+		}
+		missing = append(missing, broker)
+	}
 	if len(missing) == 0 {
 		return
 	}
@@ -339,9 +353,27 @@ func ensureLeaderCoverage(b *PlanBuilder, sel ReplicaSelector) {
 	// Local helpers that both perform the action and update leadersByBroker.
 	rotateIfReplica := func(target int32, donors []int32) bool {
 		for _, donor := range donors {
-			// Sort partition IDs for deterministic iteration
+			// Collect candidate partitions where target is already a replica
 			pids := append([]int32(nil), leadersByBroker[donor]...)
-			sort.Slice(pids, func(i, j int) bool { return pids[i] < pids[j] })
+
+			// Sort with preference: partitions where the donor is the ACTUAL leader first.
+			// This ensures we're actually freeing up leadership from the donor, rather than
+			// rotating a partition where the donor is only the preferred leader.
+			// Then by partition ID for determinism.
+			sort.Slice(pids, func(i, j int) bool {
+				pi, pj := pids[i], pids[j]
+
+				// Prefer partitions where the donor is the actual leader
+				iDonorIsActual := b.state.Partitions[pi].Leader == donor
+				jDonorIsActual := b.state.Partitions[pj].Leader == donor
+
+				if iDonorIsActual != jDonorIsActual {
+					return iDonorIsActual
+				}
+				// Then by partition ID for stability
+				return pi < pj
+			})
+
 			for _, pid := range pids {
 				reps := b.view[pid]
 				if !contains(reps, target) {
@@ -423,14 +455,24 @@ func ensurePartitionCount(b *PlanBuilder, sel ReplicaSelector) {
 		return
 	}
 
-	// Count current leaders per broker based on the present view.
+	// Count current leaders per broker.
 	leaderCount := make(map[int32]int, len(b.state.BrokerIDs))
-	for _, reps := range b.view {
-		if len(reps) > 0 {
-			leaderCount[reps[0]]++
+	if b.rebalancePartitions {
+		// Use predictive view (reassignments will be applied)
+		for _, reps := range b.view {
+			if len(reps) > 0 {
+				leaderCount[reps[0]]++
+			}
+		}
+	} else {
+		// Use actual current leaders (reassignments won't be applied)
+		for _, p := range b.state.Partitions {
+			if p.Leader != -1 {
+				leaderCount[p.Leader]++
+			}
 		}
 	}
-	// Also include leaders from staged creates (from phase 2 and any prior adds)
+	// Always include leaders from staged creates (Phase 2 fallback creates are always executed)
 	for _, ca := range b.creations {
 		if len(ca.Replicas) > 0 {
 			leaderCount[ca.Replicas[0]]++
@@ -742,7 +784,12 @@ func (s *RackAwareSelector) ChooseReplicas(preferredLeader int32, rf int) []int3
 
 // ToRequests converts a Plan to Kafka admin requests. Either result may be nil
 // if the plan contains no operations of that type.
-func (p *Plan) ToRequests(topic string) (*kmsg.AlterPartitionAssignmentsRequest, *kmsg.CreatePartitionsRequest) {
+//
+// rebalancePartitions controls whether explicit replica assignments are included
+// in the CreatePartitions request. Set it to false for Redpanda Cloud, which
+// disallows explicit partition assignments via the Kafka API and returns
+// INVALID_REQUEST when they are present.
+func (p *Plan) ToRequests(topic string, rebalancePartitions bool) (*kmsg.AlterPartitionAssignmentsRequest, *kmsg.CreatePartitionsRequest) {
 	var alter *kmsg.AlterPartitionAssignmentsRequest
 	var create *kmsg.CreatePartitionsRequest
 
@@ -765,10 +812,16 @@ func (p *Plan) ToRequests(topic string) (*kmsg.AlterPartitionAssignmentsRequest,
 		t := kmsg.NewCreatePartitionsRequestTopic()
 		t.Topic = topic
 		t.Count = int32(p.FinalPartitionCount)
-		for _, ca := range p.CreateAssignments {
-			ta := kmsg.NewCreatePartitionsRequestTopicAssignment()
-			ta.Replicas = append([]int32(nil), ca.Replicas...)
-			t.Assignment = append(t.Assignment, ta)
+		// Redpanda Cloud disallows explicit partition assignments via the Kafka API
+		// (returning INVALID_REQUEST), the same restriction that applies to
+		// AlterPartitionAssignments. Omit the Assignment list and let the broker
+		// auto-place new partitions when rebalancing is disabled.
+		if rebalancePartitions {
+			for _, ca := range p.CreateAssignments {
+				ta := kmsg.NewCreatePartitionsRequestTopicAssignment()
+				ta.Replicas = append([]int32(nil), ca.Replicas...)
+				t.Assignment = append(t.Assignment, ta)
+			}
 		}
 		r.Topics = []kmsg.CreatePartitionsRequestTopic{t}
 		create = &r

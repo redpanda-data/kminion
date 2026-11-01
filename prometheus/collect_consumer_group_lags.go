@@ -27,13 +27,13 @@ func (e *Exporter) collectConsumerGroupLags(ctx context.Context, ch chan<- prome
 
 	// Low Watermarks (at the moment they are not needed at all, they could be used to calculate the lag on partitions
 	// that don't have any active offsets)
-	lowWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -2)
+	lowWaterMarks, err := e.minionSvc.ListStartOffsetsCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to fetch low water marks", zap.Error(err))
 		return false
 	}
 	// High Watermarks
-	highWaterMarks, err := e.minionSvc.ListOffsetsCached(ctx, -1)
+	highWaterMarks, err := e.minionSvc.ListEndOffsetsCached(ctx)
 	if err != nil {
 		e.logger.Error("failed to fetch low water marks", zap.Error(err))
 		return false
@@ -128,7 +128,11 @@ func (e *Exporter) collectConsumerGroupLagsOffsetTopic(_ context.Context, ch cha
 func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan<- prometheus.Metric, marks map[string]map[int32]waterMark) bool {
 	isOk := true
 
-	groupOffsets, _ := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
+	groupOffsets, err := e.minionSvc.ListAllConsumerGroupOffsetsAdminAPI(ctx)
+	if err != nil {
+		e.logger.Error("failed to list consumer group offsets from the admin api", zap.Error(err))
+		return false
+	}
 	for groupName, offsetRes := range groupOffsets {
 		if !e.minionSvc.IsGroupAllowed(groupName) {
 			continue

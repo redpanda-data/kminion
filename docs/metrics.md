@@ -40,6 +40,26 @@ kminion_kafka_broker_log_dir_size_total_bytes{address="broker-9.analytics-prod.k
 kminion_kafka_topic_log_dir_size_total_bytes{topic_name="__consumer_offsets"} 9.026554258e+09
 ```
 
+### Connection Health Check Metrics
+
+```
+# HELP kminion_kafka_connection_probe_attempts_total Number of times kminion tried to open a fresh connection to a broker to verify it still accepts new Kafka connections
+# TYPE kminion_kafka_connection_probe_attempts_total counter
+kminion_kafka_connection_probe_attempts_total{broker_id="9"} 42
+
+# HELP kminion_kafka_connection_probe_failures_total Number of times kminion failed to open a fresh connection to a broker
+# TYPE kminion_kafka_connection_probe_failures_total counter
+kminion_kafka_connection_probe_failures_total{broker_id="9"} 0
+
+# HELP kminion_kafka_connection_probe_last_success_timestamp_seconds Unix timestamp of the last time kminion successfully opened a fresh connection to a broker
+# TYPE kminion_kafka_connection_probe_last_success_timestamp_seconds gauge
+kminion_kafka_connection_probe_last_success_timestamp_seconds{broker_id="9"} 1.694612345e+09
+
+# HELP kminion_kafka_connection_probe_tick_failures_total Number of connection health check ticks that failed before any broker could be probed (e.g. failed to create a client or list brokers)
+# TYPE kminion_kafka_connection_probe_tick_failures_total counter
+kminion_kafka_connection_probe_tick_failures_total 0
+```
+
 ### Topic & Partition Metrics
 
 ```

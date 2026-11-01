@@ -65,6 +65,12 @@ kafka:
       clientId: ""
       clientSecret: ""
       scope: ""
+  # Maximum number of concurrent fetch requests, must be > 0
+  maxConcurrentFetches: 10
+  # Whether to retry the initial test connection to Kafka. False will exit with code 1 on error,
+  # while true will retry until success. Each attempt times out after 15s, attempts are 5s apart and there
+  # is no attempt limit. This applies to the end-to-end client as well.
+  retryInitConnection: false
 
 minion:
   consumerGroups:
@@ -112,6 +118,17 @@ minion:
     # to version 1.0.0 as describing log dirs was not supported back then.
     enabled: true
 
+  # ConnectionHealthCheck is an optional, disabled-by-default probe. When
+  # enabled, kminion periodically opens a brand new connection to every
+  # broker in the cluster (independent of the connections used by the checks
+  # above and below) to detect a broker that has silently stopped accepting
+  # new Kafka connections. See kminion_kafka_connection_probe_* metrics
+  # (kminion_ is exporter.namespace).
+  connectionHealthCheck:
+    enabled: false
+    # How often to probe every broker with a fresh connection.
+    probeInterval: 1m
+
   # EndToEnd Metrics
   # When enabled, kminion creates a topic which it produces to and consumes from, to measure various advanced metrics. See docs for more info
   endToEnd:
@@ -119,8 +136,23 @@ minion:
     # How often to send end-to-end test messages
     probeInterval: 100ms
     topicManagement:
-      # You can disable topic management, without disabling the testing feature.
-      # Only makes sense if you have multiple kminion instances, and for some reason only want one of them to create/configure the topic
+      # Controls whether kminion should create, validate, and alter the end-to-end topic.
+      #
+      # When enabled (true):
+      # - kminion creates the topic if it doesn't exist
+      # - Validates partition count and replica assignments on startup and periodically (based on reconciliationInterval)
+      # - Alters the topic (reassigns partitions, adds partitions) to ensure one partition leader per broker
+      # - Fails on startup if topic alteration operations fail
+      #
+      # When disabled (false):
+      # - kminion will NOT create the topic if it doesn't exist (startup will fail)
+      # - Will NOT validate or alter an existing topic (accepts current partition layout as-is)
+      # - Logs warnings if the topic configuration is suboptimal
+      # - Continues end-to-end testing with whatever partition layout exists
+      #
+      # Use disabled mode on managed Kafka platforms that restrict partition reassignment operations.
+      # In this mode, you must manually create the topic with appropriate partition distribution
+      # before starting kminion.
       enabled: true
 
       # Name of the topic kminion uses to send its test messages
@@ -138,6 +170,12 @@ minion:
       # Rarely makes sense to change this, but maybe if you want some sort of cheap load test?
       # By default (1) every broker gets one partition
       partitionsPerBroker: 1
+
+      # Whether kminion should issue AlterPartitionAssignments requests to rebalance partition
+      # leaders across brokers. Disable this when running against Kafka-compatible clusters that
+      # reject AlterPartitionAssignments (e.g. Redpanda with autobalancer enabled, Confluent Cloud).
+      # Topic creation and partition count management remain active regardless of this setting.
+      rebalancePartitions: true
 
     producer:
       # This defines:

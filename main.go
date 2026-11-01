@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/cloudhut/kminion/v2/e2e"
 	"github.com/cloudhut/kminion/v2/kafka"
@@ -52,14 +54,20 @@ func main() {
 
 	logger.Info("started kminion", zap.String("version", version), zap.String("built_at", builtAt))
 
-	// Setup context that stops when the application receives an interrupt signal
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	// Setup context that stops when the application receives an interrupt or termination signal
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	wrappedRegisterer := promclient.WrapRegistererWithPrefix(cfg.Exporter.Namespace+"_", promclient.DefaultRegisterer)
 
 	// Create kafka service
 	kafkaSvc := kafka.NewService(cfg.Kafka, logger)
+
+	// Start the opt-in per-broker connection health check. This is a no-op
+	// unless cfg.Minion.ConnectionHealthCheck.Enabled is set, and is
+	// independent of the minion and end-to-end services started below: it
+	// never shares a client with either.
+	kafkaSvc.StartConnectionHealthCheck(ctx, cfg.Minion.ConnectionHealthCheck.Enabled, cfg.Minion.ConnectionHealthCheck.ProbeInterval, wrappedRegisterer)
 
 	// Create minion service
 	// Prometheus exporter only talks to the minion service which
@@ -113,7 +121,7 @@ func main() {
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
-	srv := &http.Server{Addr: address}
+	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {

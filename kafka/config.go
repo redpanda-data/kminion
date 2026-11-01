@@ -11,7 +11,9 @@ type Config struct {
 	TLS  TLSConfig  `koanf:"tls"`
 	SASL SASLConfig `koanf:"sasl"`
 
-	RetryInitConnection bool `koanf:"retryInitConnection"`
+	// Client behavior
+	MaxConcurrentFetches int  `koanf:"maxConcurrentFetches"`
+	RetryInitConnection  bool `koanf:"retryInitConnection"`
 }
 
 func (c *Config) SetDefaults() {
@@ -19,6 +21,8 @@ func (c *Config) SetDefaults() {
 
 	c.TLS.SetDefaults()
 	c.SASL.SetDefaults()
+
+	c.MaxConcurrentFetches = 10
 }
 
 func (c *Config) Validate() error {
@@ -34,6 +38,10 @@ func (c *Config) Validate() error {
 	err = c.SASL.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate SASL config: %w", err)
+	}
+
+	if c.MaxConcurrentFetches < 1 {
+		return fmt.Errorf("maxConcurrentFetches must be greater than 0")
 	}
 
 	return nil
