@@ -138,7 +138,7 @@ func (e *Exporter) collectConsumerGroupLagsAdminAPI(ctx context.Context, ch chan
 			continue
 		}
 
-		err = kerr.ErrorForCode(offsetRes.ErrorCode)
+		err := kerr.ErrorForCode(offsetRes.ErrorCode)
 		if err != nil {
 			e.logger.Warn("failed to get offsets from consumer group, inner kafka error",
 				zap.String("consumer_group", groupName),

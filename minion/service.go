@@ -126,7 +126,7 @@ func (s *Service) HandleIsReady() http.HandlerFunc {
 		res := response{StatusCode: status}
 		resJson, _ := json.Marshal(res)
 		w.WriteHeader(status)
-		w.Write(resJson)
+		_, _ = w.Write(resJson)
 	}
 }
 
