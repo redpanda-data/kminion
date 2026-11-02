@@ -72,7 +72,7 @@ func (s *Service) CreateAndTestClient(ctx context.Context, l *zap.Logger, opts [
 
 		if !s.cfg.RetryInitConnection {
 			client.Close()
-			return nil, fmt.Errorf("failed to test connectivity to Kafka cluster %w", err)
+			return nil, fmt.Errorf("failed to test connectivity to Kafka cluster: %w", err)
 		}
 
 		logger.Warn("failed to test connectivity to Kafka cluster, retrying in 5 seconds", zap.Error(err))
