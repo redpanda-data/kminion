@@ -27,9 +27,9 @@ func (c *Config) Validate() error {
 		return nil
 	}
 
-	// If the timeduration is 0s or 0ms or its variation of zero, it will be parsed as 0
-	if c.ProbeInterval == 0 {
-		return fmt.Errorf("failed to validate probeInterval config, the duration can't be zero")
+	// A zero or negative duration panics in time.NewTicker
+	if c.ProbeInterval <= 0 {
+		return fmt.Errorf("failed to validate probeInterval config, the duration must be greater than zero")
 	}
 
 	err := c.TopicManagement.Validate()
