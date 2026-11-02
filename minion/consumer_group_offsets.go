@@ -30,7 +30,8 @@ func (s *Service) ListAllConsumerGroupOffsetsAdminAPI(ctx context.Context) (map[
 	return s.listConsumerGroupOffsetsBulk(ctx, groupIDs)
 }
 
-// listConsumerGroupOffsetsBulk returns a map which has the Consumer group name as key
+// listConsumerGroupOffsetsBulk returns a map which has the Consumer group name as key. Groups whose offsets
+// could not be fetched map to a nil response, so that the caller can report the failure.
 func (s *Service) listConsumerGroupOffsetsBulk(ctx context.Context, groups []string) (map[string]*kmsg.OffsetFetchResponse, error) {
 	eg, _ := errgroup.WithContext(ctx)
 
@@ -44,7 +45,7 @@ func (s *Service) listConsumerGroupOffsetsBulk(ctx context.Context, groups []str
 				s.logger.Warn("failed to fetch consumer group offsets, inner kafka error",
 					zap.String("consumer_group", group),
 					zap.Error(err))
-				return nil
+				offsets = nil
 			}
 
 			mutex.Lock()
