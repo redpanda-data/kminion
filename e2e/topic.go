@@ -170,8 +170,9 @@ func (s *Service) updatePartitionCount(ctx context.Context) error {
 
 			typedErr := kerr.TypedErrorForCode(meta.Topics[0].ErrorCode)
 			if typedErr == nil {
-				s.partitionCount = len(meta.Topics[0].Partitions)
-				s.logger.Debug("updatePartitionCount: successfully updated partition count", zap.Int("partition_count", s.partitionCount))
+				partitionCount := len(meta.Topics[0].Partitions)
+				s.partitionCount.Store(int64(partitionCount))
+				s.logger.Debug("updatePartitionCount: successfully updated partition count", zap.Int("partition_count", partitionCount))
 				return nil
 			}
 			if !errors.Is(typedErr, kerr.UnknownTopicOrPartition) {
