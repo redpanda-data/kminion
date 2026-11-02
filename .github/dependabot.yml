@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # Keep the Redpanda image of the local test setup up to date.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: build(deps)
