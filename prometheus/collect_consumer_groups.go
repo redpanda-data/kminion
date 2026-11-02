@@ -31,15 +31,16 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		}
 		coordinator := grp.BrokerMetadata.NodeID
 		for _, group := range grp.Groups.Groups {
+			if !e.minionSvc.IsGroupAllowed(group.Group) {
+				continue
+			}
 			err := kerr.ErrorForCode(group.ErrorCode)
 			if err != nil {
 				e.logger.Warn("failed to describe consumer group, internal kafka error",
 					zap.Error(err),
 					zap.String("group_id", group.Group),
 				)
-				continue
-			}
-			if !e.minionSvc.IsGroupAllowed(group.Group) {
+				isOk = false
 				continue
 			}
 			state := 0
