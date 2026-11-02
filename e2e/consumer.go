@@ -83,7 +83,8 @@ func (s *Service) processMessage(record *kgo.Record) {
 
 	var msg EndToEndMessage
 	if jerr := json.Unmarshal(record.Value, &msg); jerr != nil {
-		s.logger.Error("failed to unmarshal message value", zap.Error(jerr))
+		// Any client with write access to the topic can produce such records, so do not log them at error level.
+		s.logger.Debug("failed to unmarshal message value", zap.Error(jerr))
 		return // maybe older version
 	}
 
