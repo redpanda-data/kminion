@@ -22,9 +22,13 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		return false
 	}
 
-	// The list of groups may be incomplete due to group coordinators that might fail to respond. We do log an error
-	// message in that case (in the kafka request method) and groups will not be included in this list.
+	isOk := true
 	for _, grp := range groups {
+		if grp.Groups == nil {
+			// The group coordinator failed to respond, the error has already been logged.
+			isOk = false
+			continue
+		}
 		coordinator := grp.BrokerMetadata.NodeID
 		for _, group := range grp.Groups.Groups {
 			err := kerr.ErrorForCode(group.ErrorCode)
@@ -139,7 +143,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			}
 		}
 	}
-	return true
+	return isOk
 }
 
 func decodeMemberAssignments(protocolType string, member kmsg.DescribeGroupsResponseGroupMember) (*kmsg.ConsumerMemberAssignment, error) {

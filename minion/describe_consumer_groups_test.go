@@ -1,11 +1,15 @@
 package minion
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
+	"go.uber.org/zap"
 )
 
 func TestPartitionGroupIDsByType(t *testing.T) {
@@ -204,4 +208,28 @@ func TestConsumerGroupDescribeToDescribeGroups(t *testing.T) {
 		require.Len(t, converted.Groups[0].Members, 1)
 		assert.Empty(t, converted.Groups[0].Members[0].MemberAssignment)
 	})
+}
+
+func TestDescribeGroups_FailedCoordinatorReturnsNilGroups(t *testing.T) {
+	// Nothing listens on this port, so every describe request fails.
+	client, err := kgo.NewClient(kgo.SeedBrokers("127.0.0.1:1"))
+	require.NoError(t, err)
+	defer client.Close()
+	s := &Service{logger: zap.NewNop(), client: client}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	for name, describe := range map[string]func(context.Context, []string) []DescribeConsumerGroupsResponse{
+		"classic":  s.describeClassicGroups,
+		"consumer": s.describeConsumerProtocolGroups,
+	} {
+		t.Run(name, func(t *testing.T) {
+			described := describe(ctx, []string{"group-a"})
+			require.NotEmpty(t, described, "a failed coordinator must not be dropped")
+			for _, res := range described {
+				assert.Nil(t, res.Groups)
+			}
+		})
+	}
 }
