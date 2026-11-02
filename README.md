@@ -86,13 +86,13 @@ Topic Dashboard: https://grafana.com/grafana/dashboards/14013
 
 ### ⚡ Testing locally
 
-This repo contains a docker-compose file that you can run on your machine. It will spin up a Kafka & ZooKeeper cluster
+This repo contains a docker-compose file that you can run on your machine. It will spin up a single-node Redpanda cluster
 and starts KMinion on port 8080 which is exposed to your host machine:
 
 ```shell
 # 1. Clone this repo
 # 2. Browse to the repo's root directory and run:
-docker-compose up
+docker compose up
 ```
 
 ## Chat with us
