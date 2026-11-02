@@ -12,16 +12,9 @@ release:
     ```
 changelog:
   disable: false
-  use: github
-  filters:
-    # Commit messages matching the regexp listed here will be removed from the changelog
-    exclude:
-      - '^docs:'
-      - '^test:'
-      - '^npm:'
-      - '^go.mod:'
-      - '^.github:'
-      - 'Merge branch'
+  # github-native lists the merged pull requests and credits their authors, also when
+  # the commit email is not linked to a GitHub account. It does not support filters.
+  use: github-native
 builds:
   - id: kminion
     binary: kminion
