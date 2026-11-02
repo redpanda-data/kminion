@@ -29,10 +29,22 @@ You can find a list of all exported metrics here: [/docs/metrics.md](/docs/metri
 ### 🐳 Docker image
 
 All images will be built on each push to master or for every new release. You can find an overview of all available tags
-in our [DockerHub repository](https://hub.docker.com/r/redpandadata/kminion/tags).
+in our [DockerHub repository](https://hub.docker.com/r/redpandadata/kminion/tags). Release images are also published to
+[Amazon ECR Public](https://gallery.ecr.aws/l9j0i2e0/kminion).
 
 ```shell
 docker pull redpandadata/kminion:latest
+```
+
+### 📦 Binaries
+
+Prebuilt binaries for Linux, macOS and Windows (amd64 and arm64) are attached to every
+[GitHub release](https://github.com/redpanda-data/kminion/releases).
+
+To build KMinion from source you need Go 1.26 or newer:
+
+```shell
+go build -o kminion .
 ```
 
 ### ☸ Helm chart
@@ -47,6 +59,14 @@ reference config with additional documentation in [/docs/reference-config.yaml](
 
 If you want to use a YAML config file, specify the path to the config file by setting the env variable
 `CONFIG_FILEPATH`.
+
+### 🌐 HTTP endpoints
+
+KMinion listens on port 8080 by default (`exporter.port`) and serves:
+
+- `/metrics`: the Prometheus metrics
+- `/ready`: returns 200 when KMinion is ready. With `minion.consumerGroups.scrapeMode: offsetsTopic`, it returns 503 until
+  KMinion has caught up with the `__consumer_offsets` topic
 
 ### 📊 Grafana Dashboards
 
