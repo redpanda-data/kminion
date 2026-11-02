@@ -7,14 +7,18 @@ KMinion.
 ## 🚀 Features
 
 - **Kafka versions:** Supports all Kafka versions v0.11+
-- **Supported SASL mechanisms:** plain, scram-sha-256/512, gssapi/kerberos
+- **Supported SASL mechanisms:** plain, scram-sha-256/512, gssapi/kerberos, oauthbearer
 - **TLS support:** TLS is supported, regardless whether you need mTLS, a custom CA, encrypted keys or just the trusted
   root certs
-- **Consumer Group Lags:** Number of messages a consumer group is lagging behind the latest offset
+- **Consumer Group Lags:** Number of messages a consumer group is lagging behind the latest offset. Group offsets are
+  read either via the Admin API (default) or by consuming the `__consumer_offsets` topic, which additionally exports
+  the number of offset commits per group
 - **Log dir sizes:** Metric for log dir sizes either grouped by broker or by topic
 - **Broker info:** Metric for each broker with its address, broker id, controller and rack id
 - **Configurable granularity:** Export metrics (e.g. consumer group lags) either per partition or per topic. Helps to reduce the number of exported metric series.
 - **End to End Monitoring:** Sends messages to its own topic and consumes them, measuring a messages real-world "roundtrip" latency. Also provides ack-latency and offset-commit-latency. [More Info](/docs/end-to-end.md)
+- **Connection health check:** Optionally opens a fresh connection to every broker periodically, to detect a broker
+  that has silently stopped accepting new Kafka connections
 - **Configurable targets:** You can configure what topics or groups you'd like to export using regex expressions
 - **Multiple config parsers:** It's possible to configure KMinion using YAML, Environment variables or a mix of both
 
@@ -25,10 +29,22 @@ You can find a list of all exported metrics here: [/docs/metrics.md](/docs/metri
 ### 🐳 Docker image
 
 All images will be built on each push to master or for every new release. You can find an overview of all available tags
-in our [DockerHub repository](https://hub.docker.com/r/redpandadata/kminion/tags).
+in our [DockerHub repository](https://hub.docker.com/r/redpandadata/kminion/tags). Release images are also published to
+[Amazon ECR Public](https://gallery.ecr.aws/l9j0i2e0/kminion).
 
 ```shell
 docker pull redpandadata/kminion:latest
+```
+
+### 📦 Binaries
+
+Prebuilt binaries for Linux, macOS and Windows (amd64 and arm64) are attached to every
+[GitHub release](https://github.com/redpanda-data/kminion/releases).
+
+To build KMinion from source you need the Go version declared in [go.mod](/go.mod) or newer:
+
+```shell
+go build -o kminion .
 ```
 
 ### ☸ Helm chart
@@ -44,9 +60,18 @@ reference config with additional documentation in [/docs/reference-config.yaml](
 If you want to use a YAML config file, specify the path to the config file by setting the env variable
 `CONFIG_FILEPATH`.
 
+### 🌐 HTTP endpoints
+
+KMinion listens on port 8080 by default (`exporter.port`) and serves:
+
+- `/metrics`: the Prometheus metrics
+- `/ready`: with `minion.consumerGroups.scrapeMode: offsetsTopic`, returns 503 until KMinion has caught up with the
+  `__consumer_offsets` topic, and 200 after that. In the default `adminApi` mode it always returns 200. It does not check
+  the connection to Kafka
+
 ### 📊 Grafana Dashboards
 
-I uploaded three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config.
+There are three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config. They may also not cover newer metrics, such as the connection health check metrics.
 
 Cluster Dashboard: https://grafana.com/grafana/dashboards/14012
 
@@ -62,13 +87,13 @@ Topic Dashboard: https://grafana.com/grafana/dashboards/14013
 
 ### ⚡ Testing locally
 
-This repo contains a docker-compose file that you can run on your machine. It will spin up a Kafka & ZooKeeper cluster
+This repo contains a docker-compose file that you can run on your machine. It will spin up a single-node Redpanda cluster
 and starts KMinion on port 8080 which is exposed to your host machine:
 
 ```shell
 # 1. Clone this repo
 # 2. Browse to the repo's root directory and run:
-docker-compose up
+docker compose up
 ```
 
 ## Chat with us
@@ -78,4 +103,4 @@ our Slack server: https://redpanda.com/slack
 
 ## License
 
-KMinion is distributed under the [MIT License](https://github.com/cloudhut/kminion/blob/master/LICENSE).
+KMinion is distributed under the [MIT License](/LICENSE).
