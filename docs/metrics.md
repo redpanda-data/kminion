@@ -28,6 +28,8 @@ kminion_kafka_broker_info{address="broker-9.analytics-prod.kafka.cloudhut.dev",b
 kminion_kafka_cluster_info{broker_count="12",cluster_id="UYZJg8bhT_6SxhsdaQZEQ",cluster_version="v2.6",controller_id="6"} 1
 ```
 
+For a Redpanda cluster, `cluster_version` is `redpanda`. Redpanda does not expose its version via the Kafka API.
+
 ### Log Dir Metrics
 
 ```
