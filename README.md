@@ -70,7 +70,7 @@ KMinion listens on port 8080 by default (`exporter.port`) and serves:
 
 ### 📊 Grafana Dashboards
 
-I uploaded three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config.
+There are three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config. They may also not cover newer metrics, such as the connection health check metrics.
 
 Cluster Dashboard: https://grafana.com/grafana/dashboards/14012
 
@@ -102,4 +102,4 @@ our Slack server: https://redpanda.com/slack
 
 ## License
 
-KMinion is distributed under the [MIT License](https://github.com/cloudhut/kminion/blob/master/LICENSE).
+KMinion is distributed under the [MIT License](/LICENSE).
