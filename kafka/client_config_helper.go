@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jcmturner/gokrb5/v8/client"
@@ -18,10 +19,13 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl/oauth"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
+	"github.com/youmark/pkcs8"
 	"go.uber.org/zap"
 
 	krbconfig "github.com/jcmturner/gokrb5/v8/config"
 )
+
+var legacyPEMWarnOnce sync.Once
 
 // NewKgoConfig creates a new Config for the Kafka Client as exposed by the franz-go library.
 // If TLS certificates can't be read an error will be returned.
@@ -179,17 +183,35 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 				return nil, fmt.Errorf("no valid private key found")
 			}
 
-			if x509.IsEncryptedPEMBlock(pemBlock) {
+			if pemBlock.Type == "ENCRYPTED PRIVATE KEY" {
+				// Without a passphrase the library skips decryption and returns an unclear asn1 error.
+				if cfg.TLS.Passphrase == "" {
+					return nil, fmt.Errorf("private key is encrypted, but kafka.tls.passphrase is not set")
+				}
+				key, err := pkcs8.ParsePKCS8PrivateKey(pemBlock.Bytes, []byte(cfg.TLS.Passphrase))
+				if err != nil {
+					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %w", err)
+				}
+				der, err := x509.MarshalPKCS8PrivateKey(key)
+				if err != nil {
+					return nil, fmt.Errorf("failed to encode decrypted private key: %w", err)
+				}
+				privateKey = pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+			} else if x509.IsEncryptedPEMBlock(pemBlock) {
+				// NewKgoConfig runs for every client and every health check tick, so warn only once.
+				legacyPEMWarnOnce.Do(func() {
+					logger.Warn("the TLS private key uses legacy PEM encryption, which is insecure. Use a PKCS#8 encrypted key instead")
+				})
 				decryptedKey, err := x509.DecryptPEMBlock(pemBlock, []byte(cfg.TLS.Passphrase))
 				if err != nil {
-					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %s", err)
+					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %w", err)
 				}
 				// If private key was encrypted we can overwrite the original contents now with the decrypted version
 				privateKey = pem.EncodeToMemory(&pem.Block{Type: pemBlock.Type, Bytes: decryptedKey})
 			}
 			tlsCert, err := tls.X509KeyPair(cert, privateKey)
 			if err != nil {
-				return nil, fmt.Errorf("cannot parse pem: %s", err)
+				return nil, fmt.Errorf("cannot parse pem: %w", err)
 			}
 			certificates = []tls.Certificate{tlsCert}
 		}
