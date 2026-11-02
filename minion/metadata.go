@@ -8,6 +8,9 @@ import (
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
+// GetMetadataCached returns the cluster metadata, fetched once per scrape.
+// Topics is empty when Cfg.Topics.Enabled is false; Brokers, ClusterID and
+// ControllerID are always populated.
 func (s *Service) GetMetadataCached(ctx context.Context) (*kmsg.MetadataResponse, error) {
 	reqId := ctx.Value("requestId").(string)
 	key := "metadata-" + reqId
