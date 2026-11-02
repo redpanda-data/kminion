@@ -41,7 +41,7 @@ docker pull redpandadata/kminion:latest
 Prebuilt binaries for Linux, macOS and Windows (amd64 and arm64) are attached to every
 [GitHub release](https://github.com/redpanda-data/kminion/releases).
 
-To build KMinion from source you need Go 1.26 or newer:
+To build KMinion from source you need the Go version declared in [go.mod](/go.mod) or newer:
 
 ```shell
 go build -o kminion .
@@ -65,8 +65,9 @@ If you want to use a YAML config file, specify the path to the config file by se
 KMinion listens on port 8080 by default (`exporter.port`) and serves:
 
 - `/metrics`: the Prometheus metrics
-- `/ready`: returns 200 when KMinion is ready. With `minion.consumerGroups.scrapeMode: offsetsTopic`, it returns 503 until
-  KMinion has caught up with the `__consumer_offsets` topic
+- `/ready`: with `minion.consumerGroups.scrapeMode: offsetsTopic`, returns 503 until KMinion has caught up with the
+  `__consumer_offsets` topic, and 200 after that. In the default `adminApi` mode it always returns 200. It does not check
+  the connection to Kafka
 
 ### 📊 Grafana Dashboards
 
