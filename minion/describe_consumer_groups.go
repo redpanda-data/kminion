@@ -10,6 +10,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 // Group types as reported by the ListGroups response (Kafka 3.8+). Groups using the consumer rebalance
@@ -75,17 +76,30 @@ func (s *Service) DescribeConsumerGroups(ctx context.Context) ([]DescribeConsume
 			zap.String("group_type", group.GroupType))
 	}
 
-	describedGroups := s.describeClassicGroups(ctx, classicGroupIDs)
-	describedGroups = append(describedGroups, s.describeConsumerProtocolGroups(ctx, consumerGroupIDs)...)
+	// Both batches share the scrape deadline, so they run concurrently. Otherwise a slow coordinator in one
+	// batch could use up the deadline before the other batch sends any request.
+	var classicGroups, consumerProtocolGroups []DescribeConsumerGroupsResponse
+	eg, _ := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		classicGroups = s.describeClassicGroups(ctx, classicGroupIDs)
+		return nil
+	})
+	eg.Go(func() error {
+		consumerProtocolGroups = s.describeConsumerProtocolGroups(ctx, consumerGroupIDs)
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
 
-	return describedGroups, nil
+	return append(classicGroups, consumerProtocolGroups...), nil
 }
 
 // partitionGroupIDsByType splits the listed groups into the ones using the classic rebalance protocol and
-// the ones using the consumer rebalance protocol. The group type is only reported by ListGroups v5+. Brokers
-// that do not report it cannot run the consumer rebalance protocol either, so treating those groups as
-// classic ones is always correct. Groups of any other type (e.g. share or streams groups) cannot be described
-// with either API and are returned as skipped.
+// the ones using the consumer rebalance protocol. The group type is only reported by ListGroups v5+ (Kafka
+// 3.8+), so groups without a reported type are treated as classic ones. Kafka 3.7 early-access KIP-848 groups
+// are not detected and are reported as classic groups. Groups of any other type (e.g. share or streams
+// groups) cannot be described with either API and are returned as skipped.
 func partitionGroupIDsByType(listRes *kmsg.ListGroupsResponse) (classicGroupIDs []string, consumerGroupIDs []string, skippedGroups []kmsg.ListGroupsResponseGroup) {
 	classicGroupIDs = make([]string, 0, len(listRes.Groups))
 	consumerGroupIDs = make([]string, 0)
