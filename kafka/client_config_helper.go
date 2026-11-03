@@ -206,6 +206,13 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 				if err != nil {
 					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %w", err)
 				}
+				// DecryptPEMBlock does not always detect a wrong passphrase, so check that the result is a valid key.
+				_, errPKCS1 := x509.ParsePKCS1PrivateKey(decryptedKey)
+				_, errPKCS8 := x509.ParsePKCS8PrivateKey(decryptedKey)
+				_, errEC := x509.ParseECPrivateKey(decryptedKey)
+				if errPKCS1 != nil && errPKCS8 != nil && errEC != nil {
+					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %w", x509.IncorrectPasswordError)
+				}
 				// If private key was encrypted we can overwrite the original contents now with the decrypted version
 				privateKey = pem.EncodeToMemory(&pem.Block{Type: pemBlock.Type, Bytes: decryptedKey})
 			}

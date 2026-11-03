@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -91,4 +92,35 @@ func TestNewKgoConfig_EncryptedTLSKey(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestNewKgoConfig_LegacyTLSKeyUndetectedWrongPassphrase(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "kminion"}}
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	block, err := x509.EncryptPEMBlock(rand.Reader, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key), []byte("dummy-passphrase"), x509.PEMCipherAES256)
+	require.NoError(t, err)
+
+	// About 1 in 256 wrong passphrases gives valid padding, so DecryptPEMBlock returns no error.
+	wrongPassphrase := ""
+	for i := 0; i < 10000 && wrongPassphrase == ""; i++ {
+		candidate := fmt.Sprintf("wrong-%d", i)
+		if _, err := x509.DecryptPEMBlock(block, []byte(candidate)); err == nil {
+			wrongPassphrase = candidate
+		}
+	}
+	require.NotEmpty(t, wrongPassphrase, "no wrong passphrase with valid padding found")
+
+	cfg := Config{}
+	cfg.SetDefaults()
+	cfg.Brokers = []string{"localhost:9092"}
+	cfg.TLS.Enabled = true
+	cfg.TLS.Cert = string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}))
+	cfg.TLS.Key = string(pem.EncodeToMemory(block))
+	cfg.TLS.Passphrase = wrongPassphrase
+
+	_, err = NewKgoConfig(cfg, zap.NewNop())
+	require.ErrorIs(t, err, x509.IncorrectPasswordError)
 }
