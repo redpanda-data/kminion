@@ -72,6 +72,15 @@ func TestEndToEndTopicConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "negative reconciliation interval",
+			cfg: EndToEndTopicConfig{
+				ReplicationFactor:      1,
+				PartitionsPerBroker:    1,
+				ReconciliationInterval: -time.Minute,
+			},
+			wantErr: true,
+		},
+		{
 			name: "zero reconciliation interval",
 			cfg: EndToEndTopicConfig{
 				ReplicationFactor:      1,

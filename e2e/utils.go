@@ -11,14 +11,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// createHistogramBuckets creates the buckets for the histogram based on the number of desired buckets (10) and the
-// upper bucket size.
+// createHistogramBuckets creates the buckets for the histogram based on the upper bucket size.
 func createHistogramBuckets(maxLatency time.Duration) []float64 {
 	// Since this is an exponential bucket we need to take Log base2 or binary as the upper bound
 	// Divide by 10 for the argument because the base is counted as 20ms and we want to normalize it as base 2 instead of 20
 	// +2 because it starts at 5ms or 0.005 sec, to account 5ms and 10ms before it goes to the base which in this case is 0.02 sec or 20ms
 	// and another +1 to account for decimal points on int parsing
-	latencyCount := math.Logb(float64(maxLatency.Milliseconds() / 10))
+	// An SLA below 10ms gives Logb(0), which is -Inf and makes ExponentialBuckets panic
+	normalizedLatency := maxLatency.Milliseconds() / 10
+	if normalizedLatency < 1 {
+		normalizedLatency = 1
+	}
+	latencyCount := math.Logb(float64(normalizedLatency))
 	count := int(latencyCount) + 3
 	bucket := prometheus.ExponentialBuckets(0.005, 2, count)
 

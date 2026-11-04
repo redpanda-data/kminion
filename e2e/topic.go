@@ -41,7 +41,7 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 		topicExists = false
 	default:
 		// If the topic (possibly) exists, but there's an error, then this should result in a fail
-		return fmt.Errorf("failed to get metadata for end-to-end topic: %w", err)
+		return fmt.Errorf("failed to get metadata for end-to-end topic: %w", typedErr)
 	}
 
 	// Create topic if it doesn't exist
@@ -151,13 +151,17 @@ func (s *Service) validateManagementTopic(ctx context.Context) error {
 // because the validation process may lead to the creation of new partitions.
 // This can occur when new brokers are added to the cluster.
 func (s *Service) updatePartitionCount(ctx context.Context) error {
+	// Limit the retries, because Start calls this before the HTTP server starts.
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	retryTicker := time.NewTicker(1 * time.Second)
 	defer retryTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("gave up waiting for the metadata of topic %q: %w", s.config.TopicManagement.Name, ctx.Err())
 		case <-retryTicker.C:
 			meta, err := s.getTopicMetadata(ctx)
 			if err != nil {
@@ -166,8 +170,9 @@ func (s *Service) updatePartitionCount(ctx context.Context) error {
 
 			typedErr := kerr.TypedErrorForCode(meta.Topics[0].ErrorCode)
 			if typedErr == nil {
-				s.partitionCount = len(meta.Topics[0].Partitions)
-				s.logger.Debug("updatePartitionCount: successfully updated partition count", zap.Int("partition_count", s.partitionCount))
+				partitionCount := len(meta.Topics[0].Partitions)
+				s.partitionCount.Store(int64(partitionCount))
+				s.logger.Debug("updatePartitionCount: successfully updated partition count", zap.Int("partition_count", partitionCount))
 				return nil
 			}
 			if !errors.Is(typedErr, kerr.UnknownTopicOrPartition) {
@@ -382,7 +387,15 @@ func (s *Service) getTopicMetadata(ctx context.Context) (*kmsg.MetadataResponse,
 	req := kmsg.NewMetadataRequest()
 	req.Topics = []kmsg.MetadataRequestTopic{topicReq}
 
-	return req.RequestWith(ctx, s.client)
+	res, err := req.RequestWith(ctx, s.client)
+	if err != nil {
+		return nil, err
+	}
+	// Callers read res.Topics[0]
+	if len(res.Topics) == 0 {
+		return nil, fmt.Errorf("metadata response for topic %q contains no topics", topicName)
+	}
+	return res, nil
 }
 
 func (s *Service) getTopicsConfigs(ctx context.Context, configNames []string) (*kmsg.DescribeConfigsResponse, error) {

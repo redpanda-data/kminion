@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,7 +29,7 @@ type Service struct {
 	groupTracker   *groupTracker   // tracks consumer groups starting with the kminion prefix and deletes them if they are unused for some time
 	messageTracker *messageTracker // tracks successfully produced messages,
 	clientHooks    *clientHooks    // logs broker events, tracks the coordinator (i.e. which broker last responded to our offset commit)
-	partitionCount int             // number of partitions of our test topic, used to send messages to all partitions
+	partitionCount atomic.Int64    // number of partitions of our test topic, used to send messages to all partitions
 
 	// Metrics
 	messagesProducedInFlight *prometheus.GaugeVec
@@ -209,7 +210,8 @@ func (s *Service) Start(ctx context.Context) error {
 func (s *Service) sendInitMessage(ctx context.Context, client *kgo.Client, topicName string) {
 	// Try to produce one record into each partition. This is important because
 	// one or more partitions may be offline, while others may still be writable.
-	for i := 0; i < s.partitionCount; i++ {
+	partitionCount := int(s.partitionCount.Load())
+	for i := 0; i < partitionCount; i++ {
 		client.TryProduce(ctx, &kgo.Record{
 			Key:       []byte("init-message"),
 			Value:     nil,

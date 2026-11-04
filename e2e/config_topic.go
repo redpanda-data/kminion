@@ -38,9 +38,9 @@ func (c *EndToEndTopicConfig) Validate() error {
 		return fmt.Errorf("failed to parse partitionsPerBroker, it should be more than 1, retrieved value %v", c.PartitionsPerBroker)
 	}
 
-	// If the timeduration is 0s or 0ms or its variation of zero, it will be parsed as 0
-	if c.ReconciliationInterval == 0 {
-		return fmt.Errorf("failed to validate topic.ReconciliationInterval config, the duration can't be zero")
+	// A zero or negative duration panics in time.NewTicker
+	if c.ReconciliationInterval <= 0 {
+		return fmt.Errorf("failed to validate topic.ReconciliationInterval config, the duration must be greater than zero")
 	}
 
 	return nil
