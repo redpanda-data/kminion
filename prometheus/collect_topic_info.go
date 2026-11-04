@@ -70,6 +70,27 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 			replicationFactor = len(topic.Partitions[0].Replicas)
 		}
 
+		for _, partition := range topic.Partitions {
+			underReplicated := 0
+			if len(partition.ISR) < len(partition.Replicas) {
+				underReplicated = 1
+			}
+
+			ch <- prometheus.MustNewConstMetric(
+				e.partitionUnderReplicated,
+				prometheus.GaugeValue,
+				float64(underReplicated),
+				topicName, strconv.Itoa(int(partition.Partition)),
+			)
+
+			ch <- prometheus.MustNewConstMetric(
+				e.partitionLeader,
+				prometheus.GaugeValue,
+				float64(partition.Leader),
+				topicName, strconv.Itoa(int(partition.Partition)),
+			)
+		}
+
 		var labelsValues []string
 		labelsValues = append(labelsValues, topicName)
 		labelsValues = append(labelsValues, strconv.Itoa(partitionCount))
@@ -82,6 +103,12 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 			prometheus.GaugeValue,
 			float64(1),
 			labelsValues...,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			e.topicPartitionCount,
+			prometheus.GaugeValue,
+			float64(partitionCount),
+			topicName,
 		)
 	}
 	return isOk
