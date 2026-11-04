@@ -1,12 +1,22 @@
 package kafka
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/youmark/pkcs8"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestNewKgoConfig_GSSAPIUserAuth(t *testing.T) {
@@ -27,4 +37,90 @@ func TestNewKgoConfig_GSSAPIUserAuth(t *testing.T) {
 
 	_, err := NewKgoConfig(cfg, zap.NewNop())
 	require.NoError(t, err)
+}
+
+func TestNewKgoConfig_EncryptedTLSKey(t *testing.T) {
+	const passphrase = "dummy-passphrase"
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "kminion"}}
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	pkcs8DER, err := pkcs8.MarshalPrivateKey(key, []byte(passphrase), nil)
+	require.NoError(t, err)
+	legacyBlock, err := x509.EncryptPEMBlock(rand.Reader, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key), []byte(passphrase), x509.PEMCipherAES256)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		key      []byte
+		wantWarn bool
+	}{
+		{name: "pkcs8", key: pem.EncodeToMemory(&pem.Block{Type: "ENCRYPTED PRIVATE KEY", Bytes: pkcs8DER}), wantWarn: false},
+		{name: "legacy", key: pem.EncodeToMemory(legacyBlock), wantWarn: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{}
+			cfg.SetDefaults()
+			cfg.Brokers = []string{"localhost:9092"}
+			cfg.TLS.Enabled = true
+			cfg.TLS.Cert = string(certPEM)
+			cfg.TLS.Key = string(tt.key)
+			cfg.TLS.Passphrase = passphrase
+
+			legacyPEMWarnOnce = sync.Once{}
+			core, logs := observer.New(zap.WarnLevel)
+			_, err := NewKgoConfig(cfg, zap.New(core))
+			require.NoError(t, err)
+			_, err = NewKgoConfig(cfg, zap.New(core))
+			require.NoError(t, err)
+			wantWarnings := 0
+			if tt.wantWarn {
+				wantWarnings = 1
+			}
+			require.Equal(t, wantWarnings, logs.FilterMessageSnippet("legacy PEM encryption").Len())
+
+			cfg.TLS.Passphrase = "wrong"
+			_, err = NewKgoConfig(cfg, zap.NewNop())
+			require.Error(t, err)
+
+			cfg.TLS.Passphrase = ""
+			_, err = NewKgoConfig(cfg, zap.NewNop())
+			require.ErrorContains(t, err, "kafka.tls.passphrase is not set")
+		})
+	}
+}
+
+func TestNewKgoConfig_LegacyTLSKeyUndetectedWrongPassphrase(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "kminion"}}
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	block, err := x509.EncryptPEMBlock(rand.Reader, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(key), []byte("dummy-passphrase"), x509.PEMCipherAES256)
+	require.NoError(t, err)
+
+	// About 1 in 256 wrong passphrases gives valid padding, so DecryptPEMBlock returns no error.
+	wrongPassphrase := ""
+	for i := 0; i < 10000 && wrongPassphrase == ""; i++ {
+		candidate := fmt.Sprintf("wrong-%d", i)
+		if _, err := x509.DecryptPEMBlock(block, []byte(candidate)); err == nil {
+			wrongPassphrase = candidate
+		}
+	}
+	require.NotEmpty(t, wrongPassphrase, "no wrong passphrase with valid padding found")
+
+	cfg := Config{}
+	cfg.SetDefaults()
+	cfg.Brokers = []string{"localhost:9092"}
+	cfg.TLS.Enabled = true
+	cfg.TLS.Cert = string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}))
+	cfg.TLS.Key = string(pem.EncodeToMemory(block))
+	cfg.TLS.Passphrase = wrongPassphrase
+
+	_, err = NewKgoConfig(cfg, zap.NewNop())
+	require.ErrorIs(t, err, x509.IncorrectPasswordError)
 }

@@ -36,6 +36,10 @@ kafka:
     cert: ""
     # base64 encoded tls key, cannot be set if 'keyFilepath' is set
     key: ""
+    # passphrase decrypts an encrypted tls key. Supported formats: PKCS#8 ("BEGIN ENCRYPTED PRIVATE KEY",
+    # PBES2 encryption) and legacy PEM encryption ("Proc-Type: 4,ENCRYPTED"). Legacy PEM encryption is
+    # insecure, so convert such keys to PKCS#8. For example, with OpenSSL:
+    # openssl pkcs8 -topk8 -v2 aes-256-cbc -in <key> -out <new-key>
     passphrase: ""
     insecureSkipTlsVerify: false
 
