@@ -103,7 +103,7 @@ func (e *Exporter) InitializeMetrics() {
 
 	// Topic / Partition metrics
 	// Topic info
-	var labels = []string{"topic_name", "partition_count", "replication_factor"}
+	var labels = []string{"topic_name", "topic_id", "partition_count", "replication_factor"}
 	for _, key := range e.minionSvc.Cfg.Topics.InfoMetric.ConfigKeys {
 		// prometheus does not allow . in label keys
 		labels = append(labels, strings.ReplaceAll(key, ".", "_"))
