@@ -89,7 +89,7 @@ func TestNewKgoConfig_EncryptedTLSKey(t *testing.T) {
 
 			cfg.TLS.Passphrase = ""
 			_, err = NewKgoConfig(cfg, zap.NewNop())
-			require.Error(t, err)
+			require.ErrorContains(t, err, "kafka.tls.passphrase is not set")
 		})
 	}
 }

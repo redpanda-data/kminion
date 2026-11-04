@@ -183,11 +183,13 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 				return nil, fmt.Errorf("no valid private key found")
 			}
 
+			// Without a passphrase both decrypt functions return unclear errors.
+			isEncrypted := pemBlock.Type == "ENCRYPTED PRIVATE KEY" || x509.IsEncryptedPEMBlock(pemBlock)
+			if isEncrypted && cfg.TLS.Passphrase == "" {
+				return nil, fmt.Errorf("private key is encrypted, but kafka.tls.passphrase is not set")
+			}
+
 			if pemBlock.Type == "ENCRYPTED PRIVATE KEY" {
-				// Without a passphrase the library skips decryption and returns an unclear asn1 error.
-				if cfg.TLS.Passphrase == "" {
-					return nil, fmt.Errorf("private key is encrypted, but kafka.tls.passphrase is not set")
-				}
 				key, err := pkcs8.ParsePKCS8PrivateKey(pemBlock.Bytes, []byte(cfg.TLS.Passphrase))
 				if err != nil {
 					return nil, fmt.Errorf("private key is encrypted, but could not decrypt it: %w", err)
