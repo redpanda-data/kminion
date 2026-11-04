@@ -1,0 +1,4 @@
+# E2E test artifacts
+*.log
+*.pid
+

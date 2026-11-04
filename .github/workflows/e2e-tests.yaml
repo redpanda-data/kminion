@@ -1,0 +1,48 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Start Kafka 4 with KRaft
+        run: make e2e-setup
+
+      - name: Build KMinion
+        run: make build
+
+      - name: Start KMinion with E2E tests
+        run: make e2e-start
+
+      - name: Run integration tests
+        run: make e2e-test
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo "=== Kafka logs ==="
+          docker logs broker 2>&1 | tail -100 || echo "No Kafka logs found"
+          echo ""
+          echo "=== KMinion logs ==="
+          cat kminion.log || echo "No KMinion logs found"
+
+      - name: Cleanup
+        if: always()
+        run: make e2e-cleanup
+
