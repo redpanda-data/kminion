@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestService_StartConnectionHealthCheck_DisabledIsNoop(t *testing.T) {
@@ -67,4 +68,34 @@ func TestService_CreateAndTestClient_RetryStopsOnContextCancel(t *testing.T) {
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Nil(t, client)
 	require.Less(t, time.Since(start), 5*time.Second, "the retry loop should stop when the context is done")
+}
+
+func TestNewService_OAuthBearerTokenEndpointScheme(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		wantWarn bool
+	}{
+		{name: "https", endpoint: "https://auth.example.com/token", wantWarn: false},
+		{name: "uppercase https", endpoint: "HTTPS://auth.example.com/token", wantWarn: false},
+		{name: "http", endpoint: "http://auth.example.com/token", wantWarn: true},
+		{name: "no scheme", endpoint: "auth.example.com/token", wantWarn: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{}
+			cfg.SetDefaults()
+			cfg.Brokers = []string{"localhost:9092"}
+			cfg.SASL.Enabled = true
+			cfg.SASL.Mechanism = SASLMechanismOAuthBearer
+			cfg.SASL.OAuthBearer.TokenEndpoint = tt.endpoint
+			cfg.SASL.OAuthBearer.ClientID = "client"
+			cfg.SASL.OAuthBearer.ClientSecret = "dummy"
+			require.NoError(t, cfg.Validate())
+
+			core, logs := observer.New(zap.WarnLevel)
+			NewService(cfg, zap.New(core))
+			require.Equal(t, tt.wantWarn, logs.FilterMessageSnippet("does not use https").Len() > 0)
+		})
+	}
 }

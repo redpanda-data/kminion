@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,9 +20,19 @@ type Service struct {
 }
 
 func NewService(cfg Config, logger *zap.Logger) *Service {
+	logger = logger.Named("kafka_service")
+
+	// Warn here and not in NewKgoConfig, because NewKgoConfig runs for every client and every health check tick.
+	// The client secret goes in the Basic auth header of the token request.
+	if cfg.SASL.Enabled && cfg.SASL.Mechanism == SASLMechanismOAuthBearer {
+		if u, err := url.Parse(cfg.SASL.OAuthBearer.TokenEndpoint); err == nil && u.Scheme != "https" {
+			logger.Warn("the OAuthBearer token endpoint does not use https, so the client secret is sent in plain text")
+		}
+	}
+
 	return &Service{
 		cfg:    cfg,
-		logger: logger.Named("kafka_service"),
+		logger: logger,
 	}
 }
 

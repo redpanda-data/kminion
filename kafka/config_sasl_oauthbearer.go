@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type OAuthBearerConfig struct {
@@ -46,7 +47,7 @@ func (c *OAuthBearerConfig) getToken(ctx context.Context) (string, error) {
 	req.Header.Set("Authorization", "Basic "+authHeaderValue)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 
 	resp, err := client.Do(req)
 	if err != nil {
