@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -40,7 +41,11 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 					zap.Error(err),
 					zap.String("group_id", group.Group),
 				)
-				isOk = false
+				// ConsumerGroupDescribe reports a group that was deleted after it was listed as GROUP_ID_NOT_FOUND.
+				// This is not a failure.
+				if !errors.Is(err, kerr.GroupIDNotFound) {
+					isOk = false
+				}
 				continue
 			}
 			state := 0
