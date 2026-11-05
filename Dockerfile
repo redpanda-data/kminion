@@ -30,10 +30,12 @@ RUN CGO_ENABLED=0 go build \
 FROM alpine:3
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/bin/kminion /app/kminion
-RUN addgroup -S redpanda \
-    && adduser -S redpanda -G redpanda \
+# Keep the UID and GID that adduser picked before, so existing setups do not change.
+RUN addgroup -S -g 101 redpanda \
+    && adduser -S -u 100 redpanda -G redpanda \
     && chmod o+rx /app/kminion \
     && apk upgrade --no-cache
-USER redpanda
+# A numeric user lets Kubernetes check runAsNonRoot without a runAsUser.
+USER 100:101
 
 ENTRYPOINT ["/app/kminion"]
