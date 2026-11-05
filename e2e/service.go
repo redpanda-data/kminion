@@ -12,7 +12,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 
-	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/redpanda-data/kminion/v2/kafka"
 )
 
 type Service struct {

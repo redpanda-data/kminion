@@ -5,15 +5,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloudhut/kminion/v2/kafka"
-	"github.com/cloudhut/kminion/v2/logging"
-	"github.com/cloudhut/kminion/v2/minion"
-	"github.com/cloudhut/kminion/v2/prometheus"
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/mitchellh/mapstructure"
+	"github.com/redpanda-data/kminion/v2/kafka"
+	"github.com/redpanda-data/kminion/v2/logging"
+	"github.com/redpanda-data/kminion/v2/minion"
+	"github.com/redpanda-data/kminion/v2/prometheus"
 	"go.uber.org/zap"
 )
 

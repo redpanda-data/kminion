@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudhut/kminion/v2/minion"
 	uuid2 "github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/redpanda-data/kminion/v2/minion"
 	"go.uber.org/zap"
 )
 
