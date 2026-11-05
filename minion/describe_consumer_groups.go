@@ -21,6 +21,8 @@ const (
 	groupTypeConsumer = "consumer"
 )
 
+// DescribeConsumerGroupsResponse is the describe response of one group coordinator. Groups is nil if the
+// coordinator failed to respond, so that the caller can report the failure.
 type DescribeConsumerGroupsResponse struct {
 	BrokerMetadata kgo.BrokerMetadata
 	Groups         *kmsg.DescribeGroupsResponse
@@ -135,6 +137,10 @@ func (s *Service) describeClassicGroups(ctx context.Context, groupIDs []string) 
 			s.logger.Warn("broker failed to respond to the described groups request",
 				zap.Int32("broker_id", kresp.Meta.NodeID),
 				zap.Error(kresp.Err))
+			describedGroups = append(describedGroups, DescribeConsumerGroupsResponse{
+				BrokerMetadata: kresp.Meta,
+				Groups:         nil,
+			})
 			continue
 		}
 		res := kresp.Resp.(*kmsg.DescribeGroupsResponse)
@@ -167,6 +173,10 @@ func (s *Service) describeConsumerProtocolGroups(ctx context.Context, groupIDs [
 			s.logger.Warn("broker failed to respond to the consumer group describe request",
 				zap.Int32("broker_id", kresp.Meta.NodeID),
 				zap.Error(kresp.Err))
+			describedGroups = append(describedGroups, DescribeConsumerGroupsResponse{
+				BrokerMetadata: kresp.Meta,
+				Groups:         nil,
+			})
 			continue
 		}
 		res := kresp.Resp.(*kmsg.ConsumerGroupDescribeResponse)

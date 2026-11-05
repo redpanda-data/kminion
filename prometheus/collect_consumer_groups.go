@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -22,20 +23,29 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 		return false
 	}
 
-	// The list of groups may be incomplete due to group coordinators that might fail to respond. We do log an error
-	// message in that case (in the kafka request method) and groups will not be included in this list.
+	isOk := true
 	for _, grp := range groups {
+		if grp.Groups == nil {
+			// The group coordinator failed to respond, the error has already been logged.
+			isOk = false
+			continue
+		}
 		coordinator := grp.BrokerMetadata.NodeID
 		for _, group := range grp.Groups.Groups {
+			if !e.minionSvc.IsGroupAllowed(group.Group) {
+				continue
+			}
 			err := kerr.ErrorForCode(group.ErrorCode)
 			if err != nil {
 				e.logger.Warn("failed to describe consumer group, internal kafka error",
 					zap.Error(err),
 					zap.String("group_id", group.Group),
 				)
-				continue
-			}
-			if !e.minionSvc.IsGroupAllowed(group.Group) {
+				// ConsumerGroupDescribe reports a group that was deleted after it was listed as GROUP_ID_NOT_FOUND.
+				// This is not a failure.
+				if !errors.Is(err, kerr.GroupIDNotFound) {
+					isOk = false
+				}
 				continue
 			}
 			state := 0
@@ -139,7 +149,7 @@ func (e *Exporter) collectConsumerGroups(ctx context.Context, ch chan<- promethe
 			}
 		}
 	}
-	return true
+	return isOk
 }
 
 func decodeMemberAssignments(protocolType string, member kmsg.DescribeGroupsResponseGroupMember) (*kmsg.ConsumerMemberAssignment, error) {
