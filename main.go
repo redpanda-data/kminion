@@ -12,13 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudhut/kminion/v2/e2e"
-	"github.com/cloudhut/kminion/v2/kafka"
-	"github.com/cloudhut/kminion/v2/logging"
-	"github.com/cloudhut/kminion/v2/minion"
-	"github.com/cloudhut/kminion/v2/prometheus"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redpanda-data/kminion/v2/e2e"
+	"github.com/redpanda-data/kminion/v2/kafka"
+	"github.com/redpanda-data/kminion/v2/logging"
+	"github.com/redpanda-data/kminion/v2/minion"
+	"github.com/redpanda-data/kminion/v2/prometheus"
 	"go.uber.org/zap"
 )
 

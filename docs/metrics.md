@@ -21,7 +21,7 @@ kminion_exporter_offset_consumer_records_consumed_total 5.058244883e+09
 ```
 # HELP kminion_kafka_broker_info Kafka broker information
 # TYPE kminion_kafka_broker_info gauge
-kminion_kafka_broker_info{address="broker-9.analytics-prod.kafka.cloudhut.dev",broker_id="9",is_controller="false",port="9092",rack_id="europe-west1-b"} 1
+kminion_kafka_broker_info{address="broker-9.analytics-prod.kafka.example.com",broker_id="9",is_controller="false",port="9092",rack_id="europe-west1-b"} 1
 
 # HELP kminion_kafka_cluster_info Kafka cluster information
 # TYPE kminion_kafka_cluster_info gauge
@@ -35,7 +35,7 @@ For a Redpanda cluster, `cluster_version` is `redpanda`. Redpanda does not expos
 ```
 # HELP kminion_kafka_broker_log_dir_size_total_bytes The summed size in bytes of all log dirs for a given broker
 # TYPE kminion_kafka_broker_log_dir_size_total_bytes gauge
-kminion_kafka_broker_log_dir_size_total_bytes{address="broker-9.analytics-prod.kafka.cloudhut.dev",broker_id="9",port="9092",rack_id="europe-west1-b"} 8.32654935115e+11
+kminion_kafka_broker_log_dir_size_total_bytes{address="broker-9.analytics-prod.kafka.example.com",broker_id="9",port="9092",rack_id="europe-west1-b"} 8.32654935115e+11
 
 # HELP kminion_kafka_topic_log_dir_size_total_bytes The summed size in bytes of partitions for a given topic. This includes the used space for replica partitions.
 # TYPE kminion_kafka_topic_log_dir_size_total_bytes gauge

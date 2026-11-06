@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/cloudhut/kminion/v2/kafka"
+	"github.com/redpanda-data/kminion/v2/kafka"
 )
 
 type Service struct {

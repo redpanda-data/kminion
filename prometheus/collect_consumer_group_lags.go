@@ -10,7 +10,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
 
-	"github.com/cloudhut/kminion/v2/minion"
+	"github.com/redpanda-data/kminion/v2/minion"
 )
 
 type waterMark struct {

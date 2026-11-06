@@ -3,7 +3,7 @@ package minion
 import (
 	"fmt"
 
-	"github.com/cloudhut/kminion/v2/e2e"
+	"github.com/redpanda-data/kminion/v2/e2e"
 )
 
 type Config struct {
