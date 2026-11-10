@@ -150,6 +150,9 @@ func NewKgoConfig(cfg Config, logger *zap.Logger) ([]kgo.Opt, error) {
 
 			credentialsProvider := awsCfg.Credentials
 			if cfg.SASL.AWS.RoleARN != "" {
+				if awsCfg.Region == "" {
+					return nil, fmt.Errorf("kafka.sasl.aws.region (or AWS_REGION) is required when roleArn is set")
+				}
 				stsClient := sts.NewFromConfig(awsCfg)
 				credentialsProvider = aws.NewCredentialsCache(stscreds.NewAssumeRoleProvider(stsClient, cfg.SASL.AWS.RoleARN, func(options *stscreds.AssumeRoleOptions) {
 					if cfg.SASL.AWS.RoleSessionName != "" {

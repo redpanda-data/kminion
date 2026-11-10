@@ -38,10 +38,12 @@ func (c *SASLConfig) Validate() error {
 	}
 
 	switch c.Mechanism {
-	case SASLMechanismPlain, SASLMechanismScramSHA256, SASLMechanismScramSHA512, SASLMechanismGSSAPI, SASLMechanismAWSMSKIAM:
+	case SASLMechanismPlain, SASLMechanismScramSHA256, SASLMechanismScramSHA512, SASLMechanismGSSAPI:
 		// Valid and supported
 	case SASLMechanismOAuthBearer:
 		return c.OAuthBearer.Validate()
+	case SASLMechanismAWSMSKIAM:
+		return c.AWS.Validate()
 	default:
 		return fmt.Errorf("given sasl mechanism '%v' is invalid", c.Mechanism)
 	}
