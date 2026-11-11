@@ -112,7 +112,12 @@ func main() {
 			promclient.DefaultRegisterer,
 			promhttp.HandlerFor(
 				promclient.DefaultGatherer,
-				promhttp.HandlerOpts{},
+				// Every scrape sends requests to all brokers, so limit the parallel scrapes. 3 allows an HA Prometheus
+				// pair and one more client. Other requests get a 503 at once.
+				// With a Timeout, the handler writes the response to a buffer and frees its slot before the response
+				// goes to the client, so a client that does not read cannot hold a slot. It is longer than the 60s
+				// collect timeout in prometheus/exporter.go.
+				promhttp.HandlerOpts{MaxRequestsInFlight: 3, Timeout: 70 * time.Second},
 			),
 		),
 	)
