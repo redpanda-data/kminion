@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/knadh/koanf"
@@ -87,6 +88,10 @@ func newConfig(logger *zap.Logger) (Config, error) {
 	}
 
 	err = k.Load(env.ProviderWithValue("", ".", func(s string, v string) (string, interface{}) {
+		if isServiceLinkEnvVar(s, v) {
+			// An empty key makes koanf skip the env var.
+			return "", nil
+		}
 		key := strings.Replace(strings.ToLower(s), "_", ".", -1)
 		// Keep the raw value. The default decode hook splits comma-separated values only for slice fields.
 		return key, v
@@ -106,4 +111,19 @@ func newConfig(logger *zap.Logger) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// serviceLinkEnvVarName matches the names of the env vars that Kubernetes injects for every Service in the namespace,
+// except <SERVICE>_PORT. See https://kubernetes.io/docs/concepts/services-networking/service/#environment-variables
+var serviceLinkEnvVarName = regexp.MustCompile(`_SERVICE_HOST$|_SERVICE_PORT(_[A-Z0-9_]+)?$|_PORT_[0-9]+_(TCP|UDP|SCTP)(_PROTO|_PORT|_ADDR)?$`)
+
+// isServiceLinkEnvVar reports whether an env var is a Kubernetes service link. No config key matches these names,
+// but they can turn a config key into a map, which makes decoding fail.
+func isServiceLinkEnvVar(name, value string) bool {
+	if serviceLinkEnvVarName.MatchString(name) {
+		return true
+	}
+	// <SERVICE>_PORT has a URL value, which a real config value such as EXPORTER_PORT=8080 never has.
+	return strings.HasSuffix(name, "_PORT") &&
+		(strings.HasPrefix(value, "tcp://") || strings.HasPrefix(value, "udp://") || strings.HasPrefix(value, "sctp://"))
 }
