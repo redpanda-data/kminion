@@ -1,6 +1,6 @@
 module github.com/redpanda-data/kminion/v2
 
-go 1.26.10
+go 1.26.11
 
 // Disable MPTCP listeners (Go 1.24+ default on Linux). This reduces the kernel attack surface.
 // See CVE-2026-98432 and https://go.dev/issue/82717.
