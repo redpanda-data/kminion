@@ -125,7 +125,9 @@ func main() {
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
-	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second}
+	// WriteTimeout is longer than the 70s handler timeout. It closes the connection of a client that does not
+	// read the response, so the buffered response does not stay in memory.
+	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 90 * time.Second}
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {
