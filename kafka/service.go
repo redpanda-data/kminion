@@ -30,6 +30,11 @@ func NewService(cfg Config, logger *zap.Logger) *Service {
 		}
 	}
 
+	// PLAIN sends the password and OAUTHBEARER sends the token as they are, so without TLS anyone on the network can read them.
+	if cfg.SASL.Enabled && !cfg.TLS.Enabled && (cfg.SASL.Mechanism == SASLMechanismPlain || cfg.SASL.Mechanism == SASLMechanismOAuthBearer) {
+		logger.Warn("SASL is used without TLS, so the Kafka credentials are sent in plain text", zap.String("mechanism", cfg.SASL.Mechanism))
+	}
+
 	return &Service{
 		cfg:    cfg,
 		logger: logger,

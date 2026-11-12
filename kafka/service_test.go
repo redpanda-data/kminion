@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -96,6 +97,37 @@ func TestNewService_OAuthBearerTokenEndpointScheme(t *testing.T) {
 			core, logs := observer.New(zap.WarnLevel)
 			NewService(cfg, zap.New(core))
 			require.Equal(t, tt.wantWarn, logs.FilterMessageSnippet("does not use https").Len() > 0)
+		})
+	}
+}
+
+func TestNewService_SASLWithoutTLS(t *testing.T) {
+	tests := []struct {
+		mechanism  string
+		tlsEnabled bool
+		wantWarn   bool
+	}{
+		{mechanism: SASLMechanismPlain, tlsEnabled: false, wantWarn: true},
+		{mechanism: SASLMechanismPlain, tlsEnabled: true, wantWarn: false},
+		{mechanism: SASLMechanismOAuthBearer, tlsEnabled: false, wantWarn: true},
+		{mechanism: SASLMechanismOAuthBearer, tlsEnabled: true, wantWarn: false},
+		// SCRAM and GSSAPI do not send the password.
+		{mechanism: SASLMechanismScramSHA512, tlsEnabled: false, wantWarn: false},
+		{mechanism: SASLMechanismGSSAPI, tlsEnabled: false, wantWarn: false},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s/tls=%v", tt.mechanism, tt.tlsEnabled), func(t *testing.T) {
+			cfg := Config{}
+			cfg.SetDefaults()
+			cfg.Brokers = []string{"localhost:9092"}
+			cfg.SASL.Enabled = true
+			cfg.SASL.Mechanism = tt.mechanism
+			cfg.SASL.OAuthBearer.TokenEndpoint = "https://auth.example.com/token"
+			cfg.TLS.Enabled = tt.tlsEnabled
+
+			core, logs := observer.New(zap.WarnLevel)
+			NewService(cfg, zap.New(core))
+			require.Equal(t, tt.wantWarn, logs.FilterMessageSnippet("without TLS").Len() == 1)
 		})
 	}
 }
