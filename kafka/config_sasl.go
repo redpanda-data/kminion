@@ -8,6 +8,7 @@ const (
 	SASLMechanismScramSHA512 = "SCRAM-SHA-512"
 	SASLMechanismGSSAPI      = "GSSAPI"
 	SASLMechanismOAuthBearer = "OAUTHBEARER"
+	SASLMechanismAWSMSKIAM   = "AWS_MSK_IAM"
 )
 
 // SASLConfig for Kafka Client
@@ -20,6 +21,7 @@ type SASLConfig struct {
 	// SASL Mechanisms that require more configuration than username & password
 	GSSAPI      SASLGSSAPIConfig  `koanf:"gssapi"`
 	OAuthBearer OAuthBearerConfig `koanf:"oauth"`
+	AWS         AWSConfig         `koanf:"aws"`
 }
 
 // SetDefaults for SASL Config
@@ -40,6 +42,8 @@ func (c *SASLConfig) Validate() error {
 		// Valid and supported
 	case SASLMechanismOAuthBearer:
 		return c.OAuthBearer.Validate()
+	case SASLMechanismAWSMSKIAM:
+		return c.AWS.Validate()
 	default:
 		return fmt.Errorf("given sasl mechanism '%v' is invalid", c.Mechanism)
 	}
