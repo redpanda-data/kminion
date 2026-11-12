@@ -15,6 +15,9 @@
 #
 # Env variables that expect array values can be provided by separting them using
 # a comma: KAFKA_BROKERS = "broker1:9092,broker2:9092,broker3:9092"
+#
+# KMinion ignores the env variables that Kubernetes injects for every Service in
+# the namespace, such as EXPORTER_SERVICE_HOST or EXPORTER_PORT=tcp://10.0.0.1:8080.
 #####################################################################################
 
 logger:
