@@ -127,7 +127,8 @@ func main() {
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
 	// WriteTimeout is longer than the 70s handler timeout. It closes the connection of a client that does not
 	// read the response, so the buffered response does not stay in memory.
-	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 90 * time.Second}
+	// IdleTimeout closes keep-alive connections that wait for a new request. It is longer than common scrape intervals.
+	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 90 * time.Second, IdleTimeout: 2 * time.Minute}
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {
