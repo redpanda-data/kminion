@@ -12,6 +12,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// CollectTimeout is the time limit for one collection of all metrics. The HTTP timeouts in main.go are based on it.
+const CollectTimeout = 60 * time.Second
+
 // Exporter is the Prometheus exporter that implements the prometheus.Collector interface
 type Exporter struct {
 	cfg       Config
@@ -229,7 +232,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	ctx, cancel := context.WithTimeout(context.Background(), CollectTimeout)
 	defer cancel()
 
 	// Attach a unique id which will be used for caching (and and it's invalidation) of the kafka requests
