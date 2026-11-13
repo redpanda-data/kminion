@@ -35,6 +35,13 @@ var (
 	commit = "N/A"
 )
 
+const (
+	// metricsHandlerTimeout gives a collection time to finish before the handler stops it.
+	metricsHandlerTimeout = prometheus.CollectTimeout + 10*time.Second
+	// metricsWriteTimeout gives the handler time to finish and then time to send the buffered response.
+	metricsWriteTimeout = metricsHandlerTimeout + 20*time.Second
+)
+
 func main() {
 	startupLogger, err := zap.NewProduction()
 	if err != nil {
@@ -112,7 +119,11 @@ func main() {
 			promclient.DefaultRegisterer,
 			promhttp.HandlerFor(
 				promclient.DefaultGatherer,
-				promhttp.HandlerOpts{},
+				// Every scrape sends requests to all brokers, so limit the parallel scrapes. 3 allows an HA Prometheus
+				// pair and one more client. Other requests get a 503 at once.
+				// With a Timeout, the handler writes the response to a buffer and frees its slot before the response
+				// goes to the client, so a client that does not read cannot hold a slot.
+				promhttp.HandlerOpts{MaxRequestsInFlight: 3, Timeout: metricsHandlerTimeout},
 			),
 		),
 	)
@@ -120,7 +131,10 @@ func main() {
 
 	// Start HTTP server
 	address := net.JoinHostPort(cfg.Exporter.Host, strconv.Itoa(cfg.Exporter.Port))
-	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second}
+	// WriteTimeout closes the connection of a client that does not read the response, so the buffered response
+	// does not stay in memory.
+	// IdleTimeout closes keep-alive connections that wait for a new request. It is longer than common scrape intervals.
+	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second, WriteTimeout: metricsWriteTimeout, IdleTimeout: 2 * time.Minute}
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {
