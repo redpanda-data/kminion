@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"encoding/base64"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -72,6 +73,7 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 
 		var labelsValues []string
 		labelsValues = append(labelsValues, topicName)
+		labelsValues = append(labelsValues, formatTopicID(topic.TopicID))
 		labelsValues = append(labelsValues, strconv.Itoa(partitionCount))
 		labelsValues = append(labelsValues, strconv.Itoa(replicationFactor))
 		for _, key := range e.minionSvc.Cfg.Topics.InfoMetric.ConfigKeys {
@@ -85,6 +87,16 @@ func (e *Exporter) collectTopicInfo(ctx context.Context, ch chan<- prometheus.Me
 		)
 	}
 	return isOk
+}
+
+// formatTopicID encodes the topic ID the same way Kafka does (URL-safe base64 without padding),
+// so that it matches the output of Kafka's own tooling. Brokers older than Kafka 2.8 do not
+// return topic IDs, in which case "N/A" is returned.
+func formatTopicID(id [16]byte) string {
+	if id == [16]byte{} {
+		return "N/A"
+	}
+	return base64.RawURLEncoding.EncodeToString(id[:])
 }
 
 func getOrDefault(m map[string]string, key string, defaultValue string) string {
