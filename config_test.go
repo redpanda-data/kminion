@@ -101,10 +101,48 @@ func TestIsServiceLinkEnvVar(t *testing.T) {
 		{name: "EXPORTER_PORT", value: "8080", want: false},
 		{name: "KAFKA_BROKERS", value: "a:9092", want: false},
 		{name: "KAFKA_SASL_GSSAPI_SERVICENAME", value: "kafka", want: false},
+		{name: "EXPORTER_WEBCONFIGFILEPATH", value: "/etc/kminion/web.yml", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name+"="+tt.value, func(t *testing.T) {
 			require.Equal(t, tt.want, isServiceLinkEnvVar(tt.name, tt.value))
+		})
+	}
+}
+
+func TestNewConfig_WebConfigFilepath(t *testing.T) {
+	dir := t.TempDir()
+	newTestCA(t).writeServerCert(t, dir, 2)
+	valid := copyWebConfig(t, dir, "tls.yml")
+	unknownKey := filepath.Join(dir, "unknown-key.yml")
+	require.NoError(t, os.WriteFile(unknownKey, []byte("tls_server_config:\n  cert_file: tls.crt\n  key_file: tls.key\n  unknown: true\n"), 0o600))
+	missingCert := filepath.Join(dir, "missing-cert.yml")
+	require.NoError(t, os.WriteFile(missingCert, []byte("tls_server_config:\n  cert_file: missing.crt\n  key_file: tls.key\n"), 0o600))
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{name: "empty path", path: ""},
+		{name: "valid file", path: valid},
+		{name: "missing file", path: filepath.Join(dir, "missing.yml"), wantErr: true},
+		{name: "unknown key", path: unknownKey, wantErr: true},
+		{name: "missing certificate", path: missingCert, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("CONFIG_FILEPATH", "")
+			t.Setenv("KAFKA_BROKERS", "a:9092")
+			t.Setenv("EXPORTER_WEBCONFIGFILEPATH", tt.path)
+
+			cfg, err := newConfig(zap.NewNop())
+			if tt.wantErr {
+				require.ErrorContains(t, err, "failed to validate exporter web config")
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.path, cfg.Exporter.WebConfigFilepath)
 		})
 	}
 }

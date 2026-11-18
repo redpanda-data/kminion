@@ -1,0 +1,4 @@
+# TLS with a server certificate. Relative paths resolve against the directory of this file.
+tls_server_config:
+  cert_file: tls.crt
+  key_file: tls.key

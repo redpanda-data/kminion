@@ -1,0 +1,8 @@
+# TLS with HTTP/1.1 only and an extra response header.
+tls_server_config:
+  cert_file: tls.crt
+  key_file: tls.key
+http_server_config:
+  http2: false
+  headers:
+    Strict-Transport-Security: max-age=31536000
