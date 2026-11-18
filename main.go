@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -14,12 +15,14 @@ import (
 
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/redpanda-data/kminion/v2/e2e"
 	"github.com/redpanda-data/kminion/v2/kafka"
 	"github.com/redpanda-data/kminion/v2/logging"
 	"github.com/redpanda-data/kminion/v2/minion"
 	"github.com/redpanda-data/kminion/v2/prometheus"
 	"go.uber.org/zap"
+	"go.uber.org/zap/exp/zapslog"
 )
 
 var (
@@ -135,6 +138,10 @@ func main() {
 	// does not stay in memory.
 	// IdleTimeout closes keep-alive connections that wait for a new request. It is longer than common scrape intervals.
 	srv := &http.Server{Addr: address, ReadHeaderTimeout: 10 * time.Second, WriteTimeout: metricsWriteTimeout, IdleTimeout: 2 * time.Minute}
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		logger.Fatal("failed to listen on address", zap.String("listen_address", address), zap.Error(err))
+	}
 	go func() {
 		<-ctx.Done()
 		if err := srv.Shutdown(context.Background()); err != nil {
@@ -142,11 +149,27 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-	logger.Info("listening on address", zap.String("listen_address", address))
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	logger.Info("listening on address", zap.String("listen_address", address), zap.Bool("web_config", cfg.Exporter.WebConfigFilepath != ""))
+	if err := serveHTTP(listener, srv, cfg.Exporter.WebConfigFilepath, logger); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("error starting HTTP server", zap.Error(err))
 		os.Exit(1)
 	}
 
 	logger.Info("kminion stopped")
+}
+
+// serveHTTP serves srv on l. With a web config file, the TLS settings of that file apply.
+func serveHTTP(l net.Listener, srv *http.Server, webConfigFilepath string, logger *zap.Logger) error {
+	// Send the server errors, for example failed TLS handshakes, to the JSON log.
+	errorLog, err := zap.NewStdLogAt(logger.Named("http"), zap.WarnLevel)
+	if err != nil {
+		return fmt.Errorf("failed to create the HTTP server error log: %w", err)
+	}
+	srv.ErrorLog = errorLog
+
+	if webConfigFilepath == "" {
+		return srv.Serve(l)
+	}
+	slogger := slog.New(zapslog.NewHandler(logger.Core(), zapslog.WithName("main")))
+	return web.Serve(l, srv, &web.FlagConfig{WebConfigFile: &webConfigFilepath}, slogger)
 }

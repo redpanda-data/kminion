@@ -242,3 +242,7 @@ exporter:
   host: ""
   # Port that shall be used to bind the HTTP server on
   port: 8080
+  # Path of a Prometheus web config file with the TLS settings of the HTTP server. Empty means plain HTTP.
+  # Format: https://prometheus.io/docs/prometheus/latest/configuration/https/
+  # The format is experimental upstream (prometheus/exporter-toolkit). See the README for an example.
+  webConfigFilepath: ""

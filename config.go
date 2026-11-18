@@ -11,6 +11,7 @@ import (
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/mitchellh/mapstructure"
+	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/redpanda-data/kminion/v2/kafka"
 	"github.com/redpanda-data/kminion/v2/logging"
 	"github.com/redpanda-data/kminion/v2/minion"
@@ -46,6 +47,12 @@ func (c *Config) Validate() error {
 	err = c.Logger.Validate()
 	if err != nil {
 		return fmt.Errorf("failed to validate logger config: %w", err)
+	}
+
+	// Check the web config file at startup, so a wrong file stops KMinion before it connects to Kafka.
+	err = web.Validate(c.Exporter.WebConfigFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to validate exporter web config: %w", err)
 	}
 
 	return nil

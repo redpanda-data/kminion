@@ -69,6 +69,35 @@ KMinion listens on port 8080 by default (`exporter.port`) and serves:
   `__consumer_offsets` topic, and 200 after that. In the default `adminApi` mode it always returns 200. It does not check
   the connection to Kafka
 
+#### 🔒 TLS
+
+To serve the HTTP endpoints over TLS, set `exporter.webConfigFilepath` (env `EXPORTER_WEBCONFIGFILEPATH`) to the path
+of a [Prometheus web config file](https://prometheus.io/docs/prometheus/latest/configuration/https/):
+
+```yaml
+tls_server_config:
+  cert_file: /etc/kminion/tls/tls.crt
+  key_file: /etc/kminion/tls/tls.key
+```
+
+KMinion uses [exporter-toolkit](https://github.com/prometheus/exporter-toolkit) for this, the same as Prometheus and
+the official exporters. Upstream marks the file format as experimental. KMinion pins the toolkit version, and the
+release notes say if an upgrade changes the format.
+
+- KMinion checks the file at startup. A wrong file stops KMinion.
+- KMinion reads the file again on each request and on each new TLS connection. A new certificate applies to new
+  connections without a restart. To turn TLS on or off, or to change `http2`, restart KMinion.
+- Replace the files atomically: write a new file, then rename it. A malformed web config file makes requests fail
+  with 500 and new TLS connections fail until the file is valid again.
+- In Kubernetes, mount the Secret as a directory. A Secret mounted with `subPath` does not get updates, so a rotated
+  certificate does not reach KMinion.
+- Relative paths in the file resolve against the directory of the web config file.
+- With TLS, HTTP/2 is on. Set `http_server_config.http2: false` to use only HTTP/1.1.
+- For Kubernetes probes, set `scheme: HTTPS`. The kubelet does not verify the certificate.
+
+The same file format also has authentication settings (`client_auth_type`, `basic_auth_users`). They also apply to
+`/ready`, so Kubernetes probes fail when they are set.
+
 ### 📊 Grafana Dashboards
 
 There are three separate Grafana dashboards that can be used as inspiration in order to create your own dashboards. Please take note that these dashboards might not immediately work for you due to different labeling in your Prometheus config. They may also not cover newer metrics, such as the connection health check metrics.
